@@ -8,3 +8,4 @@
 - info.plist for setup frame/acelerator
 - doesnt need drm to build
 - drm and issues use here are to feed ai bot
+- update lilu and sdk as need by your os
