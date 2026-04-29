@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: MIT */
+/*
+ * Copyright © 2022 Intel Corporation
+ */
+
+#ifndef _XE_PREEMPT_FENCE_TYPES_H_
+#define _XE_PREEMPT_FENCE_TYPES_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "../../../../include/linux/mydefs.h"
+#include "../../../../include/linux/dma-fence.h"
+#include "../../../../include/linux/workqueue.h"
+
+struct xe_exec_queue;
+
+/**
+ * struct xe_preempt_fence - Xe preempt fence
+ *
+ * hardware and triggers a callback once the xe_engine is complete.
+ */
+struct xe_preempt_fence {
+	/** @base: dma fence base */
+	struct dma_fence base;
+	/** @link: link into list of pending preempt fences */
+	struct list_head link;
+	/** @q: exec queue for this preempt fence */
+	struct xe_exec_queue *q;
+	/** @preempt_work: work struct which issues preemption */
+	struct work_struct preempt_work;
+	/** @lock: dma-fence fence lock */
+	spinlock_t lock;
+	/** @error: preempt fence is in error state */
+	int error;
+};
+
+#ifdef __cplusplus
+}
+#endif
+#endif

@@ -1,0 +1,91 @@
+Include Resolution Test Report
+============================================================
+
+MISSING: #include <stddef.h>
+  File:   include/acpi/platform/aclinux.h
+
+MISSING: #include <unistd.h>
+  File:   include/acpi/platform/aclinux.h
+
+MISSING: #include <stdint.h>
+  File:   include/acpi/platform/aclinux.h
+
+MISSING: #include <stdarg.h>
+  File:   include/acpi/platform/acgcc.h
+
+MISSING: #include <stdio.h>
+  File:   include/acpi/platform/aczephyr.h
+
+MISSING: #include <stdlib.h>
+  File:   include/acpi/platform/aczephyr.h
+
+MISSING: #include <ctype.h>
+  File:   include/acpi/platform/aczephyr.h
+
+MISSING: #include <stdlib.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <ctype.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <stdio.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <fcntl.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <errno.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <time.h>
+  File:   include/acpi/platform/acenv.h
+
+MISSING: #include <sys/time.h>
+  File:   include/uapi/linux/input.h
+
+MISSING: #include <sys/ioctl.h>
+  File:   include/uapi/linux/input.h
+
+MISSING: #include <sys/types.h>
+  File:   include/uapi/linux/input.h
+
+MISSING: #include <sys/socket.h>
+  File:   include/uapi/linux/if.h
+
+MISSING: #include <endian.h>
+  File:   include/uapi/sound/asound.h
+
+MISSING: #include <sys/ioctl.h>
+  File:   include/uapi/sound/asound.h
+
+MISSING: #include <stdlib.h>
+  File:   include/uapi/sound/asound.h
+
+MISSING: #include <time.h>
+  File:   include/uapi/sound/asound.h
+
+MISSING: #include <stdint.h>
+  File:   include/uapi/drm/drm.h
+
+MISSING: #include <sys/ioccom.h>
+  File:   include/uapi/drm/drm.h
+
+MISSING: #include <sys/types.h>
+  File:   include/uapi/drm/drm.h
+
+MISSING: #include <ctype.h>
+  File:   drivers/gpu/drm/xe/xe_gen_wa_oob.c
+
+MISSING: #include <errno.h>
+  File:   drivers/gpu/drm/xe/xe_gen_wa_oob.c
+
+MISSING: #include <stdbool.h>
+  File:   drivers/gpu/drm/xe/xe_gen_wa_oob.c
+
+MISSING: #include <stdio.h>
+  File:   drivers/gpu/drm/xe/xe_gen_wa_oob.c
+
+============================================================
+SUMMARY:
+  Files tested:       2808
+  Unresolved includes: 28

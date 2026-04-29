@@ -1,0 +1,33 @@
+#ifndef _ASM_X86_VMALLOC_H
+#define _ASM_X86_VMALLOC_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "../../../../include/linux/mydefs.h"
+#include "cpufeature.h"
+#include "page.h"
+#include "pgtable_areas.h"
+
+#ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
+
+#ifdef CONFIG_X86_64
+#define arch_vmap_pud_supported arch_vmap_pud_supported
+static inline bool arch_vmap_pud_supported(pgprot_t prot)
+{
+	return boot_cpu_has(X86_FEATURE_GBPAGES);
+}
+#endif
+
+#define arch_vmap_pmd_supported arch_vmap_pmd_supported
+static inline bool arch_vmap_pmd_supported(pgprot_t prot)
+{
+	return boot_cpu_has(X86_FEATURE_PSE);
+}
+
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* _ASM_X86_VMALLOC_H */

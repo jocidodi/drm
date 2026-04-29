@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: MIT */
+/*
+ * Copyright © 2022 Intel Corporation
+ */
+
+#ifndef _XE_DMA_BUF_H_
+#define _XE_DMA_BUF_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "../../../../include/linux/mydefs.h"
+#include "../../../../include/drm/drm_gem.h"
+
+struct dma_buf *xe_gem_prime_export(struct drm_gem_object *obj, int flags);
+struct drm_gem_object *xe_gem_prime_import(struct drm_device *dev,
+					   struct dma_buf *dma_buf);
+
+#ifdef __cplusplus
+}
+#endif
+#endif

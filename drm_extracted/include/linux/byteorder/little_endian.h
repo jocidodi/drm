@@ -1,0 +1,18 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+#ifndef _LINUX_BYTEORDER_LITTLE_ENDIAN_H
+#define _LINUX_BYTEORDER_LITTLE_ENDIAN_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "../mydefs.h"
+#include "../../uapi/linux/byteorder/little_endian.h"
+
+#ifdef CONFIG_CPU_BIG_ENDIAN
+#warning inconsistent configuration, CONFIG_CPU_BIG_ENDIAN is set
+#endif
+#include "generic.h"
+#ifdef __cplusplus
+}
+#endif
+#endif /* _LINUX_BYTEORDER_LITTLE_ENDIAN_H */
