@@ -84,9 +84,7 @@ static const char kCoreLSKDPath[] = "/System/Library/PrivateFrameworks/CoreLSKD.
 static const UInt8 kCoreLSKDOriginal[] = {0xC7, 0xC0, 0x01, 0x00, 0x00, 0x00, 0x0F, 0xA2};
 static const UInt8 kCoreLSKDPatched[] = {0xC7, 0xC0, 0xC3, 0x06, 0x03, 0x00, 0x66, 0x90};
 
-//static const char TGLGraphicsMTLDriver[] = "/System/Library/Extensions/AppleIntelTGLGraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelTGLGraphicsMTLDriver";
-
-static const char TGLGraphicsMTLDriver[] = "/Library/Extensions/AppleIntelTGLGraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelTGLGraphicsMTLDriver";
+static const char TGLGraphicsMTLDriver[] = "/System/Library/Extensions/AppleIntelTGLGraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelTGLGraphicsMTLDriver";
 static const UInt8 kTGLGraphicsMTLDrivero[] = {0x41, 0x83, 0x7d, 0x00, 0x01, 0x48, 0x8b, 0x05, 0x50, 0x7b, 0x47, 0x00};
 static const UInt8 kTGLGraphicsMTLDriverp[] =  {0x41, 0x83, 0x7d, 0x00, 0x00, 0x48, 0x8b, 0x05, 0x50, 0x7b, 0x47, 0x00};
 
