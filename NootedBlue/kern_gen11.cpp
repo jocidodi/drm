@@ -748,3 +748,7 @@ void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
 }
 
 
+int Gen11::hasExternalDispla()
+{
+	return 0;
+}
