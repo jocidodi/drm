@@ -506,6 +506,9 @@ private:
 	static void FBMemMgr_Init(void *that);
 	mach_vm_address_t oFBMemMgr_Init {};
 	
+	static uint64_t mapIOBitsPerColorToEncoderBitsPerColor(void *that,uint param_1,uint *param_2);
+	mach_vm_address_t omapIOBitsPerColorToEncoderBitsPerColor {};
+	
 	static void hwInitializeCState(void *that);
 	mach_vm_address_t ohwInitializeCState {};
 	

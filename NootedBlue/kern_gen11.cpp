@@ -142,12 +142,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN24AppleIntelBaseController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
 			{"__ZN14AppleIntelPort8isHPDLowEv",isHPDLow, this->oisHPDLow},
 			
+
+			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
+				{"__ZN31AppleIntelFramebufferController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
 				{"__ZN31AppleIntelFramebufferController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
 				{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 				{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
@@ -166,6 +169,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
+				{"__ZN24AppleIntelBaseController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
 				{"__ZN24AppleIntelBaseController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
 				{"__ZN24AppleIntelBaseController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 				
@@ -526,6 +530,16 @@ unsigned long  Gen11::isHPDLow(void *that)
 	return ret;
 };
 
+uint64_t Gen11::mapIOBitsPerColorToEncoderBitsPerColor(void *that,uint param_1,uint *param_2)
+{
+	//TODO: filter for edp only + check other options
+	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
+	if (param_2 != (uint *)0x0) {
+	  param_1 = 2;
+	}
+	
+	return FunctionCast(mapIOBitsPerColorToEncoderBitsPerColor, callback->omapIOBitsPerColorToEncoderBitsPerColor)(that,param_1,param_2);;
+};
 
 int Gen11::writeAUX(void *that,uint param_1,void *param_2,uint param_3)
 {
