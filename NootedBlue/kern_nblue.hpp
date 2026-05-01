@@ -40,7 +40,6 @@ class EXPORT PRODUCT_NAME : public IOService {
 
 class NBlue {
     friend class Gen11;
-	friend class Genx;
 	friend class DYLDPatches;
 
     public:
@@ -55,9 +54,6 @@ class NBlue {
 	WIOKit::t_PCIConfigRead16 orgConfigRead16 {nullptr};
 	WIOKit::t_PCIConfigRead32 orgConfigRead32 {nullptr};
 	
-	OSMetaClass *metaClassMap[4][2] = {{nullptr}};
-	mach_vm_address_t orgSafeMetaCast {0};
-	static OSMetaClassBase *wrapSafeMetaCast(const OSMetaClassBase *anObject, const OSMetaClass *toMeta);
 	
 	static size_t wrapFunctionReturnZero();
 	
@@ -68,16 +64,9 @@ class NBlue {
 	uint32_t framebufferId {0};
 	
     private:
-	void configurePCISpace(const char *propName, IOService *pciDevice,
-						   IOPCIAddressSpace addrSpace,
-						   UInt64 address,
-						   UInt64 length);
 	
 	
-	static inline UInt32 intel_uncore_read_notrace(void *iomem, UInt32 reg) {
-		return *(volatile UInt32*)((volatile char*)iomem + reg);
-	}
-	
+	//need review
 	UInt32 readReg32(unsigned long reg) {
 		if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
 			return this->rmmioPtr[reg];
@@ -86,7 +75,8 @@ class NBlue {
 			return this->rmmioPtr[mmPCIE_DATA2];
 		}
 	}
-
+	
+	//need review
 	void writeReg32(unsigned long reg, UInt32 val) {
 		if ((reg * sizeof(uint32_t)) < this->rmmio->getLength()) {
 			this->rmmioPtr[reg] = val;
@@ -96,151 +86,13 @@ class NBlue {
 		}
 	}
 	
-	UInt64 readReg64(unsigned long reg) {
-		if (reg * sizeof(uint64_t) < this->rmmio->getLength()) {
-			return this->rmmioPtr[reg];
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			return this->rmmioPtr[mmPCIE_DATA2];
-		}
-	}
-
-	void writeReg64(unsigned long reg, UInt64 val) {
-		if ((reg * sizeof(uint64_t)) < this->rmmio->getLength()) {
-			this->rmmioPtr[reg] = val;
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			this->rmmioPtr[mmPCIE_DATA2] = val;
-		}
-	}
 	
-	void intel_de_write( uint32_t reg,uint32_t val)
-	{
-		writeReg32(reg, val);
-	}
-	
-	uint32_t intel_de_read( uint32_t reg)
-	{
-		uint32_t val;
-		val = readReg32(reg);
-		return val;
-	}
-	
-	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
-	{
-		uint32_t old, val;
-
-		old = readReg32( reg);
-		val = (old & ~clear) | set;
-		writeReg32( reg, val);
-		return old;
-	}
-	
-	
-	void whitelist_reg_ext(uint32_t reg, uint32_t flags)//wrong code
-	{
-		uint32_t old;
-		old = readReg32( reg);
-		old= old | flags;
-		writeReg32( reg, old);
-	}
-	
-
-	
-	void
-	whitelist_reg(uint32_t reg)
-	{
-		//whitelist_reg_ext( reg, RING_FORCE_TO_NONPRIV_ACCESS_RW);
-	}
-
-	
-	void wa_add(uint32_t reg, uint32_t clear, uint32_t set, uint32_t read_mask, bool masked_reg)//wrong code
-	{
-		uint32_t old, val;
-		
-		if (masked_reg) {
-			/* Keep the enable mask, reset the actual target bits */
-			set &= ~(set >> 16);
-		}
-
-		old = readReg32( reg) ;
-		val = (old & ~clear) | set;
-		val |= read_mask;
-		writeReg32( reg, val);
-	}
-	
-	void wa_masked_en(uint32_t reg, uint32_t val)
-	{
-		wa_add( reg, 0, _MASKED_BIT_ENABLE(val), val, true);
-	}
-	
-	void wa_masked_field_set(uint32_t reg, uint32_t mask, uint32_t val)
-	{
-		wa_add(reg, 0, _MASKED_FIELD(mask, val), mask, true);
-	}
-	
-	void wa_write_clr_set( uint32_t reg, uint32_t clear, uint32_t set)
-	{
-		wa_add( reg, clear, set, clear | set, false);
-	}
-	
-	void wa_mcr_add(uint32_t reg,
-						   uint32_t clear, uint32_t set, uint32_t read_mask, bool masked_reg)
-	{
-		wa_add(reg, clear,set,read_mask,masked_reg );
-	}
-	
-	void
-	wa_mcr_masked_en(uint32_t reg, uint32_t val)
-	{
-		wa_mcr_add( reg, 0, _MASKED_BIT_ENABLE(val), val, true);
-	}
-
-	void
-	wa_mcr_write_clr_set(uint32_t reg, uint32_t clear, uint32_t set)
-	{
-		wa_mcr_add( reg, clear, set, clear | set, false);
-	}
-
-	void
-	wa_write(uint32_t reg, uint32_t set)
-	{
-		wa_write_clr_set( reg, ~0, set);
-	}
-
-	void
-	wa_write_or(uint32_t reg, uint32_t set)
-	{
-		wa_write_clr_set( reg, set, set);
-	}
-
-	void
-	wa_mcr_write_or(uint32_t reg, uint32_t set)
-	{
-		wa_mcr_write_clr_set( reg, set, set);
-	}
-
-	void
-	wa_write_clr(uint32_t reg, uint32_t clr)
-	{
-		wa_write_clr_set( reg, clr, 0);
-	}
-
-	void
-	wa_mcr_write_clr(uint32_t reg, uint32_t clr)
-	{
-		wa_mcr_write_clr_set( reg, clr, 0);
-	}
-	
-	
-    bool isCflDerivative = false;
-    bool isJslDerivative = false;
-    bool isGen9LPDerivative = false;
-    bool isGen8LPDerivative = false;
     uint32_t deviceId {0};
     uint16_t revision {0};
     uint32_t pciRevision {0};
     IOPCIDevice *iGPU {nullptr};
+	bool isRealTGL = false;  
+	uint32_t cpuModel {0};
 	
 	IOMemoryMap *rmmio {nullptr};
 	volatile UInt32 *rmmioPtr {nullptr};
@@ -262,33 +114,3 @@ static const UInt8 kAGDPBoardIDKeyOriginal[] = "board-id";
 static const UInt8 kAGDPBoardIDKeyPatched[] =  "applehax";
 
 
-struct DPCDCap16 { // 16 bytes
-	// DPCD Revision (DP Config Version)
-	// Value: 0x10, 0x11, 0x12, 0x13, 0x14
-	uint8_t revision {};
-
-	// Maximum Link Rate
-	// Value: 0x1E (HBR3) 8.1 Gbps
-	//        0x14 (HBR2) 5.4 Gbps
-	//        0x0C (3_24) 3.24 Gbps
-	//        0x0A (HBR)  2.7 Gbps
-	//        0x06 (RBR)  1.62 Gbps
-	// Reference: 0x0C is used by Apple internally.
-	uint8_t maxLinkRate {};
-
-	// Maximum Number of Lanes
-	// Value: 0x1 (HBR2)
-	//        0x2 (HBR)
-	//        0x4 (RBR)
-	// Side Notes:
-	// (1) Bit 7 is used to indicate whether the link is capable of enhanced framing.
-	// (2) Bit 6 is used to indicate whether TPS3 is supported.
-	uint8_t maxLaneCount {};
-
-	// Maximum Downspread
-	uint8_t maxDownspread {};
-
-	// Other fields omitted in this struct
-	// Detailed information can be found in the specification
-	uint8_t others[12] {};
-};

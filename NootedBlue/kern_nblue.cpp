@@ -3,7 +3,6 @@
 
 #include "kern_nblue.hpp"
 #include "kern_gen11.hpp"
-#include "kern_model.hpp"
 #include "DYLDPatches.hpp"
 #include "HDMI.hpp"
 #include "kern_patcherplus.hpp"
@@ -45,7 +44,6 @@ void NBlue::init() {
 	lilu.onKextLoadForce(&kextIOAcceleratorFamily2);
 	
 	gen11.init();
-	//agfxhda.init();
 	dyldpatches.init();
 	
     lilu.onPatcherLoadForce(
@@ -59,89 +57,7 @@ void NBlue::init() {
 	
 }
 
-void NBlue::configurePCISpace(const char *propName, IOService *pciDevice,
-					   IOPCIAddressSpace addrSpace,
-					   UInt64 address,
-					   UInt64 length)
-{
-	bool isExtended = addrSpace.s.t;
-	UInt8 spaceType = addrSpace.s.space;
-	UInt32 regOffset;
 
-	
-	if(isExtended) {
-		addrSpace.es.registerNumExtended=(uint32_t)address;
-		regOffset = addrSpace.es.registerNum;
-	} else {
-		regOffset = addrSpace.s.registerNum;
-	}
-	
-	addrSpace.s.reloc=1;
-	if (!address ) addrSpace.s.reloc=0;
-	if (!strcmp(propName,"ranges")) addrSpace.s.reloc=1;
-	
-	if (address) {
-		if(spaceType != kIOPCIConfigSpace) {
-			if(spaceType == kIOPCIIOSpace) {
-				UInt32 ioValue = (static_cast<UInt32>(address) & 0xFFFFFFFC) | 0x1;
-			   // pciDevice->configWrite32(regOffset, (ioValue));
-			} else {
-				UInt32 addressLo = static_cast<UInt32>(address & 0xFFFFFFFF);
-				UInt32 addressHi = static_cast<UInt32>(address >> 32);
-				
-				addressLo &= ~0xF;
-				
-				if(addrSpace.s.prefetch) {
-					addressLo |= 0x8;
-				}
-				
-				switch(spaceType) {
-					case kIOPCI32BitMemorySpace:
-						addressLo |= 0x0;
-						break;
-					case kIOPCI64BitMemorySpace:
-						addressLo |= 0x4;
-						break;
-					default:
-						break;
-				}
-				
-				
-			   // pciDevice->configWrite32(regOffset, (addressLo));
-				if (spaceType == kIOPCI64BitMemorySpace) {
-				  //  pciDevice->configWrite32(regOffset + 4,0xFFFFFFFF);
-				   // pciDevice->configWrite32(regOffset + 4, (addressHi));
-				}
-			}
-		}
-	}
-
-	
-	if(spaceType == kIOPCI64BitMemorySpace) addrSpace.s.space =kIOPCI32BitMemorySpace;
-	
-	UInt32 configEntry[5];
-	configEntry[0] = (addrSpace.bits);
-	
-	if(spaceType == kIOPCIIOSpace && address==0) {
-		configEntry[1] = 0;
-		configEntry[2] = 0;
-	} else {
-		configEntry[1] = (static_cast<UInt32>(address >> 32));
-		configEntry[2] = (static_cast<UInt32>(address & 0xFFFFFFFF));
-	}
-	configEntry[3] = (static_cast<UInt32>(length >> 32));
-	configEntry[4] = (static_cast<UInt32>(length & 0xFFFFFFFF));
-
-	OSData *existing = OSDynamicCast(OSData, pciDevice->getProperty(propName));
-	OSData *updated = existing ? OSData::withData(existing) : OSData::withCapacity(0);
-	
-	if(updated) {
-		updated->appendBytes(configEntry, sizeof(configEntry));
-		pciDevice->setProperty(propName, updated);
-		updated->release();
-	}
-
-}
 void NBlue::processPatcher(KernelPatcher &patcher) {
     auto *devInfo = DeviceInfo::create();
     if (devInfo) {
@@ -151,105 +67,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 
         this->iGPU = OSDynamicCast(IOPCIDevice, devInfo->videoBuiltin);
         PANIC_COND(!this->iGPU, "nblue", "videoBuiltin is not IOPCIDevice");
-		/*
-		IOPCIAddressSpace space;
 
-		this->iGPU->removeProperty("reg");
-		this->iGPU->removeProperty("assigned-addresses");
-		this->iGPU->removeProperty("IODeviceMemory");
-		
-		
-		IOPCIAddressSpace addrSpace=this->iGPU->space;
-			UInt64 address;
-			UInt64 length;
-		
-		address=0;
-		length=0;
-		addrSpace.s.space=kIOPCIConfigSpace;
-		addrSpace.s.registerNum=0x0;
-		configurePCISpace("reg", this->iGPU,addrSpace,address,length);
-		
-		address=0;
-		length=0x1000000;
-		addrSpace.s.space=kIOPCI64BitMemorySpace;
-		addrSpace.s.registerNum=0x10;
-		configurePCISpace("reg", this->iGPU,addrSpace,address,length);
-		
-		
-		addrSpace.s.prefetch=1;
-		address=0;
-		length=0x10000000;
-		addrSpace.s.space=kIOPCI64BitMemorySpace;
-		addrSpace.s.registerNum=0x18;
-		configurePCISpace("reg", this->iGPU,addrSpace,address,length);
-
-
-		
-		addrSpace.s.prefetch=0;
-		address=0;
-		length=0x40;
-		addrSpace.s.space=kIOPCIIOSpace;
-		addrSpace.s.registerNum=0x20;
-		configurePCISpace("reg", this->iGPU,addrSpace,address,length);
-		
-
-		
-		
-		IODeviceMemory::InitElement rangeList[3];
-		
-		address=0x6002000000;
-		length=0x1000000;
-		addrSpace.s.space=kIOPCI64BitMemorySpace;
-		addrSpace.s.registerNum=0x10;
-		configurePCISpace("assigned-addresses", this->iGPU,addrSpace,address,length);
-		
-		rangeList[0] =
-		{
-			.start = address ,
-			.length = length,
-			.tag = addrSpace.bits
-		};
-		
-		addrSpace.s.prefetch=1;
-		address=0x4000000000;
-		length=0x10000000;
-		addrSpace.s.space=kIOPCI64BitMemorySpace;
-		addrSpace.s.registerNum=0x18;
-		configurePCISpace("assigned-addresses", this->iGPU,addrSpace,address,length);
-
-		rangeList[1] =
-		{
-			.start = address ,
-			.length = length,
-			.tag = addrSpace.bits
-		};
-		
-		addrSpace.s.prefetch=0;
-		address=0x4000;
-		length=0x40;
-		addrSpace.s.space=kIOPCIIOSpace;
-		addrSpace.s.registerNum=0x20;
-		configurePCISpace("assigned-addresses", this->iGPU,addrSpace,address,length);
-
-
-		rangeList[2] =
-		{
-			.start = address ,
-			.length = length,
-			.tag = addrSpace.bits
-		};
-		
-		OSArray *memoryArray = IODeviceMemory::arrayFromList(rangeList, 3);
-		if (memoryArray) {
-			this->iGPU->setProperty("IODeviceMemory",memoryArray);
-			//this->iGPU->setDeviceMemory(memoryArray);
-			memoryArray->release();
-		}
-		
-
-		this->iGPU->configWrite32(kIOPCIConfigBaseAddress0,  0x02000000);
-		this->iGPU->configWrite32(kIOPCIConfigBaseAddress1,  0x60);
-		*/
 		
 		//this->iGPU->enablePCIPowerManagement(kPCIPMCSPowerStateD0);
 		this->iGPU->setBusMasterEnable(true);
@@ -259,77 +77,45 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		WIOKit::renameDevice(this->iGPU, "IGPU");
 		WIOKit::awaitPublishing(this->iGPU);
 		
-		/*
-		 UInt8  msiCap;
-	     bool hasMSI = this->iGPU->findPCICapability(kIOPCICapabilityIDMSI, &msiCap);
-		UInt16 control= this->iGPU->configRead16( msiCap + 2);
-		control |= 1;
-		this->iGPU->configWrite16(msiCap + 2, control);
-		 control = this->iGPU->configRead16(kIOPCIConfigCommand);
-		 control |= kIOPCICommandInterruptDisable | kIOPCICommandBusMaster;
-		this->iGPU->configWrite16(kIOPCIConfigCommand, control);
-		this->iGPU->setProperty("IOPCIMSIMode", kOSBooleanTrue);
-		*/
 		
 		UInt8 *configBytes = (UInt8 *)IOMalloc(0x100);
 		for (UInt16 offset = 0; offset < 0x100; offset++) {
 			configBytes[offset] = this->iGPU->configRead8(offset);
 		}
 		this->iGPU->setProperty("cfgspace", configBytes, 0x100);
-		//this->iGPU->setProperty("ATY,Platforminfo", nullptr, 0);
 		
         static uint8_t builtin[] = {0x00};
-		//static uint8_t builtin2[] = {0x02, 0x00, 0x5c, 0x8A};
-		//static uint8_t builtin3[] = {0x5c, 0x8A,0x00,0x00};
-		
 		static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
 		static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
-
-		
-		
-		static uint8_t sconf[] = {};
-		
-		
-		//[drm:pps_init_registers [i915]] panel power sequencer register settings: PP_ON 0x7d00001, PP_OFF 0x1f40001, PP_DIV 0x60
-		//hwGetPanelTimingProperties()
-		
-		static uint8_t panel[] = {0x01, 0x00, 0x00, 0x00};
-		/*static uint8_t panel1[] = {0xd0, 0x07, 0x00, 0x00};
-		static uint8_t panel2[] = {0x01, 0x00, 0x00, 0x00};
-		static uint8_t panel3[] = {0x4f, 0x01, 0x00, 0x00};
-		static uint8_t panel4[] = {0x06, 0x00, 0x00, 0x00};
-
-		if (!this->iGPU->getProperty("AAPL00,PanelPowerUp")) {
-			this->iGPU->setProperty("AAPL00,PanelPowerUp", panel, arrsize(panel));
-			this->iGPU->setProperty("AAPL00,PanelPowerOn", panel1, arrsize(panel1));
-			this->iGPU->setProperty("AAPL00,PanelPowerDown", panel2, arrsize(panel2));
-			this->iGPU->setProperty("AAPL00,PanelPowerOff", panel3, arrsize(panel3));
-			this->iGPU->setProperty("AAPL00,PanelCycleDelay", panel4, arrsize(panel4));
-		}*/
-
-		//this->iGPU->setProperty("AAPL01,IgnoreConnection", panel, arrsize(panel));
 		
 		this->iGPU->setProperty("built-in", builtin, arrsize(builtin));
 		this->iGPU->setProperty("AAPL,slot-name", const_cast<char *>("built-in"), 9);
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
 		this->iGPU->setProperty("model", const_cast<char *>("Intel Iris Xe Graphics"), 23);
 		
-		
-		//auto *prop = OSDynamicCast(OSData, this->iGPU->getProperty("saved-config"));
-		//if (!prop) this->iGPU->setProperty("saved-config", sconf, 0xea);
+
 			
 		this->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
 		this->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
 
-
-		//auto x = OSDynamicCast(OSData, this->iGPU->getProperty("AAPL,ig-platform-id"));
-		//framebufferId = *(uint32_t*)x->getBytesNoCopy();
-		
-		//NETLOG("gen11", "framebufferId: = %x", framebufferId);
 		setRMMIOIfNecessary();
 
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
+		
+
+			uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+			asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+			uint32_t family = (eax >> 8) & 0xF;
+			uint32_t model = (eax >> 4) & 0xF;
+			uint32_t extModel = (eax >> 16) & 0xF;
+			uint32_t stepping = eax & 0xF;
+			if (family == 0x6) model |= (extModel << 4);
+			this->cpuModel = model;
+			this->isRealTGL = (model == 0x8C || model == 0x8D);
+			SYSLOG("ngreen", "V52: CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",
+				   family, model, stepping, this->isRealTGL);
+		
 		
 		
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
@@ -341,28 +127,12 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
         SYSLOG("nblue", "Failed to create DeviceInfo");
     }
 	
-	/*KernelPatcher::RouteRequest request {"__ZN15OSMetaClassBase12safeMetaCastEPKS_PK11OSMetaClass", wrapSafeMetaCast,
-		this->orgSafeMetaCast};
-	PANIC_COND(!patcher.routeMultipleLong(KernelPatcher::KernelID, &request, 1), "nblue",
-		"Failed to route kernel symbols");*/
 	
 	dyldpatches.processPatcher(patcher);
 	
 }
 
-OSMetaClassBase *NBlue::wrapSafeMetaCast(const OSMetaClassBase *anObject, const OSMetaClass *toMeta) {
-	auto ret = FunctionCast(wrapSafeMetaCast, callback->orgSafeMetaCast)(anObject, toMeta);
-	if (UNLIKELY(!ret)) {
-		for (const auto &ent : callback->metaClassMap) {
-			if (LIKELY(ent[0] == toMeta)) {
-				return FunctionCast(wrapSafeMetaCast, callback->orgSafeMetaCast)(anObject, ent[1]);
-			} else if (UNLIKELY(ent[1] == toMeta)) {
-				return FunctionCast(wrapSafeMetaCast, callback->orgSafeMetaCast)(anObject, ent[0]);
-			}
-		}
-	}
-	return ret;
-}
+
 
 void NBlue::setRMMIOIfNecessary() {
 	if (UNLIKELY(!this->rmmio || !this->rmmio->getLength())) {
@@ -480,7 +250,7 @@ struct ApplePanelData {
 };
 
 
-static ApplePanelData appleBacklightData[0]; // this disable Backlight panels
+static ApplePanelData appleBacklightData[0]; // this disables Backlight panels
 
 // this enables Backlight panels
 //rename as whish
