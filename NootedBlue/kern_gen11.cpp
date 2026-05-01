@@ -7,23 +7,26 @@ static const char *pathG11FB = "/System/Library/Extensions/AppleIntelICLLPGraphi
                                "AppleIntelICLLPGraphicsFramebuffer";
 static const char *pathG11FBT = "/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/"
 							   "AppleIntelTGLGraphicsFramebuffer";
+
 static const char *pathG11HW =
     "/System/Library/Extensions/AppleIntelICLGraphics.kext/Contents/MacOS/AppleIntelICLGraphics";
 static const char *pathG11HWT =
 	"/System/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics";
 static const char *pathG11HWTe =
-	"/Library/Extensions/AppleIntelTGLController.kext/Contents/MacOS/AppleIntelTGLController";
+	"/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics";
 
 static KernelPatcher::KextInfo kextG11FB {"com.apple.driver.AppleIntelICLLPGraphicsFramebuffer", &pathG11FB, 1, {}, {},
     KernelPatcher::KextInfo::Unloaded};
+static KernelPatcher::KextInfo kextG11FBT {"com.xxxxx.driver.AppleIntelTGLGraphicsFramebuffer", &pathG11FBT, 1, {}, {},
+	KernelPatcher::KextInfo::Unloaded};
+
 static KernelPatcher::KextInfo kextG11HW {"com.apple.driver.AppleIntelICLGraphics", &pathG11HW, 1, {}, {},
     KernelPatcher::KextInfo::Unloaded};
 static KernelPatcher::KextInfo kextG11HWT {"com.apple.driver.AppleIntelTGLGraphics", &pathG11HWT, 1, {}, {},
 	KernelPatcher::KextInfo::Unloaded};
-static KernelPatcher::KextInfo kextG11HWTe {"com.anomy.driver.AppleIntelTGLController", &pathG11HWTe, 1, {}, {},
+static KernelPatcher::KextInfo kextG11HWTe {"com.xxxxx.driver.AppleIntelTGLGraphics", &pathG11HWTe, 1, {}, {},
 	KernelPatcher::KextInfo::Unloaded};
-static KernelPatcher::KextInfo kextG11FBT {"com.xxxxx.driver.AppleIntelTGLGraphicsFramebuffer", &pathG11FBT, 1, {}, {},
-	KernelPatcher::KextInfo::Unloaded};
+
 
 
 Gen11 *Gen11::callback = nullptr;
@@ -36,7 +39,6 @@ void Gen11::init() {
 	
     lilu.onKextLoadForce(&kextG11HW);
 	lilu.onKextLoadForce(&kextG11HWT);
-	
 	lilu.onKextLoadForce(&kextG11HWTe);
 }
 
@@ -44,11 +46,7 @@ void Gen11::init() {
 
 bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
 	
-	if ( kextG11HWTe.loadIndex == index){
-		NBlue::callback->setRMMIOIfNecessary();
-		return true;
-	}
-	else if (kextG11FB.loadIndex == index) {
+	if (kextG11FB.loadIndex == index) {
 
 		NBlue::callback->setRMMIOIfNecessary();
 		
@@ -540,9 +538,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		return true;
 		
 		
-    } else if (kextG11HWT.loadIndex == index) {
+    } else if (kextG11HWT.loadIndex == index || kextG11HWTe.loadIndex == index) {
 		NBlue::callback->setRMMIOIfNecessary();
-		
+		auto kext=kextG11HWT.loadIndex == index ? kextG11HWT: kextG11HWTe;
 		
 		SolveRequestPlus solveRequests[] = {
 			
@@ -646,18 +644,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r7b[] = {0xe0, 0xff, 0xc3, 0x74, 0x0d};
 		
 			LookupPatchPlus const patches[] = {
-				
-				{&kextG11HWT, f3, r3, arrsize(f3),	1},
-				{&kextG11HWT, f3a, r3a, arrsize(f3a),	1},
-				
-				
-				{&kextG11HWT, f5, r5, arrsize(f5),	1},
-				
-				//{&kextG11HWT, f7a, r7a, arrsize(f7a),	1},
-				//{&kextG11HWT, f7b, r7b, arrsize(f7b),	1},
-				
+				{&kext, f3, r3, arrsize(f3),	1},
+				{&kext, f3a, r3a, arrsize(f3a),	1},
+				{&kext, f5, r5, arrsize(f5),	1},
+				//{&kext, f7a, r7a, arrsize(f7a),	1},
+				//{&kext, f7b, r7b, arrsize(f7b),	1},
 			};
-			
 			PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11HWT Failed to apply patches!");
 
 		
