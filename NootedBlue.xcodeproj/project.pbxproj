@@ -50,7 +50,6 @@
 		2E315A602BC6EA4D008411AA /* DYLDPatches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DYLDPatches.cpp; sourceTree = "<group>"; };
 		2E5BF5812BCC212F0095BDCF /* HDMI.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HDMI.cpp; sourceTree = "<group>"; };
 		2E5BF5822BCC212F0095BDCF /* HDMI.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = HDMI.hpp; sourceTree = "<group>"; };
-		2EE611AD2FA6C0F500E58E2A /* Drivers.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Drivers.xml; sourceTree = "<group>"; };
 		2EE611AE2FA6C10F00E58E2A /* Firmware.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Firmware.cpp; sourceTree = "<group>"; };
 		2EE611AF2FA6C10F00E58E2A /* Firmware.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Firmware.hpp; sourceTree = "<group>"; };
 		2EE611B02FA6C10F00E58E2A /* ZlibAlloc.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ZlibAlloc.hpp; sourceTree = "<group>"; };
@@ -129,17 +128,8 @@
 				F0BB9E532A57A0340081F5FA /* kern_patcherplus.cpp */,
 				F0BB9E542A57A0340081F5FA /* kern_patcherplus.hpp */,
 				F009B7A029E4EE3C00786AFF /* kern_start.cpp */,
-				2EE611AC2FA6C0F500E58E2A /* Firmware */,
 			);
 			path = NootedBlue;
-			sourceTree = "<group>";
-		};
-		2EE611AC2FA6C0F500E58E2A /* Firmware */ = {
-			isa = PBXGroup;
-			children = (
-				2EE611AD2FA6C0F500E58E2A /* Drivers.xml */,
-			);
-			path = Firmware;
 			sourceTree = "<group>";
 		};
 		CE405EB91E49DD7100AA0B3D /* Headers */ = {

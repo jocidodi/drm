@@ -204,8 +204,10 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			   if (!err) ok=1;
 			}
 			
+			OSArray *tdrivers= OSArray::withCapacity(0);
+			int tcap=0;
 			if (ok) {
-				const auto driversXML = getFWByName("Drivers.xml");
+				const auto driversXML = getFWByName("Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
 				dataNull[driversXML.size] = 0;
@@ -214,12 +216,43 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				delete[] dataNull;
 				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
 						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
-				auto *drivers = OSDynamicCast(OSArray, dataUnserialized);
+				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
 				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
-				PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
+				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+				if (Match->getLength()>0){
+					tcap++;
+					tdrivers->ensureCapacity(tcap);
+					tdrivers->setObject(tcap-1,drivers);
+				}
+				//PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
 			}
+			if (ok) {
+				const auto driversXML = getFWByName("Drivera2.xml");
+				auto *dataNull = new char[driversXML.size + 1];
+				memcpy(dataNull, driversXML.data, driversXML.size);
+				dataNull[driversXML.size] = 0;
+				OSString *errStr = nullptr;
+				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+				delete[] dataNull;
+				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
+				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+				if (Match->getLength()>0){
+					tcap++;
+					tdrivers->ensureCapacity(tcap);
+					tdrivers->setObject(tcap-1,drivers);
+				}
+				//PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
+				OSSafeReleaseNULL(dataUnserialized);
+				IOFree(driversXML.data, driversXML.size);
+			}
+			
+			if (tcap)
+			PANIC_COND(!gIOCatalogue->addDrivers(tdrivers), "NRed", "Failed to add drivers");
 		}
 		
 		
