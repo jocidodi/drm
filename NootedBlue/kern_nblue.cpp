@@ -5,10 +5,11 @@
 #include "kern_gen11.hpp"
 #include "DYLDPatches.hpp"
 #include "HDMI.hpp"
+#include "Firmware.hpp"
 #include "kern_patcherplus.hpp"
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
-
+#include <IOKit/IOCatalogue.h>
 
 static const char *pathIOAcceleratorFamily2= "/System/Library/Extensions/IOAcceleratorFamily2.kext/Contents/MacOS/IOAcceleratorFamily2";
 static const char *pathAGDP = "/System/Library/Extensions/AppleGraphicsControl.kext/Contents/PlugIns/"
@@ -130,6 +131,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 	
 	dyldpatches.processPatcher(patcher);
 	
+	
 }
 
 
@@ -142,6 +144,9 @@ void NBlue::setRMMIOIfNecessary() {
 }
 
 bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
+	
+	
+	
 	if (kextIOAcceleratorFamily2.loadIndex == index) {
 		
 		static const uint8_t f1[]= {0x74, 0x57, 0x45, 0x8b, 0x8f, 0x84, 0x02, 0x00, 0x00, 0x48, 0x8d, 0x3d, 0x4a, 0x47, 0xfb, 0xff};
@@ -170,6 +175,53 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			const LookupPatchPlus patch {&kextAGDP, kAGDPFBCountCheckOriginal, kAGDPFBCountCheckPatched, 1};
 			SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP fb count check patch");
 		}*/
+		
+		int ok=0;
+	vnode_t vnode = NULLVP;
+	vfs_context_t ctxt = vfs_context_create(nullptr);
+	errno_t err = vnode_lookup("/usr/bin/sudo", 0, &vnode, ctxt);
+	if (!err) vnode_put(vnode);
+	vfs_context_rele(ctxt);
+	if (!err) ok=1;
+		
+		if (ok) { //not running mac os installer
+			
+			ok=0;
+		 vnode = NULLVP;
+		 ctxt = vfs_context_create(nullptr);
+		 err = vnode_lookup("/System/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
+		if (!err) vnode_put(vnode);
+		vfs_context_rele(ctxt);
+		if (!err) ok=1;
+			
+			if (!ok) {
+				vnode = NULLVP;
+				ctxt = vfs_context_create(nullptr);
+				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
+			   if (!err) vnode_put(vnode);
+			   vfs_context_rele(ctxt);
+			   if (!err) ok=1;
+			}
+			
+			if (ok) {
+				const auto driversXML = getFWByName("Drivers.xml");
+				auto *dataNull = new char[driversXML.size + 1];
+				memcpy(dataNull, driversXML.data, driversXML.size);
+				dataNull[driversXML.size] = 0;
+				OSString *errStr = nullptr;
+				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+				delete[] dataNull;
+				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+				auto *drivers = OSDynamicCast(OSArray, dataUnserialized);
+				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+				PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
+				OSSafeReleaseNULL(dataUnserialized);
+				IOFree(driversXML.data, driversXML.size);
+			}
+		}
+		
+		
 		return true;
 	}  else if (kextBacklight.loadIndex == index) {
 		KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
