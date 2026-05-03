@@ -184,6 +184,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 	vfs_context_rele(ctxt);
 	if (!err) ok=1;
 		
+		//TODO: fix for unsigned kexts
 		if (ok) { //not running mac os installer
 			
 			ok=0;
@@ -304,8 +305,7 @@ struct ApplePanelData {
 
 static ApplePanelData appleBacklightData[0]; // this disables Backlight panels
 
-// this enables Backlight panels
-//rename as whish
+// rename to enable Backlight panels
 static ApplePanelData appleBacklightData2[] = {
 	{"F14Txxxx", {0x00, 0x11, 0x00, 0x00, 0x00, 0x34, 0x00, 0x52, 0x00, 0x73, 0x00, 0x94, 0x00, 0xBE, 0x00, 0xFA, 0x01,
 					 0x36, 0x01, 0x72, 0x01, 0xC5, 0x02, 0x2F, 0x02, 0xB9, 0x03, 0x60, 0x04, 0x1A, 0x05, 0x0A, 0x06,

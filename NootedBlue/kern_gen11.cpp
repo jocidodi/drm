@@ -136,13 +136,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
-
 			{"__ZN19AppleIntelPowerWell21hwSetPowerWellStatePGEbj",hwSetPowerWellStatePG, this->ohwSetPowerWellStatePG},
-			{"__ZN24AppleIntelBaseController13hwReadMailboxEj",hwReadMailbox, this->ohwReadMailbox},
-			{"__ZN24AppleIntelBaseController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
 			{"__ZN14AppleIntelPort8isHPDLowEv",isHPDLow, this->oisHPDLow},
 			
-
 			
 			
 		};
@@ -150,6 +146,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
+				{"__ZN31AppleIntelFramebufferController13hwReadMailboxEj",hwReadMailbox, this->ohwReadMailbox},
+				{"__ZN31AppleIntelFramebufferController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
 				{"__ZN31AppleIntelFramebufferController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
 				{"__ZN31AppleIntelFramebufferController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
 				{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
@@ -169,6 +167,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
+				{"__ZN24AppleIntelBaseController13hwReadMailboxEj",hwReadMailbox, this->ohwReadMailbox},
+				{"__ZN24AppleIntelBaseController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
 				{"__ZN24AppleIntelBaseController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
 				{"__ZN24AppleIntelBaseController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
 				{"__ZN24AppleIntelBaseController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
@@ -191,7 +191,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 	
 		
-		//CamelliaTcon2
+		//CamelliaTcon2 ID replace
 		static const uint8_t f1b[] = {0x11, 0x0a, 0x84, 0x41};
 		static const uint8_t r1b[] = {0x11, 0x0a, 0x82, 0x41};
 		
@@ -233,12 +233,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r13pb[]= {0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, 0x49, 0x8b, 0x0e, 0x4c, 0x89, 0xf7, 0x89, 0xc6, 0xff, 0x91, 0x38, 0x01, 0x00, 0x00};
 
 		
-		//getPathByPipe logs
+		//getPathByPipe disable logs
 		static const uint8_t f15[]= {0x74, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		static const uint8_t r15[]= {0xeb, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		
 
-		//getHPDState
+		//getHPDState register
 		static const uint8_t f19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
 		static const uint8_t r19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
 		
@@ -291,7 +291,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f24dp, r24dp, arrsize(f24dp),	4},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
-
 			};
 			
 			PANIC_COND(!LookupPatchPlus::applyAll(patcher, patchesp , address, size), "nblue", "kextG11FBT Failed to apply production patches!");
@@ -301,16 +300,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 				{&kextG11FBT, f6a, r6a, arrsize(f6a),	1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
-				{&kextG11FBT, f19, r19, arrsize(f19),	1},
-				{&kextG11FBT, f20, r20, arrsize(f20),	1},
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
 				{&kextG11FBT, f15, r15, arrsize(f15),	1},
+				{&kextG11FBT, f19, r19, arrsize(f19),	1},
+				{&kextG11FBT, f20, r20, arrsize(f20),	1},
 				{&kextG11FBT, f24b, r24b, arrsize(f24b),	11},
 				{&kextG11FBT, f24c, r24c, arrsize(f24c),	1},
 				{&kextG11FBT, f24d, r24d, arrsize(f24d),	6},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
-				
 
 			};
 			
@@ -331,12 +329,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		SYSLOG_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
 		//sku bypass IntelAccelerator::getGPUInfo
-		static const uint8_t f2[] = {
-			0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00
-		};
-		static const uint8_t r2[] = {
-			0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00
-		};
+		static const uint8_t f2[] = {0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
+		static const uint8_t r2[] = {0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
     
 		LookupPatchPlus const patches[] = {
 			{&kextG11HW, f2, r2, arrsize(f2),	1},
@@ -366,22 +360,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 			 
 		 };
-		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
+		//PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
 		//sku bypass IntelAccelerator::getGPUInfo
-		static const uint8_t f3[] = {
-			0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x7f, 0x15, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0x74, 0x2d
-		};
-		static const uint8_t r3[] = {
-			0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x90, 0x90, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0xeb, 0x2d
-		};
+		static const uint8_t f3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x7f, 0x15, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0x74, 0x2d};
+		static const uint8_t r3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x90, 0x90, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0xeb, 0x2d};
 		
-		static const uint8_t f3a[] = {
-			0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0c
-		};
-		static const uint8_t r3a[] = {
-			0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0a
-		};
+		// 12 to 10 slices + L3BankCount = 8
+		static const uint8_t f3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0c};
+		static const uint8_t r3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0a};
 		
 		
 		//blit3d mem alloc patch
@@ -393,6 +380,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kext, f3, r3, arrsize(f3),	1},
 				{&kext, f3a, r3a, arrsize(f3a),	1},
 				{&kext, f5, r5, arrsize(f5),	1},
+				
 			};
 			PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11HWT Failed to apply patches!");
 
@@ -444,11 +432,11 @@ uint64_t  Gen11::getOSInformation(void *that)
 
 		pinfo[1].fSliceCount=1;
 		pinfo[1].fmaxEuCount=8;
-		pinfo[1].fsubslices=5;
+		pinfo[1].fsubslices=10;
 	
 	//pinfo[1].fInfoFBCompressionMemorySize=	0xc00000;
-	pinfo[1].fVideoTurboFreq=270000000;
-	pinfo[1].VCLK=1000*0x438;
+	//pinfo[1].fVideoTurboFreq=270000000;
+	//pinfo[1].VCLK=1000*0x438;
 	
 	
 	pinfo[1].connectors[0].index=0;//DDI0
@@ -456,7 +444,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	pinfo[1].connectors[0].pipe=0;//fix wrong register use patch or set = 1
 	pinfo[1].connectors[0].pad=0;
 	pinfo[1].connectors[0].type=ConnectorLVDS;
-	pinfo[1].connectors[0].flags=0x8+0x400;
+	pinfo[1].connectors[0].flags=0x8;
 	
 	pinfo[1].connectors[1].index=1;
 	pinfo[1].connectors[1].busId=1;
@@ -483,10 +471,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 	return ret;
 }
 
-	static const uint8_t DAT_000b0bb0[] = {
-		0x00, 0x36, 0x6e, 0x01, 0x00, 0xf8, 0x24, 0x01,
-		0x00, 0xf0, 0x49, 0x02, 0x40, 0x78, 0x7d, 0x01
-	};
 
 
 IOReturn Gen11::wrapPavpSessionCallback( void *intelAccelerator, int32_t sessionCommand, uint32_t sessionAppId, uint32_t *a4, bool flag) {
@@ -517,7 +501,7 @@ unsigned long Gen11::hwRegsNeedUpdate
 	
 	auto ret=FunctionCast(hwRegsNeedUpdate, callback->ohwRegsNeedUpdate)(that,param_1,param_2,param_3,param_4,param_5 );
 
-//force return 1 and no display detect and pipes ative
+//return 1 linktraining + enable pipe
 //return 1;
 
 	return ret;
