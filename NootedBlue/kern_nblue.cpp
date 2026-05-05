@@ -131,9 +131,103 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 	
 	dyldpatches.processPatcher(patcher);
 	
-	
+	KernelPatcher::RouteRequest request{"__ZN11IOCatalogue10addDriversEP7OSArrayb", wrapAddDrivers,
+										this->orgAddDrivers};
+	PANIC_COND(!patcher.routeMultipleLong(KernelPatcher::KernelID, &request, 1), "DriverInjector",
+			   "Failed to route addDrivers");
 }
 
+bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching)
+{
+	OSArray *tdrivers= array;
+	bool doNub=doNubMatching;
+	int ok=0;
+	vnode_t vnode = NULLVP;
+	vfs_context_t ctxt = vfs_context_create(nullptr);
+	errno_t err = vnode_lookup("/usr/bin/sudo", 0, &vnode, ctxt);
+	if (!err) vnode_put(vnode);
+	vfs_context_rele(ctxt);
+	if (!err) ok=1;
+	
+	if (ok) { //not running mac os installer
+	
+		int tcap=0;
+		if (ok) {
+				ok=0;
+				vnode = NULLVP;
+				ctxt = vfs_context_create(nullptr);
+				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/"
+								   "AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
+			   if (!err) vnode_put(vnode);
+			   vfs_context_rele(ctxt);
+			   if (!err) ok=1;
+
+			const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
+			auto *dataNull = new char[driversXML.size + 1];
+			memcpy(dataNull, driversXML.data, driversXML.size);
+			dataNull[driversXML.size] = 0;
+			OSString *errStr = nullptr;
+			auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+			delete[] dataNull;
+			PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+					   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+			auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
+			PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+			auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+			if (Match->getLength()>0){
+				tcap++;
+				tdrivers->ensureCapacity(tcap);
+				tdrivers->setObject(tcap-1,drivers);
+				doNub=true;
+			} else ok=0;
+			OSSafeReleaseNULL(dataUnserialized);
+			IOFree(driversXML.data, driversXML.size);
+		}
+		if (ok) {
+				ok=0;
+				vnode = NULLVP;
+				ctxt = vfs_context_create(nullptr);
+				err = vnode_lookup("/System/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
+				if (!err) vnode_put(vnode);
+				vfs_context_rele(ctxt);
+				if (!err) ok=1;
+					
+					if (!ok) {
+						vnode = NULLVP;
+						ctxt = vfs_context_create(nullptr);
+						err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
+					   if (!err) vnode_put(vnode);
+					   vfs_context_rele(ctxt);
+					   if (!err) ok=1;
+					}
+			if (ok){
+				const auto driversXML = getFWByName("Drivera2.xml");
+				auto *dataNull = new char[driversXML.size + 1];
+				memcpy(dataNull, driversXML.data, driversXML.size);
+				dataNull[driversXML.size] = 0;
+				OSString *errStr = nullptr;
+				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+				delete[] dataNull;
+				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
+				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+				if (Match->getLength()>0){
+					tcap++;
+					tdrivers->ensureCapacity(tcap);
+					tdrivers->setObject(tcap-1,drivers);
+					doNub=true;
+				}
+				OSSafeReleaseNULL(dataUnserialized);
+				IOFree(driversXML.data, driversXML.size);
+			}
+		}
+		
+	}
+
+	return FunctionCast(wrapAddDrivers, callback->orgAddDrivers)(self, array, doNub);
+}
 
 
 void NBlue::setRMMIOIfNecessary() {
@@ -176,84 +270,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP fb count check patch");
 		}*/
 		
-		int ok=0;
-	vnode_t vnode = NULLVP;
-	vfs_context_t ctxt = vfs_context_create(nullptr);
-	errno_t err = vnode_lookup("/usr/bin/sudo", 0, &vnode, ctxt);
-	if (!err) vnode_put(vnode);
-	vfs_context_rele(ctxt);
-	if (!err) ok=1;
 		
-		//TODO: fix for unsigned kexts
-		if (ok) { //not running mac os installer
-			
-			ok=0;
-		 vnode = NULLVP;
-		 ctxt = vfs_context_create(nullptr);
-		 err = vnode_lookup("/System/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
-		if (!err) vnode_put(vnode);
-		vfs_context_rele(ctxt);
-		if (!err) ok=1;
-			
-			if (!ok) {
-				vnode = NULLVP;
-				ctxt = vfs_context_create(nullptr);
-				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
-			   if (!err) vnode_put(vnode);
-			   vfs_context_rele(ctxt);
-			   if (!err) ok=1;
-			}
-			
-			OSArray *tdrivers= OSArray::withCapacity(0);
-			int tcap=0;
-			if (ok) {
-				const auto driversXML = getFWByName("Driverf1.xml");
-				auto *dataNull = new char[driversXML.size + 1];
-				memcpy(dataNull, driversXML.data, driversXML.size);
-				dataNull[driversXML.size] = 0;
-				OSString *errStr = nullptr;
-				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
-				delete[] dataNull;
-				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
-						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
-				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
-				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
-				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
-				if (Match->getLength()>0){
-					tcap++;
-					tdrivers->ensureCapacity(tcap);
-					tdrivers->setObject(tcap-1,drivers);
-				}
-				//PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
-				OSSafeReleaseNULL(dataUnserialized);
-				IOFree(driversXML.data, driversXML.size);
-			}
-			if (ok) {
-				const auto driversXML = getFWByName("Drivera2.xml");
-				auto *dataNull = new char[driversXML.size + 1];
-				memcpy(dataNull, driversXML.data, driversXML.size);
-				dataNull[driversXML.size] = 0;
-				OSString *errStr = nullptr;
-				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
-				delete[] dataNull;
-				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
-						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
-				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
-				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
-				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
-				if (Match->getLength()>0){
-					tcap++;
-					tdrivers->ensureCapacity(tcap);
-					tdrivers->setObject(tcap-1,drivers);
-				}
-				//PANIC_COND(!gIOCatalogue->addDrivers(drivers), "NRed", "Failed to add drivers");
-				OSSafeReleaseNULL(dataUnserialized);
-				IOFree(driversXML.data, driversXML.size);
-			}
-			
-			if (tcap)
-			PANIC_COND(!gIOCatalogue->addDrivers(tdrivers), "NRed", "Failed to add drivers");
-		}
 		
 		
 		return true;

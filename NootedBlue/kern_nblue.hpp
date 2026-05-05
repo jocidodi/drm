@@ -86,6 +86,8 @@ class NBlue {
 		}
 	}
 	
+	static bool wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching);
+	mach_vm_address_t orgAddDrivers{0};
 	
     uint32_t deviceId {0};
     uint16_t revision {0};
