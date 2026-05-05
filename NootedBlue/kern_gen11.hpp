@@ -470,32 +470,8 @@ private:
 	static uint64_t  getOSInformation(void *that);
 	mach_vm_address_t ogetOSInformation {};
 	
-	static uint32_t enableVDDForAux(void *that,void *param_1);
-	mach_vm_address_t oenableVDDForAux {};
-	
-	static uint32_t disableVDDForAux(void *that);
-	mach_vm_address_t odisableVDDForAux {};
-	
-	static unsigned long  isHPDLow(void *that);
-	mach_vm_address_t oisHPDLow {};
-	
-	static void hwWriteMailbox(void *that,uint param_1,uint param_2,bool param_3);
-	mach_vm_address_t ohwWriteMailbox {};
-	
-	static IOReturn wrapFBClientDoAttribute(void *fbclient, uint32_t attribute, unsigned long *unk1, unsigned long unk2, unsigned long *unk3, unsigned long *unk4, void *externalMethodArguments);
-	mach_vm_address_t orgFBClientDoAttribute {};
-	
 	static IOReturn wrapPavpSessionCallback(void *intelAccelerator, int32_t sessionCommand, uint32_t sessionAppId, uint32_t *a4, bool flag);
 	mach_vm_address_t orgPavpSessionCallback {};
-	
-	static void hwConfigureCustomAUX(void *that,bool param_1);
-	mach_vm_address_t ohwConfigureCustomAUX {};
-	
-	static unsigned long hwRegsNeedUpdate
-			  (void *that,void *param_1,
-			   void *param_2,void *param_3,void *param_4,
-			   void *param_5);
-	mach_vm_address_t ohwRegsNeedUpdate {};
 	
 	static bool	AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2);
 	mach_vm_address_t oAppleIntelFramebufferinit {};
@@ -506,32 +482,10 @@ private:
 	static void FBMemMgr_Init(void *that);
 	mach_vm_address_t oFBMemMgr_Init {};
 	
-	static uint64_t mapIOBitsPerColorToEncoderBitsPerColor(void *that,uint param_1,uint *param_2);
-	mach_vm_address_t omapIOBitsPerColorToEncoderBitsPerColor {};
-	
-	static void hwInitializeCState(void *that);
-	mach_vm_address_t ohwInitializeCState {};
-	
 	static unsigned long AppleIntelScalerinit(void *that,uint8_t param_1);
 	mach_vm_address_t oAppleIntelScalerinit {};
 	
-	static void hwSetPowerWellStatePG(void *that,bool param_1,uint param_2);
-	mach_vm_address_t ohwSetPowerWellStatePG {};
-	
-	static uint32_t hwReadMailbox(void *that,uint param_1);
-	mach_vm_address_t ohwReadMailbox {};
-	
-	static void AppleIntelPowerWellinit(void *that,void *param_1);
-	mach_vm_address_t oAppleIntelPowerWellinit {};
-	
-	static int hasExternalDispla();
-	
-	static int writeAUX(void *that,uint param_1,void *param_2,uint param_3);
-	mach_vm_address_t owriteAUX {};
-	
-	static int readAUX(void *that,uint param_1,void *param_2,uint param_3);
-	mach_vm_address_t oreadAUX {};
-	
+
 
 
 	

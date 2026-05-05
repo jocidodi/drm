@@ -49,59 +49,18 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 		NBlue::callback->setRMMIOIfNecessary();
 		
-		
 		RouteRequestPlus requests[] = {
-
-			{"__ZN21AppleIntelFramebuffer13SaveNVRAMModeEv",dofalse},
-			{"__ZN21AppleIntelFramebuffer18prepareToEnterWakeEv",dovoid},
-			{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
-			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
-			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
-			{"__ZN20IntelFBClientControl11doAttributeEjPmmS0_S0_P25IOExternalMethodArguments",wrapFBClientDoAttribute,	this->orgFBClientDoAttribute},
-
+			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
+		//platform id
 		static const uint8_t f15[]= {0x00,0x02, 0x00, 0x5c, 0x8a};
 		static const uint8_t r15[]= {0x00,0x00, 0x00, 0x49, 0x9a};
-		
-		
-		// AppleIntelFramebufferController::hwSetMode skip hwRegsNeedUpdate
-		static const uint8_t f2[] = {0xE8, 0x31, 0xE5, 0xFF, 0xFF, 0x84, 0xC0, 0x74, 0x3D};
-		static const uint8_t r2[] = {0xE8, 0x31, 0xE5, 0xFF, 0xFF, 0x84, 0xC0, 0xEB, 0x3D};
-		
-		//sonoma
-		static const uint8_t f2b[] = {0xE8, 0x54, 0xEA, 0xFF, 0xFF, 0x84, 0xC0, 0x74, 0x5C};
-		static const uint8_t r2b[] = {0xE8, 0x54, 0xEA, 0xFF, 0xFF, 0x84, 0xC0, 0xeb, 0x5C};
-		
-		//sequoia
-		static const uint8_t f2c[] = {0xE8, 0x74, 0xEA, 0xFF, 0xFF, 0x84, 0xC0, 0x74, 0x5C};
-		static const uint8_t r2c[] = {0xE8, 0x74, 0xEA, 0xFF, 0xFF, 0x84, 0xC0, 0xeb, 0x5C};
-		
-		if (getKernelVersion() <= KernelVersion::Ventura) {
-			KernelPatcher::LookupPatch patch { &kextG11FB, f2, r2, sizeof(f2), 1 };
-			patcher.applyLookupPatch(&patch);
-		}
-		
-		if (getKernelVersion() == KernelVersion::Sonoma) {
-			KernelPatcher::LookupPatch patchb { &kextG11FB, f2b, r2b, sizeof(f2b), 1 };
-			patcher.applyLookupPatch(&patchb);
-		}
-		
-		if (getKernelVersion() >= KernelVersion::Sequoia) {
-			KernelPatcher::LookupPatch patchc { &kextG11FB, f2c, r2c, sizeof(f2c), 1 };
-			patcher.applyLookupPatch(&patchc);
-		}
-		
-		
 
 		LookupPatchPlus const patches[] = {
-
 			{&kextG11FB, f15, r15, arrsize(f15),    1},
 		};
-		
-		
-		
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
 		DBGLOG("nblue", "Loaded AppleIntelICLLPGraphicsFramebuffer!");
@@ -126,7 +85,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		{
 			SolveRequestPlus solveRequests[] = {
 				{"_gPlatformInformationList", this->gPlatformInformationList},
-				
 			};
 			PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		}
@@ -136,58 +94,32 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
-			{"__ZN19AppleIntelPowerWell21hwSetPowerWellStatePGEbj",hwSetPowerWellStatePG, this->ohwSetPowerWellStatePG},
-			{"__ZN14AppleIntelPort8isHPDLowEv",isHPDLow, this->oisHPDLow},
-			
-			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
-				{"__ZN31AppleIntelFramebufferController13hwReadMailboxEj",hwReadMailbox, this->ohwReadMailbox},
-				{"__ZN31AppleIntelFramebufferController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
-				{"__ZN31AppleIntelFramebufferController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
-				{"__ZN31AppleIntelFramebufferController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
-				{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 				{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
-				{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
-				{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 				{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 				{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation, this->ogetOSInformation},
-				{"__ZN19AppleIntelPowerWell4initEP31AppleIntelFramebufferController",AppleIntelPowerWellinit, this->oAppleIntelPowerWellinit},
-				{"__ZN31AppleIntelFramebufferController16disableVDDForAuxEv",disableVDDForAux, this->odisableVDDForAux},
-				{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
-				
+
 			};
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route p symbols");
 			
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
-				{"__ZN24AppleIntelBaseController13hwReadMailboxEj",hwReadMailbox, this->ohwReadMailbox},
-				{"__ZN24AppleIntelBaseController14hwWriteMailboxEjjb",hwWriteMailbox, this->ohwWriteMailbox},
-				{"__ZN24AppleIntelBaseController38mapIOBitsPerColorToEncoderBitsPerColorEjPj",mapIOBitsPerColorToEncoderBitsPerColor, this->omapIOBitsPerColorToEncoderBitsPerColor},
-				{"__ZN24AppleIntelBaseController18hasExternalDisplayEv",hasExternalDispla},// external wrong detection
-				{"__ZN24AppleIntelBaseController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
-				
 				{"__ZN21AppleIntelFramebuffer4initEP24AppleIntelBaseControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
-				{"__ZN24AppleIntelBaseController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
-				{"__ZN24AppleIntelBaseController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 				{"__ZN24AppleIntelBaseController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN24AppleIntelBaseController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 				{"__ZN24AppleIntelBaseController16getOSInformationEv",getOSInformation, this->ogetOSInformation},
-				{"__ZN19AppleIntelPowerWell4initEP24AppleIntelBaseController",AppleIntelPowerWellinit, this->oAppleIntelPowerWellinit},
-				{"__ZN24AppleIntelBaseController16disableVDDForAuxEv",disableVDDForAux, this->odisableVDDForAux},
-				{"__ZN24AppleIntelBaseController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
 				
 			};
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route d symbols");
 			
 		}
-		
 		
 	
 		
@@ -199,11 +131,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f1c[] = {0x12, 0x14, 0xc4, 0x41};
 		static const uint8_t r1c[] = {0x11, 0x0a, 0x82, 0x41};
 		
-		static const uint8_t f1p[]= {0xe8, 0x66, 0xb0, 0xfe, 0xff, 0x89, 0x45, 0xc8, 0x3d, 0xff, 0xff, 0x00, 0x00, 0x74, 0x45};
-		static const uint8_t r1p[]= {0xe8, 0x66, 0xb0, 0xfe, 0xff, 0x89, 0x45, 0xc8, 0x3d, 0xff, 0xff, 0x00, 0x00, 0xeb, 0x45};
-		
 
-		//force edp panel
+		//force edp panel if pipe=1
 		static const uint8_t f6a[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
 		static const uint8_t r6a[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
 
@@ -250,7 +179,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r20p[]= {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x48, 0x85, 0xdb, 0x74, 0x17};
 
 		
-		//fix register adresses if pipe=0
+		//production ver fix register adresses if pipe=0
 		static const uint8_t f24bp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
 		static const uint8_t r24bp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
 		
@@ -260,7 +189,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f24dp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
 		static const uint8_t r24dp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
 		
-		//fix register adresses if pipe=0
+		//debug ver fix register adresses if pipe=0
 		static const uint8_t f24b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
 		static const uint8_t r24b[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
 		
@@ -335,8 +264,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		LookupPatchPlus const patches[] = {
 			{&kextG11HW, f2, r2, arrsize(f2),	1},
 		};
-		
-
 		SYSLOG_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11HW Failed to apply patches!");
 
 		return true;
@@ -347,7 +274,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		auto kext=kextG11HWT.loadIndex == index ? kextG11HWT: kextG11HWTe;
 		
 		SolveRequestPlus solveRequests[] = {
-			//apple rings control variable
+			//apple rings control variable -> 11 globals
 			{"__ZL11kIGHwCsDesc", this->kIGHwCsDesc},
 			
 		};
@@ -357,10 +284,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		 RouteRequestPlus requests[] = {
 			 
 			 {"__ZN16IntelAccelerator19PAVPCommandCallbackE22PAVPSessionCommandID_tjPjb", wrapPavpSessionCallback, this->orgPavpSessionCallback},
-
-			 
 		 };
-		//PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
+		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
 		//sku bypass IntelAccelerator::getGPUInfo
 		static const uint8_t f3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x7f, 0x15, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0x74, 0x2d};
@@ -421,13 +346,13 @@ uint64_t  Gen11::getOSInformation(void *that)
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
-		pinfo[1].cameliav=3;
+		pinfo[1].cameliav=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 	
 		pinfo[1].fMobile=1;
-		pinfo[1].fPipeCount=3;
-		pinfo[1].fInfoPortCount=3;
+		pinfo[1].fPipeCount=4;
+		pinfo[1].fInfoPortCount=4;
 		pinfo[1].fInfoFramebufferCount=2;
 
 		pinfo[1].fSliceCount=1;
@@ -444,7 +369,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	pinfo[1].connectors[0].pipe=0;//fix wrong register use patch or set = 1
 	pinfo[1].connectors[0].pad=0;
 	pinfo[1].connectors[0].type=ConnectorLVDS;
-	pinfo[1].connectors[0].flags=0x8;
+	pinfo[1].connectors[0].flags=0x8+0x10;
 	
 	pinfo[1].connectors[1].index=1;
 	pinfo[1].connectors[1].busId=1;
@@ -475,7 +400,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 
 IOReturn Gen11::wrapPavpSessionCallback( void *intelAccelerator, int32_t sessionCommand, uint32_t sessionAppId, uint32_t *a4, bool flag) {
 	
-	
 	if (sessionCommand == 4) {
 		return kIOReturnTimeout;
 	}
@@ -483,64 +407,9 @@ IOReturn Gen11::wrapPavpSessionCallback( void *intelAccelerator, int32_t session
 	return FunctionCast(wrapPavpSessionCallback, callback->orgPavpSessionCallback)(intelAccelerator, sessionCommand, sessionAppId, a4, flag);
 }
 
-IOReturn Gen11::wrapFBClientDoAttribute(void *fbclient, uint32_t attribute, unsigned long *unk1, unsigned long unk2, unsigned long *unk3, unsigned long *unk4,  void *externalMethodArguments) {
-	if (attribute == 0x923) {
-		return kIOReturnUnsupported;
-	}
-	
-	return FunctionCast(wrapFBClientDoAttribute, callback->orgFBClientDoAttribute)(fbclient, attribute, unk1, unk2, unk3, unk4,  externalMethodArguments);
-}
-
-
-
-unsigned long Gen11::hwRegsNeedUpdate
-		  (void *that,void *param_1,
-		   void *param_2,void *param_3,void *param_4,
-		   void *param_5)
-{
-	
-	auto ret=FunctionCast(hwRegsNeedUpdate, callback->ohwRegsNeedUpdate)(that,param_1,param_2,param_3,param_4,param_5 );
-
-//return 1 linktraining + enable pipe
-//return 1;
-
-	return ret;
-}
-
-
-unsigned long  Gen11::isHPDLow(void *that)
-{
-	auto ret= FunctionCast(isHPDLow, callback->oisHPDLow)(that);
-	return ret;
-};
-
-uint64_t Gen11::mapIOBitsPerColorToEncoderBitsPerColor(void *that,uint param_1,uint *param_2)
-{
-	//TODO: filter for edp only + check other options
-	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
-	if (param_2 != (uint *)0x0) {
-	  param_1 = 2;
-	}
-	
-	return FunctionCast(mapIOBitsPerColorToEncoderBitsPerColor, callback->omapIOBitsPerColorToEncoderBitsPerColor)(that,param_1,param_2);;
-};
-
-int Gen11::writeAUX(void *that,uint param_1,void *param_2,uint param_3)
-{
-	auto ret=FunctionCast(writeAUX, callback->owriteAUX)(that ,param_1,param_2,param_3);
-	return ret;
-}
-int Gen11::readAUX(void *that,uint param_1,void *param_2,uint param_3)
-{
-	auto ret=FunctionCast(readAUX, callback->oreadAUX)(that ,param_1,param_2,param_3);
-	return ret;
-}
-
-
 
 void Gen11::dovoid()
 {
-	
 }
 
 bool Gen11::dotrue()
@@ -562,124 +431,6 @@ void Gen11::FBMemMgr_Init(void *that)
 
 }
 
-
-uint32_t Gen11::disableVDDForAux(void *that)
-{
-	
-		uint32_t ppControl = NBlue::callback->readReg32(0xC7204);
-	NBlue::callback->writeReg32(0xC7204, ppControl & 0xFFFFFFF7);
-
-		int retries = 0x32;
-		while (retries > 0) {
-			IOSleep(10);
-			
-			int32_t ppStatus = NBlue::callback->readReg32(0xC7200);
-			
-			if (ppStatus > -1) {
-
-				if (getMember<bool>(that, 0xe62) == true) {
-					IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
-					r->setProperty("AAPL,LCD-PowerState-ON", false);
-				}
-
-				return kIOReturnSuccess;
-			}
-			retries--;
-		}
-
-		IOSleep(300);
-
-		return kIOReturnSuccess;
-
-	
-};
-
-
-uint32_t Gen11::enableVDDForAux(void *that,void *param_1)
-{
-
-		uint32_t ppControl = NBlue::callback->readReg32(0xC7204);
-		int32_t ppStatus = NBlue::callback->readReg32(0xC7200);
-
-		if ((ppControl & 0x8) == 0) {
-
-			if ((int)ppStatus < 0) {
-				return 0xe00002eb;
-			}
-
-
-			int timeout = 25;
-			while (timeout > 0) {
-				ppStatus = NBlue::callback->readReg32(0xC7200);
-				if ((ppStatus >> 27 & 1) == 0) {
-					break;
-				}
-				IOSleep(20);
-				timeout--;
-			}
-
-
-			NBlue::callback->writeReg32(0xC7204, ppControl | 0x8);
-
-			if (getMember<bool>(that, 0xe62) == true) {
-				IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
-				r->setProperty("AAPL,LCD-PowerState-ON", true);
-			}
-
-			
-			if (getMember<uint32_t>(param_1, 0xd48) != 0) {
-				int hpdTimer = 0;
-				while (hpdTimer != 300) {
-					if (isHPDLow(param_1) == 0) {
-						return kIOReturnSuccess;
-					}
-					IOSleep(20);
-					hpdTimer += 20;
-				}
-
-				return 0xe00002d6;
-			}
-		}
-
-	return kIOReturnSuccess;
-
-};
-
-
-void Gen11::AppleIntelPowerWellinit(void *that,void *param_1)
-{
-	
-	FunctionCast(AppleIntelPowerWellinit, callback->oAppleIntelPowerWellinit)(that,param_1);
-	
-	if (NBlue::callback->isRealTGL) {
-		const u32 TGL_PCODE_TCCOLD = 0x12;
-		const u32 TGL_PCODE_EXIT_TCCOLD_DATA_L_UNBLOCK_REQ = 0;
-		const u32 TGL_PCODE_EXIT_TCCOLD_DATA_L_EXIT_FAILED = 0x80000000;
-		
-		u8 tc_tries = 0;
-		int tc_ret;
-		
-		while (1) {
-			u32 low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_UNBLOCK_REQ;
-			u32 high_val = 0;
-			
-			hwWriteMailbox(ccont2, TGL_PCODE_TCCOLD, low_val, true);
-			tc_ret =hwReadMailbox(ccont2, TGL_PCODE_TCCOLD);
-			if (tc_ret == 0) {
-				break;
-			}
-			
-			if (++tc_tries == 3)
-				break;
-			
-			IOSleep(1);
-		}
-	}
-	
-}
-
-
-
 bool Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2)
 {
 	getMember<void *>(frame, 0x4a40) = ccont;
@@ -691,7 +442,6 @@ bool Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2)
 
 uint64_t  Gen11::AppleIntelPlaneinit(void *that,uint8_t param_1)
 {
-	
 	auto ret= FunctionCast(AppleIntelPlaneinit, callback->oAppleIntelPlaneinit)(that,param_1 );
 	getMember<void *>(that, 0x90) = ccont;
 	return ret;
@@ -699,54 +449,9 @@ uint64_t  Gen11::AppleIntelPlaneinit(void *that,uint8_t param_1)
 
 unsigned long Gen11::AppleIntelScalerinit(void *that,uint8_t param_1)
 {
-	
 	auto ret=  FunctionCast(AppleIntelScalerinit, callback->oAppleIntelScalerinit)(that,param_1 );
 	getMember<void *>(that, 0x28) = ccont;
 	getMember<void *>(that, 0x10) = ccont2;
 	return ret;
 }
 
-uint32_t Gen11::hwReadMailbox(void *that,uint param_1)
-{
-	return FunctionCast(hwReadMailbox, callback->ohwReadMailbox)(that,param_1 );
-}
-
-void Gen11::hwWriteMailbox(void *that,uint param_1,uint param_2,bool param_3)
-{
-	FunctionCast(hwWriteMailbox, callback->ohwWriteMailbox)(that,param_1,param_2,param_3 );
-}
-
-
-void Gen11::hwSetPowerWellStatePG(void *that,bool param_1,uint param_2)
-{
-	if (!NBlue::callback->isRealTGL) {
-		uint32_t ctl2 = NBlue::callback->readReg32(0x45404);
-		uint32_t newVal;
-		if (param_1) {
-			// Enable: clear all REQ bits then set the requested ones.
-			newVal = (ctl2 & 0xFFFFFF55U) | (param_2 & 0xAAU);
-		} else {
-			// Disable: clear the requested REQ bits.
-			newVal = ctl2 & ~(param_2 & 0xAAU);
-		}
-		NBlue::callback->writeReg32(0x45404, newVal);
-		return;
-	}
-	FunctionCast(hwSetPowerWellStatePG, callback->ohwSetPowerWellStatePG)(that,param_1,param_2);
-}
-
-void Gen11::hwInitializeCState(void *that)
-{
-	FunctionCast(hwInitializeCState, callback->ohwInitializeCState)(that);
-}
-
-void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
-{
-	FunctionCast(hwConfigureCustomAUX, callback->ohwConfigureCustomAUX)(that,param_1 );
-}
-
-
-int Gen11::hasExternalDispla()
-{
-	return 0;
-}
