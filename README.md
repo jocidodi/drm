@@ -1,4 +1,4 @@
-1) drm setup for browsing i915/xe
+1) drm setup for browsing i915/xe linux sources
 
 - create a new xcodeprogj and add drm_extracted
 - after indexing browsing structures should be fine
@@ -6,9 +6,9 @@
 
 2) nblue setup
    
-- Install framebuffer to /l/e
+- Install framebuffer + hookcase to /l/e
 - Install acel+bundles to /s/l/e
-- default kexts setup using nred logic. change in xcode
+- default kexts setup using nred logic. change inside xcodeproj
 - update lilu and sdk as need by your os
 - boot with (remove -allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
