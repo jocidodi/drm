@@ -351,8 +351,8 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	
 		pinfo[1].fMobile=1;
-		pinfo[1].fPipeCount=3;
-		pinfo[1].fInfoPortCount=3;
+		pinfo[1].fPipeCount=4;
+		pinfo[1].fInfoPortCount=4;
 		pinfo[1].fInfoFramebufferCount=2;
 
 		pinfo[1].fSliceCount=1;
