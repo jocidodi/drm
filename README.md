@@ -10,12 +10,12 @@
 - Install framebuffer + hookcase to /l/e
 - Install acel+bundles to /s/l/e
 - wrong kexts permissions or bad kext install = boot hang
-  sudo chmod -R 755
-  sudo chown -R root:wheel
-  be sure owner rw, others ro
+- sudo chmod -R 755
+- sudo chown -R root:wheel
+- be sure owner rw, others ro
 - default kexts setup using nred logic. change inside xcodeproj
 - update lilu and sdk as need by your os
-- boot with (remove -allow3d for frame only)
+- boot with (remove allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
 
 
