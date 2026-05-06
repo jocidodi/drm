@@ -5,10 +5,13 @@
 
 
 2) nblue setup
-- info.plist for setup frame/acelerator
-- doesnt need drm to build
-- drm and issues use here is to feed ai bot
+   
+- Install framebuffer to /l/e
+- Install acel+bundles to /s/l/e
+- default kexts setup using nred logic. change in xcode
 - update lilu and sdk as need by your os
+- boot with (remove -allow3d for frame only)
+  debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
 
 
 This count as "working"
