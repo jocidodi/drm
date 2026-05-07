@@ -66,23 +66,17 @@ class NBlue {
     private:
 	
 	
-	//need review
-	UInt32 readReg32(unsigned long reg) {
+	inline UInt32 readReg32(unsigned long reg) {
 		if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
 			return this->rmmioPtr[reg];
 		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			return this->rmmioPtr[mmPCIE_DATA2];
+			return 0;
 		}
 	}
 	
-	//need review
-	void writeReg32(unsigned long reg, UInt32 val) {
+	inline void writeReg32(unsigned long reg, UInt32 val) {
 		if ((reg * sizeof(uint32_t)) < this->rmmio->getLength()) {
 			this->rmmioPtr[reg] = val;
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			this->rmmioPtr[mmPCIE_DATA2] = val;
 		}
 	}
 	
