@@ -489,7 +489,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
 	
-		pinfo[p].camelliaVersion=0;
+		pinfo[p].camelliaVersion=3;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 		pinfo[p].fMobile=1;
@@ -507,17 +507,17 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[0].index=0;
 	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=0;
+	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].pad=0;
 	pinfo[p].connectors[0].type=ConnectorLVDS;
-	pinfo[p].connectors[0].flags=0x8+0x10;
+	pinfo[p].connectors[0].flags=0x1+0x10;
 	
 	pinfo[p].connectors[1].index=0; //DDI0 if index=0 //porthal init
 	pinfo[p].connectors[1].busId=0;
-	pinfo[p].connectors[1].pipe=1; // if zero need reg patch //getTranscoderOffset
+	pinfo[p].connectors[1].pipe=0; // if zero need reg patch //getTranscoderOffset
 	pinfo[p].connectors[1].pad=0;
-	pinfo[p].connectors[1].type=ConnectorLVDS;
-	pinfo[p].connectors[1].flags=0x8+0x10;
+	pinfo[p].connectors[1].type=ConnectorDummy;
+	pinfo[p].connectors[1].flags=0;
 	
 	pinfo[p].connectors[2].index=1;
 	pinfo[p].connectors[2].busId=0;
