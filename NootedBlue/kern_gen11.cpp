@@ -49,8 +49,17 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 		NBlue::callback->setRMMIOIfNecessary();
 		
+		SolveRequestPlus solveRequests[] = {
+			{"_gPlatformInformationList", this->gPlatformInformationList2},
+		};
+		PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
+		
 		RouteRequestPlus requests[] = {
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
+			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds2, this->oinitPlatformWorkarounds2},
+			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
+			
+			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
@@ -455,3 +464,75 @@ unsigned long Gen11::AppleIntelScalerinit(void *that,uint8_t param_1)
 	return ret;
 }
 
+void  Gen11::initPlatformWorkarounds2(void *that)
+{
+	//PlatformWorkarounds
+	getMember<volatile uint32_t>(that, 0xc1c)=
+ FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|
+	FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|
+	FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|
+	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
+	
+	//ig boot flags
+	getMember<volatile uint32_t>(that, 0xc10)=FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
+	
+}
+uint64_t  Gen11::getOSInformation2(void *that)
+{
+	
+	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList2);
+	int p=0x14;
+	
+	pinfo[p].flags=
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	FB_FLAG_LIMIT_4K_SOURCE_SIZE|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
+	FB_FLAG_FRAMEBUFFER_COMPRESSION;
+	
+	
+		pinfo[p].camelliaVersion=0;
+		//CamelliaTcon2=2 BanksiaTcon=3
+	
+		pinfo[p].fMobile=1;
+		pinfo[p].fPipeCount=4;
+		pinfo[p].fPortCount=4;
+		pinfo[p].fInfoFramebufferCount=3;
+
+		pinfo[p].fSliceCount=1;
+		pinfo[p].fEuCount=8;
+		pinfo[p].fSubSliceCount=10;
+	
+	//pinfo[p].fInfoFBCompressionMemorySize=	0xc00000;
+	//pinfo[p].fVideoTurboFreq=270000000;
+	//pinfo[p].VCLK=1000*0x438;
+	
+	pinfo[p].connectors[0].index=0;
+	pinfo[p].connectors[0].busId=0;
+	pinfo[p].connectors[0].pipe=0;
+	pinfo[p].connectors[0].pad=0;
+	pinfo[p].connectors[0].type=ConnectorLVDS;
+	pinfo[p].connectors[0].flags=0x8+0x10;
+	
+	pinfo[p].connectors[1].index=0; //DDI0 if index=0 //porthal init
+	pinfo[p].connectors[1].busId=0;
+	pinfo[p].connectors[1].pipe=1; // if zero need reg patch //getTranscoderOffset
+	pinfo[p].connectors[1].pad=0;
+	pinfo[p].connectors[1].type=ConnectorLVDS;
+	pinfo[p].connectors[1].flags=0x8+0x10;
+	
+	pinfo[p].connectors[2].index=1;
+	pinfo[p].connectors[2].busId=0;
+	pinfo[p].connectors[2].pipe=2;
+	pinfo[p].connectors[2].pad=0;
+	pinfo[p].connectors[2].type=ConnectorHDMI;
+	pinfo[p].connectors[2].flags=0x1+0x800;
+	
+	pinfo[p].connectors[3].index=3;
+	pinfo[p].connectors[3].busId=0;
+	pinfo[p].connectors[3].pipe=3;
+	pinfo[p].connectors[3].pad=0;
+	pinfo[p].connectors[3].type=ConnectorDummy;
+	pinfo[p].connectors[3].flags=0;
+	
+	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
+	return ret;
+}

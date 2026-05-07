@@ -338,75 +338,46 @@ enum FramebufferFlags2
 	FB_FLAG_SUPPORT_5K_SOURCE_SIZE = 0x800000
 };
 
-enum  FeatureControlOption {
-	// 4KVideoDownscale is invalid in C++, renamed to VideoDownscale4K
-	VideoDownscale4K,        // "4KVideoDownscale"
-	AGPMLogControl,          // "AGPMLogControl"
-	ASFU,                    // "ASFU"
-	ASRDisable,              // "ASRDisable"
-	CachedEDIDDisable,       // "CachedEDIDDisable"
-	Dither,                  // "Dither"
-	DitherDisable,           // "DitherDisable"
-	DPM,                     // "DPM"
-	DPDownSpreadDisable,     // "DPDownSpreadDisable"
-	DSCCapReporting,         // "DSCCapReporting"
-	DSCSupport,              // "DSCSupport"
-	DBUFOptimizeTime,        // "DBUFOptimizeTime"
-	DisableApertureAccess,   // "DisableApertureAccess"
-	DisableDFB,              // "DisableDFB"
-	DisableHigherWMLevels,   // "DisableHigherWMLevels"
-	DisableInternalPanel,    // "DisableInternalPanel"
-	DynamicFBCEnable,        // "DynamicFBCEnable"
-	DynamicFBCFrameCount,    // "DynamicFBCFrameCount"
-	DynamicRingTables,       // "DynamicRingTables"
-	DynamicSliceSwitch,      // "DynamicSliceSwitch"
-	EDPDownSpreadDisable,    // "EDPDownSpreadDisable"
-	EUSDEnable,              // "EUSDEnable"
-	Enable8K,                // "Enable8K"
-	EnableDFB,               // "EnableDFB"
-	EnableDeepDisplay,       // "EnableDeepDisplay"
-	EnableLPVPonExternal,    // "EnableLPVPonExternal"
-	EnableMultipipeScaler,   // "EnableMultipipeScaler"
-	EnablePlaneRotation,     // "EnablePlaneRotation"
-	EnableTconScaler,        // "EnableTconScaler"
-	FBCEnableOnBypass,       // "FBCEnableOnBypass"
-	FECSupport,              // "FECSupport"
-	ForceAccelBacked,        // "ForceAccelBacked"
-	GFMPPFM,                 // "GFMPPFM"
-	GPU420Support,           // "GPU420Support"
-	GPUInterruptHandling,    // "GPUInterruptHandling"
-	Gamma,                   // "Gamma"
-	IgnoreHMD,               // "IgnoreHMD"
-	IPCEnable,               // "IPCEnable"
-	LoadRingOverridePerSlice,// "LoadRingOverridePerSlice"
-	LogSyncAsyncFlipChanges, // "LogSyncAsyncFlipChanges"
-	NoAsyncWithVRR,          // "NoAsyncWithVRR"
-	NoDoubleBufferWithVRR,   // "NoDoubleBufferWithVRR"
-	NoResidency,             // "NoResidency"
-	NV12Enable,              // "NV12Enable"
-	NumTransactionsThreshold,// "NumTransactionsThreshold"
-	P010Enable,              // "P010Enable"
-	PStateOccupancyReportUsed, // "PStateOccupancyReportUsed"
-	PStateResidencyWAEnable, // "PStateResidencyWAEnable"
-	PowerStates,             // "PowerStates"
-	RCxEIModeEnable,         // "RCxEIModeEnable"
-	RenderStandby,           // "RenderStandby"
-	SetRC6Voltage,           // "SetRC6Voltage"
-	SliceSDEnable,           // "SliceSDEnable"
-	SliceSDEnableOld,        // "SliceSDEnableOld"
-	SubSliceSDEnable,        // "SubSliceSDEnable"
-	SupportDynamicCDClk,     // "SupportDynamicCDClk"
-	TTNFBuffDistribution,    // "TTNFBuffDistribution"
-	ThreadingMode,           // "ThreadingMode"
-	TracePointEnable,        // "TracePointEnable"
-	TransactionCountTime,    // "TransactionCountTime"
-	TransitionAmount,        // "TransitionAmount"
-	TransCapEnable,          // "transcapenable"
-	UseGucSliceSwitch,       // "UseGucSliceSwitch"
-	VRRSupport,              // "VRRSupport"
-	VideoBusyTimer,          // "VideoBusyTimer"
-	VideoTurboFreq,          // "VideoTurboFreq"
-	YTiling                  // "YTiling"
+
+struct PACKED FramebufferCNLCurrents {
+	uint32_t value1;
+	uint32_t pad;
+	uint64_t valu2;
+};
+struct PACKED ConnectorInfo {
+	uint32_t index;
+	uint32_t busId;
+	uint32_t pipe;
+	uint32_t pad;
+	ConnectorType type;
+	uint32_t flags;
+};
+struct PACKED FramebufferICLLP {
+	uint32_t framebufferId;
+
+	uint32_t fPchType;
+	uint64_t *fModelNameAddr;
+	uint8_t  fMobile;
+	uint8_t  fPipeCount;
+	uint8_t  fPortCount;
+	uint8_t  fInfoFramebufferCount;
+	uint32_t fStolenMemorySize;
+	uint32_t fFramebufferMemorySize;
+	uint32_t fUnifiedMemorySize;
+	ConnectorInfo connectors[6];
+	uint32_t flags;
+	uint32_t unk2;
+	FramebufferCNLCurrents currents[3];
+	uint32_t unk3[2];
+	uint32_t camelliaVersion;
+	uint32_t unk4[3];
+	uint32_t fNumTransactionsThreshold;
+	uint32_t fVideoTurboFreq;
+	uint32_t fSliceCount;
+	uint32_t fEuCount;
+	uint32_t fSubSliceCount;
+	uint8_t unk6;
+	uint8_t pad[3];
 };
 
 
@@ -463,6 +434,7 @@ private:
 	
 	void* gPlatformInformationList{nullptr};
 	void* kIGHwCsDesc {};
+	void* gPlatformInformationList2{nullptr};
 	
 	static void  initPlatformWorkarounds(void *that);
 	mach_vm_address_t oinitPlatformWorkarounds {};
@@ -485,7 +457,11 @@ private:
 	static unsigned long AppleIntelScalerinit(void *that,uint8_t param_1);
 	mach_vm_address_t oAppleIntelScalerinit {};
 	
+	static void  initPlatformWorkarounds2(void *that);
+	mach_vm_address_t oinitPlatformWorkarounds2 {};
 
+	static uint64_t  getOSInformation2(void *that);
+	mach_vm_address_t ogetOSInformation2 {};
 
 
 	
