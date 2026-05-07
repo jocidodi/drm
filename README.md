@@ -18,7 +18,8 @@
 - boot with (remove allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
 
-default is load tgl frame + acel if installed. if none then system icl frame loads. install or recovery model all are skiped
+Default is load tgl frame + acel if installed. bad install will cause boot hang.
+if no tgl installed then system icl frame loads. In msc os install or recovery mode all kexts are skiped
 
 
 
