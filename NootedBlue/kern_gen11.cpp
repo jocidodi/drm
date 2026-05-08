@@ -440,7 +440,7 @@ void Gen11::FBMemMgr_Init(void *that)
 
 }
 
-bool Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2)
+uint32_t Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint param_2)
 {
 	getMember<void *>(frame, 0x4a40) = ccont;
 	getMember<void *>(frame, 0xc40) = ccont;
@@ -449,14 +449,14 @@ bool Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2)
 	return ret;
 }
 
-uint64_t  Gen11::AppleIntelPlaneinit(void *that,uint8_t param_1)
+uint64_t  Gen11::AppleIntelPlaneinit(void *that,uint param_1)
 {
 	auto ret= FunctionCast(AppleIntelPlaneinit, callback->oAppleIntelPlaneinit)(that,param_1 );
 	getMember<void *>(that, 0x90) = ccont;
 	return ret;
 }
 
-unsigned long Gen11::AppleIntelScalerinit(void *that,uint8_t param_1)
+unsigned long Gen11::AppleIntelScalerinit(void *that,uint param_1)
 {
 	auto ret=  FunctionCast(AppleIntelScalerinit, callback->oAppleIntelScalerinit)(that,param_1 );
 	getMember<void *>(that, 0x28) = ccont;

@@ -445,16 +445,16 @@ private:
 	static IOReturn wrapPavpSessionCallback(void *intelAccelerator, int32_t sessionCommand, uint32_t sessionAppId, uint32_t *a4, bool flag);
 	mach_vm_address_t orgPavpSessionCallback {};
 	
-	static bool	AppleIntelFramebufferinit(void *frame,void *cont,uint32_t param_2);
+	static uint32_t	AppleIntelFramebufferinit(void *frame,void *cont,uint param_2);
 	mach_vm_address_t oAppleIntelFramebufferinit {};
 	
-	static uint64_t  AppleIntelPlaneinit(void *that,uint8_t param_1);
+	static uint64_t  AppleIntelPlaneinit(void *that,uint param_1);
 	mach_vm_address_t oAppleIntelPlaneinit {};
 	
 	static void FBMemMgr_Init(void *that);
 	mach_vm_address_t oFBMemMgr_Init {};
 	
-	static unsigned long AppleIntelScalerinit(void *that,uint8_t param_1);
+	static unsigned long AppleIntelScalerinit(void *that,uint param_1);
 	mach_vm_address_t oAppleIntelScalerinit {};
 	
 	static void  initPlatformWorkarounds2(void *that);
