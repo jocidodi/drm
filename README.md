@@ -8,12 +8,12 @@
    
 - Add nblue to opencore
 - Install framebuffer + hookcase to /l/extensions
-- Install acel+bundles to /s/l/e (need break mac os seal) or acel to /l/e and bundles to /l/gpubundles
+- Install acel+bundles to /l/e and bundles to /l/gpubundles
 - wrong kexts permissions or bad kext install = boot hang
 - sudo chmod -R 755
 - sudo chown -R root:wheel
 - be sure owner rw, others ro
-- default kexts setup using nred logic. change inside xcodeproj
+- default kexts setup inside Firmware folder
 - update lilu and sdk as need by your os
 - boot with (remove allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
