@@ -7,8 +7,8 @@
 2) nblue setup
    
 - Add nblue to opencore
-- Install framebuffer + hookcase to /l/e
-- Install acel+bundles to /s/l/e
+- Install framebuffer + hookcase to /l/extensions
+- Install acel+bundles to /s/l/e (need break mac os seal) or acel to /l/e and bundles to /l/gpubundles
 - wrong kexts permissions or bad kext install = boot hang
 - sudo chmod -R 755
 - sudo chown -R root:wheel
