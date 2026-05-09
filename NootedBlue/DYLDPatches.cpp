@@ -46,35 +46,30 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		}
 		
 		//sle
+		int sle=0;
 		if ((!strncmp(path, TGLGraphicsMTLDriver, arrsize(TGLGraphicsMTLDriver)) )) {
-		const DYLDPatch patches[] = {
+			/*const DYLDPatch patches[] = {
 			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
-		};
-		DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			
-			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
-			const DYLDPatch patches[] = {
-				{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
-				{klibMTLIGCCompilerPluginOriginal2, klibMTLIGCCompilerPluginPatched2, "klibMTLIGCCompilerPluginOriginal2"},
 			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			}
+			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);*/
+			sle=1;
 		}
 		
-		//le + gpubundle
-		if ((!strncmp(path, TGLGraphicsMTLDriver2, arrsize(TGLGraphicsMTLDriver2)) )) {
-		const DYLDPatch patches[] = {
-			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
-		};
-		DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			
-			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+		//le + gpubundle not in cache !!
+		/*if ((!strncmp(path, TGLGraphicsMTLDriver2, arrsize(TGLGraphicsMTLDriver2)) )) {
 			const DYLDPatch patches[] = {
-				{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
-				{klibMTLIGCCompilerPluginOriginal2, klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal3"},
+			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
 			};
 			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			}
+			sle=0;
+		}*/
+		
+		if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+			const DYLDPatch patches[] = {
+			{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+			{klibMTLIGCCompilerPluginOriginal2, sle ? klibMTLIGCCompilerPluginPatched2:klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal2"},
+			};
+			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
 		}
 		
 		

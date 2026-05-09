@@ -36,9 +36,9 @@
 		<key>ClampMaxWorkGroupSizeTo1024Disable</key>
 		<integer>0</integer>
 		<key>PoshDisable</key>
-		<integer>0</integer>
+		<integer>1</integer>
 		<key>PtbrDisable</key>
-		<integer>0</integer>
+		<integer>1</integer>
 	</dict>
 	<key>MPSIntelPluginFeatureList</key>
 	<dict>
