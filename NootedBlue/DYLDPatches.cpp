@@ -38,25 +38,43 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 	if (vn_getpath(vp, path, &pathlen) != 0) { return; }
 
 	if (!UserPatcher::matchSharedCachePath(path)) {
+		
 	    if ((!strncmp(path, kCoreLSKDMSEPath, arrsize(kCoreLSKDMSEPath))) ||
 			(!strncmp(path, kCoreLSKDPath, arrsize(kCoreLSKDPath)))) {
 		const DYLDPatch patch = {kCoreLSKDOriginal, kCoreLSKDPatched, "CoreLSKD streaming CPUID to Haswell"};
 		patch.apply(const_cast<void *>(data), PAGE_SIZE);
 		}
 		
+		//sle
 		if ((!strncmp(path, TGLGraphicsMTLDriver, arrsize(TGLGraphicsMTLDriver)) )) {
 		const DYLDPatch patches[] = {
 			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
 		};
 		DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			
+			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+			const DYLDPatch patches[] = {
+				{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+				{klibMTLIGCCompilerPluginOriginal2, klibMTLIGCCompilerPluginPatched2, "klibMTLIGCCompilerPluginOriginal2"},
+			};
+			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			}
 		}
 		
-		if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+		//le + gpubundle
+		if ((!strncmp(path, TGLGraphicsMTLDriver2, arrsize(TGLGraphicsMTLDriver2)) )) {
 		const DYLDPatch patches[] = {
-			{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
-			{klibMTLIGCCompilerPluginOriginal2, klibMTLIGCCompilerPluginPatched2, "klibMTLIGCCompilerPluginOriginal2"},
+			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
 		};
 		DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			
+			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+			const DYLDPatch patches[] = {
+				{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+				{klibMTLIGCCompilerPluginOriginal2, klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal3"},
+			};
+			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			}
 		}
 		
 		
