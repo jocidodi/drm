@@ -177,14 +177,15 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 		}
 		if (ok) {
 				ok=0;
-				int sle=1;
+				int sle=-1;
 				vnode = NULLVP;
 				ctxt = vfs_context_create(nullptr);
 				err = vnode_lookup("/System/Library/Extensions/AppleIntelTGLGraphics.kext/Contents/MacOS/AppleIntelTGLGraphics", 0, &vnode, ctxt);
 				if (!err) vnode_put(vnode);
 				vfs_context_rele(ctxt);
 				if (!err) ok=1;
-					
+				if (!err) sle=1;
+			
 					if (!ok) {
 						vnode = NULLVP;
 						ctxt = vfs_context_create(nullptr);
@@ -194,7 +195,8 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 					   if (!err) ok=1;
 						if (!err) sle=0;
 					}
-			if (ok){
+			
+			if (ok && sle>=0){
 				const auto driversXML = getFWByName(sle ? "Drivera2.xml": "Drivera3.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
