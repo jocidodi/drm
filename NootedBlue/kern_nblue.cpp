@@ -78,13 +78,6 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		WIOKit::renameDevice(this->iGPU, "IGPU");
 		WIOKit::awaitPublishing(this->iGPU);
 		
-		
-		UInt8 *configBytes = (UInt8 *)IOMalloc(0x100);
-		for (UInt16 offset = 0; offset < 0x100; offset++) {
-			configBytes[offset] = this->iGPU->configRead8(offset);
-		}
-		this->iGPU->setProperty("cfgspace", configBytes, 0x100);
-		
         static uint8_t builtin[] = {0x00};
 		static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
 		static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
@@ -94,7 +87,6 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
 		this->iGPU->setProperty("model", const_cast<char *>("Intel Iris Xe Graphics"), 23);
 		
-
 			
 		this->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
 		this->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
@@ -241,39 +233,15 @@ void NBlue::setRMMIOIfNecessary() {
 
 bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
 	
-	
-	
 	if (kextIOAcceleratorFamily2.loadIndex == index) {
 		
-		static const uint8_t f1[]= {0x74, 0x57, 0x45, 0x8b, 0x8f, 0x84, 0x02, 0x00, 0x00, 0x48, 0x8d, 0x3d, 0x4a, 0x47, 0xfb, 0xff};
-		static const uint8_t r1[]= {0xeb, 0x57, 0x45, 0x8b, 0x8f, 0x84, 0x02, 0x00, 0x00, 0x48, 0x8d, 0x3d, 0x4a, 0x47, 0xfb, 0xff};
-		const LookupPatchPlus patch {&kextIOAcceleratorFamily2, f1, r1, 1};
-		//SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply kextIOAcceleratorFamily2 patch");
-
 		return true;
 	}  else if (kextIOGraphics.loadIndex == index) {
-		/*
-		KernelPatcher::RouteRequest requests[] = {
-				{"__ZN13IOFramebuffer25extValidateDetailedTimingEP8OSObjectPvP25IOExternalMethodArguments", wrapValidateDetailedTiming},
-			};
-			patcher.routeMultiple(index, requests, address, size);
-			patcher.clearError();*/
+
 		return true;
 	}  else if (kextAGDP.loadIndex == index) {
 		const LookupPatchPlus patch {&kextAGDP, kAGDPBoardIDKeyOriginal, kAGDPBoardIDKeyPatched, 1};
 		SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP board-id patch");
-
-		/*if (getKernelVersion() == KernelVersion::Ventura) {
-			const LookupPatchPlus patch {&kextAGDP, kAGDPFBCountCheckVenturaOriginal, kAGDPFBCountCheckVenturaPatched,
-				1};
-			SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP fb count check patch");
-		} else {
-			const LookupPatchPlus patch {&kextAGDP, kAGDPFBCountCheckOriginal, kAGDPFBCountCheckPatched, 1};
-			SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP fb count check patch");
-		}*/
-		
-		
-		
 		
 		return true;
 	}  else if (kextBacklight.loadIndex == index) {
