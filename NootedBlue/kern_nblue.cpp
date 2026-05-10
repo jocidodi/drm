@@ -154,26 +154,28 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			   vfs_context_rele(ctxt);
 			   if (!err) ok=1;
 
-			const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
-			auto *dataNull = new char[driversXML.size + 1];
-			memcpy(dataNull, driversXML.data, driversXML.size);
-			dataNull[driversXML.size] = 0;
-			OSString *errStr = nullptr;
-			auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
-			delete[] dataNull;
-			PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
-					   errStr ? errStr->getCStringNoCopy() : "Unspecified");
-			auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
-			PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
-			auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
-			if (Match->getLength()>0){
-				tcap++;
-				tdrivers->ensureCapacity(tcap);
-				tdrivers->setObject(tcap-1,drivers);
-				doNub=true;
-			} else ok=0;
-			OSSafeReleaseNULL(dataUnserialized);
-			IOFree(driversXML.data, driversXML.size);
+			if (ok) { // remove this if to load icl if tgl not installed
+				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
+				auto *dataNull = new char[driversXML.size + 1];
+				memcpy(dataNull, driversXML.data, driversXML.size);
+				dataNull[driversXML.size] = 0;
+				OSString *errStr = nullptr;
+				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+				delete[] dataNull;
+				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
+				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+				if (Match->getLength()>0){
+					tcap++;
+					tdrivers->ensureCapacity(tcap);
+					tdrivers->setObject(tcap-1,drivers);
+					doNub=true;
+				} else ok=0;
+				OSSafeReleaseNULL(dataUnserialized);
+				IOFree(driversXML.data, driversXML.size);
+			}
 		}
 		if (ok) {
 				ok=0;
