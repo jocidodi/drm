@@ -1,14 +1,14 @@
 1) drm setup for browsing i915/xe linux sources
 
-- create a new xcodeprogj and add drm_extracted
+- create a new xcodeproj and add drm_extracted
 - after indexing browsing structures should be fine
 
 
 2) nblue setup
    
 - Add nblue to opencore
-- use le_kexts.sh to install kexts.
-- default kexts info.plist setup inside nblue Firmware folder
+- use le_kexts.sh to install kexts. (drag and drop sle_Internal/debugLE/Library to terminal)
+- default kexts info.plist setup is inside nblue Firmware folder. rebuild nblue to apply
 - update lilu and sdk as need by your os
 - boot with (remove allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
