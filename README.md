@@ -7,13 +7,8 @@
 2) nblue setup
    
 - Add nblue to opencore
-- Install framebuffer + hookcase to /l/extensions
-- Install acel+bundles to /l/e and bundles to /l/gpubundles
-- wrong kexts permissions or bad kext install = boot hang
-- sudo chmod -R 755
-- sudo chown -R root:wheel
-- be sure owner rw, others ro
-- default kexts setup inside Firmware folder
+- use le_kexts.sh to install kexts.
+- default kexts info.plist setup inside nblue Firmware folder
 - update lilu and sdk as need by your os
 - boot with (remove allow3d for frame only)
   debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware -allow3d
