@@ -8,6 +8,7 @@
    
 - Add nblue to opencore
 - use le_kexts.sh to install kexts. (drag and drop sle_Internal/debugLE/Library to terminal)
+- type chmod +x le_kexts.sh if it doesnt run.
 - default kexts info.plist setup is inside nblue Firmware folder. rebuild nblue to apply
 - update lilu and sdk as need by your os
 - boot with (remove allow3d for frame only)
