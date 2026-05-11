@@ -34,7 +34,7 @@ extern "C" {
 #define IOGRAPHICSTYPES_REV     71
 
 typedef SInt32  IOIndex;
-
+typedef UInt32  IOSelect;
 typedef UInt32  IOFixed1616;
 typedef UInt32  IODisplayVendorID;
 typedef UInt32  IODisplayProductID;
