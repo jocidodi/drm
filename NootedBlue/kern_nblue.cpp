@@ -249,7 +249,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		return true;
 	}  else if (kextBacklight.loadIndex == index) {
-		KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
+		/*KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
 	  orgApplePanelSetDisplay};
 			if (patcher.routeMultiple(kextBacklight.loadIndex, &request, 1, address, size)) {
 				const UInt8 find[] = {"F%uT%04x"};
@@ -257,7 +257,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				const LookupPatchPlus patch {&kextBacklight, find, replace, 1};
 				SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply backlight patch");
 			}
-		return true;
+		return true;*/
 } else if (kextMCCSControl.loadIndex == index) {
 		KernelPatcher::RouteRequest requests[] = {
 				{"__ZN25AppleMCCSControlGibraltar5probeEP9IOServicePi", wrapFunctionReturnZero},
@@ -327,10 +327,7 @@ struct ApplePanelData {
 };
 
 
-static ApplePanelData appleBacklightData[0]; //  disable Backlight panels
-
-// use to enable Backlight panels
-static ApplePanelData appleBacklightData2[] = {
+static ApplePanelData appleBacklightData[] = {
 	{"F14Txxxx", {0x00, 0x11, 0x00, 0x00, 0x00, 0x34, 0x00, 0x52, 0x00, 0x73, 0x00, 0x94, 0x00, 0xBE, 0x00, 0xFA, 0x01,
 					 0x36, 0x01, 0x72, 0x01, 0xC5, 0x02, 0x2F, 0x02, 0xB9, 0x03, 0x60, 0x04, 0x1A, 0x05, 0x0A, 0x06,
 					 0x0E, 0x07, 0x10}},
