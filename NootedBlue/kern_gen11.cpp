@@ -360,8 +360,8 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	
 		pinfo[1].fMobile=1;
-		pinfo[1].fPipeCount=4;
-		pinfo[1].fInfoPortCount=4;
+		pinfo[1].fPipeCount=3;
+		pinfo[1].fInfoPortCount=3;
 		pinfo[1].fInfoFramebufferCount=2;
 
 		pinfo[1].fSliceCount=1;
@@ -371,9 +371,10 @@ uint64_t  Gen11::getOSInformation(void *that)
 	//pinfo[1].fInfoFBCompressionMemorySize=	0xc00000;
 	//pinfo[1].fVideoTurboFreq=270000000;
 	//pinfo[1].VCLK=1000*0x438;
+	NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
 	
 	
-	pinfo[1].connectors[0].index=0;//DDI0
+	/*pinfo[1].connectors[0].index=0;//DDI0
 	pinfo[1].connectors[0].busId=0;
 	pinfo[1].connectors[0].pipe=0;//fix wrong register use patch or set = 1
 	pinfo[1].connectors[0].pad=0;
@@ -399,7 +400,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	pinfo[1].connectors[3].pipe=3;
 	pinfo[1].connectors[3].pad=0;
 	pinfo[1].connectors[3].type=ConnectorDummy;
-	pinfo[1].connectors[3].flags=0;
+	pinfo[1].connectors[3].flags=0;*/
 	
 	auto ret=FunctionCast(getOSInformation, callback->ogetOSInformation)(that );
 	return ret;
@@ -489,13 +490,13 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
 	
-		pinfo[p].camelliaVersion=3;
+		pinfo[p].camelliaVersion=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 		pinfo[p].fMobile=1;
-		pinfo[p].fPipeCount=4;
-		pinfo[p].fPortCount=4;
-		pinfo[p].fInfoFramebufferCount=3;
+		pinfo[p].fPipeCount=3;
+		pinfo[p].fPortCount=3;
+		pinfo[p].fInfoFramebufferCount=2;
 
 		pinfo[p].fSliceCount=1;
 		pinfo[p].fEuCount=8;
@@ -505,7 +506,16 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	//pinfo[p].fVideoTurboFreq=270000000;
 	//pinfo[p].VCLK=1000*0x438;
 	
-	pinfo[p].connectors[0].index=0;
+	NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
+	
+	//force display to frame zero
+	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].flags=0x1;
+	
+	
+	
+	//force display to frame zero manual
+	/*pinfo[p].connectors[0].index=0;
 	pinfo[p].connectors[0].busId=0;
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].pad=0;
@@ -531,7 +541,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	pinfo[p].connectors[3].pipe=3;
 	pinfo[p].connectors[3].pad=0;
 	pinfo[p].connectors[3].type=ConnectorDummy;
-	pinfo[p].connectors[3].flags=0;
+	pinfo[p].connectors[3].flags=0;*/
 	
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;

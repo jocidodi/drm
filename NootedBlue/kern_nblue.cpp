@@ -109,7 +109,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 			SYSLOG("ngreen", "V52: CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",
 				   family, model, stepping, this->isRealTGL);
 		
-		
+		getVBIOSFromOpRegion();
 		
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead32, configRead32, &orgConfigRead32);
