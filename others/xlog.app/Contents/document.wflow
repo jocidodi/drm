@@ -60,7 +60,7 @@
 				<dict>
 					<key>COMMAND_STRING</key>
 					<string>log show --style syslog --predicate 'processID == 0' --last 1h --info --debug  &gt; /tmp/x.log
-osascript -e  'tell app "Finder" to open alias "vent:tmp:x.log"'</string>
+osascript -e  'tell application "Console" to open alias ":::tmp:x.log"'</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>
