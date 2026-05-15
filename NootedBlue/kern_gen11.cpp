@@ -371,36 +371,36 @@ uint64_t  Gen11::getOSInformation(void *that)
 	//pinfo[1].fInfoFBCompressionMemorySize=	0xc00000;
 	//pinfo[1].fVideoTurboFreq=270000000;
 	//pinfo[1].VCLK=1000*0x438;
-	NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
 	
+	//NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
 	
-	/*pinfo[1].connectors[0].index=0;//DDI0
+	pinfo[1].connectors[0].index=0;//DDI0
 	pinfo[1].connectors[0].busId=0;
 	pinfo[1].connectors[0].pipe=0;//fix wrong register use patch or set = 1
 	pinfo[1].connectors[0].pad=0;
 	pinfo[1].connectors[0].type=ConnectorLVDS;
-	pinfo[1].connectors[0].flags=0x8+0x10;
+	pinfo[1].connectors[0].flags=0x1+0x8+0x10;
 	
 	pinfo[1].connectors[1].index=1;
-	pinfo[1].connectors[1].busId=1;
-	pinfo[1].connectors[1].pipe=2;
+	pinfo[1].connectors[1].busId=0;
+	pinfo[1].connectors[1].pipe=1;
 	pinfo[1].connectors[1].pad=0;
-	pinfo[1].connectors[1].type=ConnectorHDMI;
-	pinfo[1].connectors[1].flags=0x1+0x800;
+	pinfo[1].connectors[1].type=ConnectorDummy;
+	pinfo[1].connectors[1].flags=0;
 	
 	pinfo[1].connectors[2].index=2;
-	pinfo[1].connectors[2].busId=2;
+	pinfo[1].connectors[2].busId=0;
 	pinfo[1].connectors[2].pipe=2;
 	pinfo[1].connectors[2].pad=0;
 	pinfo[1].connectors[2].type=ConnectorDummy;
 	pinfo[1].connectors[2].flags=0;
 	
 	pinfo[1].connectors[3].index=3;
-	pinfo[1].connectors[3].busId=3;
+	pinfo[1].connectors[3].busId=0;
 	pinfo[1].connectors[3].pipe=3;
 	pinfo[1].connectors[3].pad=0;
 	pinfo[1].connectors[3].type=ConnectorDummy;
-	pinfo[1].connectors[3].flags=0;*/
+	pinfo[1].connectors[3].flags=0;
 	
 	auto ret=FunctionCast(getOSInformation, callback->ogetOSInformation)(that );
 	return ret;
@@ -469,9 +469,9 @@ void  Gen11::initPlatformWorkarounds2(void *that)
 {
 	//PlatformWorkarounds
 	getMember<volatile uint32_t>(that, 0xc1c)=
- FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|
-	FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|
-	FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|
+ FB_FLAG_ENABLE_SLICE_FEATURES/*|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/|FB_FLAG_LIMIT_4K_SOURCE_SIZE|
+	/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|
+	FB_FLAG_ALTERNATE_PWM_INCREMENT1|*/FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|
 	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
 	
 	//ig boot flags
@@ -485,7 +485,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	int p=0x14;
 	
 	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
 	FB_FLAG_LIMIT_4K_SOURCE_SIZE|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
@@ -506,42 +506,36 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	//pinfo[p].fVideoTurboFreq=270000000;
 	//pinfo[p].VCLK=1000*0x438;
 	
-	NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
-	
-	//force display to frame zero
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].flags=0x1;
+	//NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
 	
 	
-	
-	//force display to frame zero manual
-	/*pinfo[p].connectors[0].index=0;
+	pinfo[p].connectors[0].index=0; //DDI0
 	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].pipe=1; //regs "fix"
 	pinfo[p].connectors[0].pad=0;
 	pinfo[p].connectors[0].type=ConnectorLVDS;
-	pinfo[p].connectors[0].flags=0x1+0x10;
+	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
 	
-	pinfo[p].connectors[1].index=0; //DDI0 if index=0 //porthal init
+	pinfo[p].connectors[1].index=1;
 	pinfo[p].connectors[1].busId=0;
-	pinfo[p].connectors[1].pipe=0; // if zero need reg patch //getTranscoderOffset
+	pinfo[p].connectors[1].pipe=0;
 	pinfo[p].connectors[1].pad=0;
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	pinfo[p].connectors[1].flags=0;
 	
-	pinfo[p].connectors[2].index=1;
+	pinfo[p].connectors[2].index=2;
 	pinfo[p].connectors[2].busId=0;
 	pinfo[p].connectors[2].pipe=2;
 	pinfo[p].connectors[2].pad=0;
-	pinfo[p].connectors[2].type=ConnectorHDMI;
-	pinfo[p].connectors[2].flags=0x1+0x800;
+	pinfo[p].connectors[2].type=ConnectorDummy;
+	pinfo[p].connectors[2].flags=0;
 	
 	pinfo[p].connectors[3].index=3;
 	pinfo[p].connectors[3].busId=0;
 	pinfo[p].connectors[3].pipe=3;
 	pinfo[p].connectors[3].pad=0;
 	pinfo[p].connectors[3].type=ConnectorDummy;
-	pinfo[p].connectors[3].flags=0;*/
+	pinfo[p].connectors[3].flags=0;
 	
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;

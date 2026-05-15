@@ -154,7 +154,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			   vfs_context_rele(ctxt);
 			   if (!err) ok=1;
 
-			if (ok) { // remove this if to load icl if tgl not installed
+			//if (ok) { // remove this if to load icl if tgl not installed
 				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
@@ -175,7 +175,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				} else ok=0;
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
-			}
+			//}
 		}
 		if (ok) {
 				ok=0;
