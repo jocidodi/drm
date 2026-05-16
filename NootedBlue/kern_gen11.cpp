@@ -58,6 +58,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
 			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds2, this->oinitPlatformWorkarounds2},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
+			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},
+			
 			
 			
 		};
@@ -417,6 +419,10 @@ IOReturn Gen11::wrapPavpSessionCallback( void *intelAccelerator, int32_t session
 	return FunctionCast(wrapPavpSessionCallback, callback->orgPavpSessionCallback)(intelAccelerator, sessionCommand, sessionAppId, a4, flag);
 }
 
+int Gen11::dozero()
+{
+	return 0;
+}
 
 void Gen11::dovoid()
 {

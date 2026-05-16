@@ -474,7 +474,7 @@ public:
 	static void dovoid();
 	static bool dotrue();
 	static bool dofalse();
-	
+	static int dozero();
 	
 };
 
