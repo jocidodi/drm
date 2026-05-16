@@ -216,7 +216,7 @@
 		<key>DisplayPipeSupported</key>
 		<true/>
 		<key>TransactionsSupported</key>
-		<true/>
+		<false/>
 	</dict>
 	<key>IOCFPlugInTypes</key>
 	<dict>

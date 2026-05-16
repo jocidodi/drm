@@ -41,35 +41,34 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		
 	    if ((!strncmp(path, kCoreLSKDMSEPath, arrsize(kCoreLSKDMSEPath))) ||
 			(!strncmp(path, kCoreLSKDPath, arrsize(kCoreLSKDPath)))) {
-		const DYLDPatch patch = {kCoreLSKDOriginal, kCoreLSKDPatched, "CoreLSKD streaming CPUID to Haswell"};
-		patch.apply(const_cast<void *>(data), PAGE_SIZE);
+			const DYLDPatch patch = {kCoreLSKDOriginal, kCoreLSKDPatched, "CoreLSKD streaming CPUID to Haswell"};
+			patch.apply(const_cast<void *>(data), PAGE_SIZE);
 		}
 		
-		//sle
+		int ok=0;
 		int sle=0;
-		if ((!strncmp(path, TGLGraphicsMTLDriver, arrsize(TGLGraphicsMTLDriver)) )) {
-			/*const DYLDPatch patches[] = {
-			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
-			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);*/
-			sle=1;
-		}
+		vnode_t vnode = NULLVP;
+		vfs_context_t ctxt = vfs_context_create(nullptr);
+		errno_t err = vnode_lookup(TGLGraphicsMTLDriver2, 0, &vnode, ctxt);
+		if (!err) vnode_put(vnode);
+		vfs_context_rele(ctxt);
+		if (!err) ok=1;
 		
-		//le + gpubundle not in cache !!
-		/*if ((!strncmp(path, TGLGraphicsMTLDriver2, arrsize(TGLGraphicsMTLDriver2)) )) {
-			const DYLDPatch patches[] = {
-			{kTGLGraphicsMTLDrivero, kTGLGraphicsMTLDriverp, "kTGLGraphicsMTLDriverp"},
-			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			sle=0;
-		}*/
+		vnode = NULLVP;
+		ctxt = vfs_context_create(nullptr);
+		err = vnode_lookup(TGLGraphicsMTLDriver, 0, &vnode, ctxt);
+		if (!err) vnode_put(vnode);
+		vfs_context_rele(ctxt);
+		if (!err) { ok=1; sle=1;}
 		
-		if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
-			const DYLDPatch patches[] = {
-			{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
-			{klibMTLIGCCompilerPluginOriginal2, sle ? klibMTLIGCCompilerPluginPatched2:klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal2"},
-			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+		if (ok) {
+			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+				const DYLDPatch patches[] = {
+					{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+					{klibMTLIGCCompilerPluginOriginal2, sle ? klibMTLIGCCompilerPluginPatched2:klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal2"},
+				};
+				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			}
 		}
 		
 		

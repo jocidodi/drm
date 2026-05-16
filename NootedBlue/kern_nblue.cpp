@@ -79,8 +79,12 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		WIOKit::awaitPublishing(this->iGPU);
 		
         static uint8_t builtin[] = {0x00};
+		
 		static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
 		static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
+		
+		//static uint8_t builtin2[] = {0x02, 0x00, 0x5c, 0x8A};
+		//static uint8_t builtin3[] = {0x5c, 0x8A,0x00,0x00};
 		
 		this->iGPU->setProperty("built-in", builtin, arrsize(builtin));
 		this->iGPU->setProperty("AAPL,slot-name", const_cast<char *>("built-in"), 9);
@@ -148,13 +152,12 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				ok=0;
 				vnode = NULLVP;
 				ctxt = vfs_context_create(nullptr);
-				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/"
-								   "AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
+				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
 			   if (!err) vnode_put(vnode);
 			   vfs_context_rele(ctxt);
 			   if (!err) ok=1;
 
-			//if (ok) { // remove this if to load icl if tgl not installed
+			//if (ok) { // remove this to load icl if tgl not installed
 				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
@@ -177,7 +180,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				IOFree(driversXML.data, driversXML.size);
 			//}
 		}
-		if (ok) {
+		if (1/*ok*/) {
 				ok=0;
 				int sle=-1;
 				vnode = NULLVP;
@@ -200,6 +203,29 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			
 			if (ok && sle>=0){
 				const auto driversXML = getFWByName(sle ? "Drivera2.xml": "Drivera3.xml");
+				auto *dataNull = new char[driversXML.size + 1];
+				memcpy(dataNull, driversXML.data, driversXML.size);
+				dataNull[driversXML.size] = 0;
+				OSString *errStr = nullptr;
+				auto *dataUnserialized = OSUnserializeXML(dataNull, driversXML.size + 1, &errStr);
+				delete[] dataNull;
+				PANIC_COND(!dataUnserialized, "NRed", "Failed to unserialize Drivers.xml: %s",
+						   errStr ? errStr->getCStringNoCopy() : "Unspecified");
+				auto *drivers = OSDynamicCast(OSDictionary, dataUnserialized);
+				PANIC_COND(!drivers, "NRed", "Failed to cast Drivers.xml data");
+				auto* Match = OSDynamicCast(OSString, drivers->getObject("IOPCIPrimaryMatch"));
+				if (Match->getLength()>0){
+					tcap++;
+					tdrivers->ensureCapacity(tcap);
+					tdrivers->setObject(tcap-1,drivers);
+					doNub=true;
+				}
+				OSSafeReleaseNULL(dataUnserialized);
+				IOFree(driversXML.data, driversXML.size);
+			}
+			else
+			{
+				const auto driversXML = getFWByName("Drivera1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
 				dataNull[driversXML.size] = 0;

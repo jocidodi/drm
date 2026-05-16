@@ -265,17 +265,22 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		 
 		 RouteRequestPlus requests[] = {
 			 {"__ZN16IntelAccelerator19PAVPCommandCallbackE22PAVPSessionCommandID_tjPjb", wrapPavpSessionCallback, this->orgPavpSessionCallback},
+			 
 		 };
-		SYSLOG_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
+		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//sku bypass IntelAccelerator::getGPUInfo
-		static const uint8_t f2[] = {0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
-		static const uint8_t r2[] = {0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
+		//sku bypass IntelAccelerator::getGPUInfo set Sku = 8
+		//static const uint8_t f2[] = {0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
+		//static const uint8_t r2[] = {0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
+		
+		//sonoma
+		static const uint8_t f2[] = {0x0f, 0x87, 0x00, 0x01, 0x00, 0x00, 0x48, 0x8d, 0x0d, 0x77, 0x02, 0x00, 0x00};
+		static const uint8_t r2[] = {0x48, 0xe9, 0x3e, 0x00, 0x00, 0x00, 0x48, 0x8d, 0x0d, 0x77, 0x02, 0x00, 0x00};
     
 		LookupPatchPlus const patches[] = {
 			{&kextG11HW, f2, r2, arrsize(f2),	1},
 		};
-		SYSLOG_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11HW Failed to apply patches!");
+		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11HW Failed to apply patches!");
 
 		return true;
 		
@@ -378,12 +383,12 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	pinfo[1].connectors[0].index=0;//DDI0
 	pinfo[1].connectors[0].busId=0;
-	pinfo[1].connectors[0].pipe=0;//fix wrong register use patch or set = 1
+	pinfo[1].connectors[0].pipe=0;//1 dp power 0 edp power
 	pinfo[1].connectors[0].pad=0;
 	pinfo[1].connectors[0].type=ConnectorLVDS;
 	pinfo[1].connectors[0].flags=0x1+0x8+0x10;
 	
-	pinfo[1].connectors[1].index=1;
+	pinfo[1].connectors[1].index=1;//DDI1
 	pinfo[1].connectors[1].busId=0;
 	pinfo[1].connectors[1].pipe=1;
 	pinfo[1].connectors[1].pad=0;
@@ -515,9 +520,9 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	//NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
 	
 	
-	pinfo[p].connectors[0].index=0; //DDI0
+	pinfo[p].connectors[0].index=0;
 	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=1; //regs "fix"
+	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].pad=0;
 	pinfo[p].connectors[0].type=ConnectorLVDS;
 	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
