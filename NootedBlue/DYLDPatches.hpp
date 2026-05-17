@@ -89,6 +89,11 @@ static const char TGLGraphicsMTLDriver2[] = "/Library/GPUBundles/AppleIntelTGLGr
 static const UInt8 kTGLGraphicsMTLDrivero[] = {0x41, 0x83, 0x7d, 0x00, 0x01, 0x48, 0x8b, 0x05, 0x50, 0x7b, 0x47, 0x00};
 static const UInt8 kTGLGraphicsMTLDriverp[] =  {0x41, 0x83, 0x7d, 0x00, 0x00, 0x48, 0x8b, 0x05, 0x50, 0x7b, 0x47, 0x00};
 
+static const char ICLGraphicsMTLDriver[] = "/System/Library/Extensions/AppleIntelICLGraphicsMTLDriver.bundle/Contents/MacOS/AppleIntelICLGraphicsMTLDriver";
+static const char ICLGraphicsGLDriver[] = "/System/Library/Extensions/AppleIntelICLGraphicsGLDriver.bundle/Contents/MacOS/AppleIntelICLGraphicsGLDriver";
+static const UInt8 kICLGraphicsMTLDrivero[] = {0x3d, 0x86, 0x80, 0x5d, 0x8a};
+static const UInt8 kICLGraphicsMTLDriverp[] =  {0x3d, 0x86, 0x80, 0x49, 0x9a};
+
 
 
 static const char libMTLIGCCompilerPluginPath[] = "/System/Library/Extensions/AppleIntelGraphicsShared.bundle/Contents/MacOS/libMTLIGCCompilerPlugin.dylib";
