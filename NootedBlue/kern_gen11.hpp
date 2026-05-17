@@ -393,6 +393,8 @@ enum IGHwCsType
 	kIGHwCsTypeVCS2,    //  4
 	kIGHwCsTypeVECS0,   //  5
 };
+
+//size is 0x79 do not pack this thing as its size will be 0x80 and bug apple code
 struct IGHwCsDesc {
 	IGHwCsType   type;
 	uint32_t     csMask;
