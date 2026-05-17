@@ -71,7 +71,7 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 			}
 		}
 		
-		if ((!strncmp(path, ICLGraphicsMTLDriver, arrsize(ICLGraphicsMTLDriver)) )) {
+		/*if ((!strncmp(path, ICLGraphicsMTLDriver, arrsize(ICLGraphicsMTLDriver)) )) {
 			const DYLDPatch patches[] = {
 				{kICLGraphicsMTLDrivero, kICLGraphicsMTLDriverp, "kICLGraphicsMTLDriverp"},
 			};
@@ -82,7 +82,7 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 				{kICLGraphicsMTLDrivero, kICLGraphicsMTLDriverp, "kICLGraphicsGLDriverp"},
 			};
 			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-		}
+		}*/
 		
 		return;
 	}

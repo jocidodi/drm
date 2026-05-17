@@ -64,11 +64,8 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
     if (devInfo) {
         devInfo->processSwitchOff();
 		
-		
-
         this->iGPU = OSDynamicCast(IOPCIDevice, devInfo->videoBuiltin);
         PANIC_COND(!this->iGPU, "nblue", "videoBuiltin is not IOPCIDevice");
-
 		
 		//this->iGPU->enablePCIPowerManagement(kPCIPMCSPowerStateD0);
 		this->iGPU->setBusMasterEnable(true);
@@ -80,40 +77,26 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		
         static uint8_t builtin[] = {0x00};
 		
-		//tgl
-		static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
-		static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
-		
-		//icl
-		//static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
-		//static uint8_t builtin3[] = {0x5d, 0x8A,0x00,0x00};
-		
 		this->iGPU->setProperty("built-in", builtin, arrsize(builtin));
 		this->iGPU->setProperty("AAPL,slot-name", const_cast<char *>("built-in"), 9);
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
 		this->iGPU->setProperty("model", const_cast<char *>("Intel Iris Xe Graphics"), 23);
-		
 			
-		this->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
-		this->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
-
 		setRMMIOIfNecessary();
 
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
-		
 
-			uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
-			asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
-			uint32_t family = (eax >> 8) & 0xF;
-			uint32_t model = (eax >> 4) & 0xF;
-			uint32_t extModel = (eax >> 16) & 0xF;
-			uint32_t stepping = eax & 0xF;
-			if (family == 0x6) model |= (extModel << 4);
-			this->cpuModel = model;
-			this->isRealTGL = (model == 0x8C || model == 0x8D);
-			SYSLOG("ngreen", "V52: CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",
-				   family, model, stepping, this->isRealTGL);
+		uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+		uint32_t family = (eax >> 8) & 0xF;
+		uint32_t model = (eax >> 4) & 0xF;
+		uint32_t extModel = (eax >> 16) & 0xF;
+		uint32_t stepping = eax & 0xF;
+		if (family == 0x6) model |= (extModel << 4);
+		this->cpuModel = model;
+		this->isRealTGL = (model == 0x8C || model == 0x8D);
+		SYSLOG("ngreen", "V52: CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",family, model, stepping, this->isRealTGL);
 		
 		getVBIOSFromOpRegion();
 		
@@ -137,6 +120,33 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 
 bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching)
 {
+	if (1)
+	{
+		static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
+		static uint8_t builtin3[] = {0x5d, 0x8A, 0x00, 0x00};
+		int ok=0;
+		vnode_t vnode = NULLVP;
+		vfs_context_t ctxt = vfs_context_create(nullptr);
+		errno_t err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
+		if (!err) vnode_put(vnode);
+		vfs_context_rele(ctxt);
+		if (!err) ok=1;
+		
+		//tgl
+		if (ok)
+		{
+			builtin2[2]=0x49;
+			builtin2[3]=0x9A;
+			builtin3[0]=0x49;
+			builtin3[1]=0x9A;
+		}
+		
+		NBlue::callback->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
+		NBlue::callback->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
+	}
+	
+	
+	
 	OSArray *tdrivers= array;
 	bool doNub=doNubMatching;
 	int ok=0;
@@ -146,6 +156,9 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 	if (!err) vnode_put(vnode);
 	vfs_context_rele(ctxt);
 	if (!err) ok=1;
+	
+	
+	
 	
 	if (ok) { //not running mac os installer
 	

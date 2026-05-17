@@ -66,13 +66,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
 		//platform id
-		static const uint8_t f15[]= {0x00,0x02, 0x00, 0x5c, 0x8a};
+		static const uint8_t f15[]= {0x00,0x00, 0x00, 0x5d, 0x8a};
 		static const uint8_t r15[]= {0x00,0x00, 0x00, 0x49, 0x9a};
 
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f15, r15, arrsize(f15),    1},
 		};
-		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
+		//PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
 		DBGLOG("nblue", "Loaded AppleIntelICLLPGraphicsFramebuffer!");
 		return true;
@@ -274,10 +274,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//sku bypass IntelAccelerator::getGPUInfo set Sku = 8
 		//static const uint8_t f2[] = {0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
 		//static const uint8_t r2[] = {0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
-		
-		//sonoma
-		//static const uint8_t f2[] = {0x0f, 0x87, 0x00, 0x01, 0x00, 0x00, 0x48, 0x8d, 0x0d, 0x77, 0x02, 0x00, 0x00};
-		//static const uint8_t r2[] = {0x48, 0xe9, 0x3e, 0x00, 0x00, 0x00, 0x48, 0x8d, 0x0d, 0x77, 0x02, 0x00, 0x00};
 		
 		//sku
 		static const uint8_t f2[] = {0x41, 0xc1, 0xef, 0x1c, 0x44, 0x89, 0xbb, 0x50, 0x11, 0x00, 0x00};
@@ -507,7 +503,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 {
 	
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList2);
-	int p=0x14;
+	int p=0x5;
 	
 	pinfo[p].flags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|
