@@ -80,11 +80,13 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		
         static uint8_t builtin[] = {0x00};
 		
-		static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
-		static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
+		//tgl
+		//static uint8_t builtin2[] = {0x00, 0x00, 0x49, 0x9A};
+		//static uint8_t builtin3[] = {0x49, 0x9A,0x00,0x00};
 		
-		//static uint8_t builtin2[] = {0x02, 0x00, 0x5c, 0x8A};
-		//static uint8_t builtin3[] = {0x5c, 0x8A,0x00,0x00};
+		//icl
+		static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
+		static uint8_t builtin3[] = {0x5d, 0x8A,0x00,0x00};
 		
 		this->iGPU->setProperty("built-in", builtin, arrsize(builtin));
 		this->iGPU->setProperty("AAPL,slot-name", const_cast<char *>("built-in"), 9);
