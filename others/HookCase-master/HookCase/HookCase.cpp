@@ -16853,6 +16853,7 @@ IOReturn AppleInteeBaseController::hwSetupDSBMemory()
         return kIOReturnNoMemory;
       }
     
+    return kIOReturnSuccess; // display ver <30
     
       // Program GTT entries
       if (fDSBSize != 0) {
@@ -17042,6 +17043,7 @@ IOReturn AppleIntelBaseController::hwSetupDSBMemory()
         return kIOReturnNoMemory;
       }
     
+    return kIOReturnSuccess; // display ver <30
     
       // Program GTT entries
       if (fDSBSize != 0) {
@@ -17264,6 +17266,8 @@ IOReturn AppleIntelFramebufferController::hwSetupDSBMemory()
       if (fDSBMemBuf == nullptr) {
         return kIOReturnNoMemory;
       }
+    
+    return kIOReturnSuccess; // display ver <30
     
     
       // Program GTT entries
