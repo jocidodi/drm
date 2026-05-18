@@ -16980,7 +16980,7 @@ void AppleIntelBaseController::WriteRegister32(unsigned long regOffset,
     uint64_t rmmio = getMember<uint64_t>(this, 0x9B0);
     uint32_t rmmiolen = getMember<uint32_t>(this, 0xC78);
     
-    if (rmmiolen-4<=regOffset)
+    if (regOffset < rmmiolen-4)
     *reinterpret_cast<uint32_t *>(reinterpret_cast<uint64_t>(rmmio) +regOffset) = regValue;
 };
 uint32_t AppleIntelBaseController::ReadRegister32(unsigned long regOffset) {
@@ -17201,7 +17201,7 @@ void AppleIntelFramebufferController::WriteRegister32(unsigned long regOffset,
     uint64_t rmmio = getMember<uint64_t>(this, 0x9B0);
     uint32_t rmmiolen = getMember<uint32_t>(this, 0xC78);
 
-    if (rmmiolen-4<=regOffset)
+    if (regOffset < rmmiolen-4)
     *reinterpret_cast<uint32_t *>(reinterpret_cast<uint64_t>(rmmio) +
                                              regOffset) = regValue;
 };
