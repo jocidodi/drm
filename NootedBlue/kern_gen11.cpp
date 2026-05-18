@@ -271,10 +271,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		 };
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//sku bypass IntelAccelerator::getGPUInfo set Sku = 8
-		//static const uint8_t f2[] = {0x0F, 0x87, 0x17, 0x01, 0x00, 0x00, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
-		//static const uint8_t r2[] = {0xe9, 0x8b, 0x00, 0x00, 0x00, 0x90, 0x48, 0x8D, 0x0D, 0x96, 0x02, 0x00, 0x00};
-		
 		//sku
 		static const uint8_t f2[] = {0x41, 0xc1, 0xef, 0x1c, 0x44, 0x89, 0xbb, 0x50, 0x11, 0x00, 0x00};
 		static const uint8_t r2[] = {0xc7, 0x83, 0x50, 0x11, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x90};
@@ -317,7 +313,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x7f, 0x15, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0x74, 0x2d};
 		static const uint8_t r3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x90, 0x90, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0xeb, 0x2d};
 		
-		// 12 to 10 slices + L3BankCount = 8
+		// 12 to 10 subslices + L3BankCount = 8
 		static const uint8_t f3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0c};
 		static const uint8_t r3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0a};
 		
@@ -353,8 +349,8 @@ void  Gen11::initPlatformWorkarounds(void *that)
 {
 	//PlatformWorkarounds
 	getMember<volatile uint32_t>(that, 0xc5c)=
-	/*FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_ENABLE_SLICE_FEATURES|*/
-	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
+	FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_ENABLE_SLICE_FEATURES|*/
+	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL/*|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
 	
 	//ig boot flags
 	getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
@@ -362,17 +358,17 @@ void  Gen11::initPlatformWorkarounds(void *that)
 }
 uint64_t  Gen11::getOSInformation(void *that)
 {
-	
+	//fPCIConfigRevisionID
+	getMember<int32_t>(that, 0xce4)=1; //PHYA
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
-	
 	
 	pinfo[1].fInfoFlags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ALLOW_CONNECTOR_RECOVER
-	/*|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
+	|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
-		pinfo[1].cameliav=0;
+		pinfo[1].cameliav=3;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 	
@@ -383,7 +379,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 
 		pinfo[1].fSliceCount=1;
 		pinfo[1].fmaxEuCount=8;
-		pinfo[1].fsubslices=10;
+		pinfo[1].fsubslices=8;
 	
 	//pinfo[1].fInfoFBCompressionMemorySize=	0xc00000;
 	//pinfo[1].fVideoTurboFreq=270000000;
@@ -490,9 +486,9 @@ void  Gen11::initPlatformWorkarounds2(void *that)
 {
 	//PlatformWorkarounds
 	getMember<volatile uint32_t>(that, 0xc1c)=
- /*FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/
-	/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|
-	FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/
+ /*FB_FLAG_ENABLE_SLICE_FEATURES|*/FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/
+	/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|*/
+	FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/
 	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
 	
 	//ig boot flags
@@ -501,17 +497,18 @@ void  Gen11::initPlatformWorkarounds2(void *that)
 }
 uint64_t  Gen11::getOSInformation2(void *that)
 {
-	
+	//fPCIConfigRevisionID
+	getMember<int32_t>(that, 0xc9c)=1;
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList2);
 	int p=0x5;
 	
 	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|
-	FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
 	
-		pinfo[p].camelliaVersion=0;
+		pinfo[p].camelliaVersion=3;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 		pinfo[p].fMobile=1;
@@ -521,7 +518,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 
 		pinfo[p].fSliceCount=1;
 		pinfo[p].fEuCount=8;
-		pinfo[p].fSubSliceCount=10;
+		pinfo[p].fSubSliceCount=8;
 	
 	//pinfo[p].fInfoFBCompressionMemorySize=	0xc00000;
 	//pinfo[p].fVideoTurboFreq=270000000;
@@ -561,3 +558,4 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;
 }
+
