@@ -368,7 +368,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
-		pinfo[1].cameliav=3;
+		pinfo[1].cameliav=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 	
@@ -508,7 +508,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
 	
-		pinfo[p].camelliaVersion=3;
+		pinfo[p].camelliaVersion=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
 		pinfo[p].fMobile=1;
