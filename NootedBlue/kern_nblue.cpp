@@ -881,6 +881,234 @@ static const char* port_to_string(enum port port)
 }
 
 
+static int vbt_get_panel_type(const struct bdb_header *bdb)
+{
+	const struct bdb_lfp_options *lfp_options;
+
+	lfp_options = (struct bdb_lfp_options *)find_raw_section(bdb, BDB_LFP_OPTIONS);
+	if (!lfp_options)
+		return -1;
+
+	if (lfp_options->panel_type > 0xf &&
+		lfp_options->panel_type != 0xff) {
+		return -1;
+	}
+
+	//if (devdata && devdata->child.handle == DEVICE_HANDLE_LFP2)
+	//	return lfp_options->panel_type2;
+
+	return lfp_options->panel_type;
+}
+enum intel_backlight_type {
+	INTEL_BACKLIGHT_PMIC,
+	INTEL_BACKLIGHT_LPSS,
+	INTEL_BACKLIGHT_DISPLAY_DDI,
+	INTEL_BACKLIGHT_DSI_DCS,
+	INTEL_BACKLIGHT_PANEL_DRIVER_INTERFACE,
+	INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE,
+};
+struct intel_vbt_panel_data {
+	void *lfp_vbt_mode; /* if any */
+	void *sdvo_lvds_vbt_mode; /* if any */
+	
+	/* Feature bits */
+	int panel_type;
+	unsigned int lvds_dither:1;
+	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
+	
+	bool vrr;
+	
+	u8 seamless_drrs_min_refresh_rate;
+	//enum drrs_type drrs_type;
+	
+	struct {
+		int max_link_rate;
+		int rate;
+		int lanes;
+		int preemphasis;
+		int vswing;
+		int bpp;
+		//struct intel_pps_delays pps;
+		u8 drrs_msa_timing_delay;
+		bool low_vswing;
+		bool hobl;
+		bool dsc_disable;
+		bool pipe_joiner_enable;
+	} edp;
+	
+	struct {
+		bool enable;
+		bool full_link;
+		bool require_aux_wakeup;
+		int idle_frames;
+		int tp1_wakeup_time_us;
+		int tp2_tp3_wakeup_time_us;
+		int psr2_tp2_tp3_wakeup_time_us;
+	} psr;
+	
+	struct {
+		u16 pwm_freq_hz;
+		u16 brightness_precision_bits;
+		u16 hdr_dpcd_refresh_timeout;
+		bool present;
+		bool active_low_pwm;
+		u8 min_brightness;	/* min_brightness/255 of max */
+		s8 controller;		/* brightness controller number */
+		enum intel_backlight_type type;
+	} backlight;
+	
+};
+
+struct intel_panel {
+	/* Simple drm_panel */
+	void *base;
+
+	/* Fixed EDID for eDP and LVDS. May hold ERR_PTR for invalid EDID. */
+	void *fixed_edid;
+
+	//struct list_head fixed_modes;
+
+	/* backlight */
+	struct {
+		bool present;
+		u32 level;
+		u32 min;
+		u32 max;
+		bool enabled;
+		bool combination_mode;	/* gen 2/4 only */
+		bool active_low_pwm;
+		bool alternate_pwm_increment;	/* lpt+ */
+
+		/* PWM chip */
+		u32 pwm_level_min;
+		u32 pwm_level_max;
+		bool pwm_enabled;
+		bool util_pin_active_low;	/* bxt+ */
+		u8 controller;		/* bxt+ only */
+		void *pwm;
+		//struct pwm_state pwm_state;
+
+		/* DPCD backlight */
+		union {
+			struct {
+				//struct drm_edp_backlight_info info;
+				bool luminance_control_support;
+			} vesa;
+			struct {
+				bool sdr_uses_aux;
+				bool supports_2084_decode;
+				bool supports_2020_gamut;
+				bool supports_segmented_backlight;
+				bool supports_sdp_colorimetry;
+				bool supports_tone_mapping;
+			} intel_cap;
+		} edp;
+
+		///struct backlight_device *device;
+
+		//const struct intel_panel_bl_funcs *funcs;
+		//const struct intel_panel_bl_funcs *pwm_funcs;
+		//void (*power)(struct intel_connector *, bool enable);
+	} backlight;
+
+	struct intel_vbt_panel_data vbt;
+};
+
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+static void
+parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
+			struct intel_panel *panel)
+{
+	const struct bdb_lfp_backlight *backlight_data;
+	const struct lfp_backlight_data_entry *entry;
+	int panel_type = vbt_get_panel_type(bdb);
+	u16 level;
+	
+	panel->vbt.panel_type=panel_type;
+
+	backlight_data = (struct bdb_lfp_backlight *)find_raw_section(bdb, BDB_LFP_BACKLIGHT);
+	if (!backlight_data)
+		return;
+
+	if (backlight_data->entry_size != sizeof(backlight_data->data[0])) {
+		return;
+	}
+
+	entry = &backlight_data->data[panel_type];
+
+	panel->vbt.backlight.present = entry->type == BDB_BACKLIGHT_TYPE_PWM;
+	if (!panel->vbt.backlight.present) {
+		return;
+	}
+
+	panel->vbt.backlight.type = INTEL_BACKLIGHT_DISPLAY_DDI;
+	panel->vbt.backlight.controller = 0;
+	if (bdb->version >= 191) {
+		const struct lfp_backlight_control_method *method;
+
+		method = &backlight_data->backlight_control[panel_type];
+		
+		panel->vbt.backlight.type = static_cast<enum intel_backlight_type>(method->type);
+		panel->vbt.backlight.controller = method->controller;
+	}
+	
+	panel->vbt.backlight.pwm_freq_hz = entry->pwm_freq_hz;
+	panel->vbt.backlight.active_low_pwm = entry->active_low_pwm;
+
+	if (bdb->version >= 234) {
+		u16 min_level;
+		bool scale;
+
+		level = backlight_data->brightness_level[panel_type].level;
+		min_level = backlight_data->brightness_min_level[panel_type].level;
+
+		if (bdb->version >= 236)
+			scale = backlight_data->brightness_precision_bits[panel_type] == 16;
+		else
+			scale = level > 255;
+
+		if (scale)
+			min_level = min_level / 255;
+
+		if (min_level > 255) {
+			level = 255;
+		}
+		panel->vbt.backlight.min_brightness = min_level;
+
+		panel->vbt.backlight.brightness_precision_bits =
+			backlight_data->brightness_precision_bits[panel_type];
+	} else {
+		level = backlight_data->level[panel_type];
+		panel->vbt.backlight.min_brightness = entry->min_brightness;
+	}
+
+	if (bdb->version >= 239)
+		panel->vbt.backlight.hdr_dpcd_refresh_timeout =
+			DIV_ROUND_UP(backlight_data->hdr_dpcd_refresh_timeout[panel_type], 100);
+	else
+		panel->vbt.backlight.hdr_dpcd_refresh_timeout = 30;
+
+
+	
+	OSArray *connectorArray = OSArray::withCapacity(6);
+	OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+
+	connectorDict->setObject("panel_type", OSNumber::withNumber(panel_type, 32));
+	connectorDict->setObject("frequency hz", OSNumber::withNumber(panel->vbt.backlight.pwm_freq_hz, 32));
+
+	connectorDict->setObject("active", OSString::withCString(panel->vbt.backlight.active_low_pwm ? "low" : "high"));
+	connectorDict->setObject("min brightness", OSNumber::withNumber(panel->vbt.backlight.min_brightness, 32));
+	connectorDict->setObject("level", OSNumber::withNumber(level, 32));
+
+	connectorArray->setObject(connectorDict);
+	connectorDict->release();
+
+	igpu->setProperty("PANEL", connectorArray);
+	connectorArray->release();
+	
+	
+}
+
 static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
 	const void *block_data = find_raw_section(bdb, section_id);
@@ -998,6 +1226,9 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			enum aux_ch aux_ch = map_aux_ch(&display_ctx,child->aux_channel);
 			char buf[AUX_CH_NAME_BUFSIZE+3];
 			char buf2[6];
+			struct intel_panel panel;
+			
+			parse_lfp_backlight(igpu,bdb,&panel);
 			
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
 			
