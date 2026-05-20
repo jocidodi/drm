@@ -387,6 +387,21 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
 	
+	OSArray *connectorArray = OSArray::withCapacity(6);
+	for (int i = 0; i < 6; i++) {
+		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[1].connectors[i].index, 32));
+		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[1].connectors[i].busId, 32));
+		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[1].connectors[i].pipe, 32));
+		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[1].connectors[i].pad, 32));
+		connectorDict->setObject("type", OSNumber::withNumber(pinfo[1].connectors[i].type, 32));
+		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[1].connectors[i].flags, 32));
+		connectorArray->setObject(connectorDict);
+		connectorDict->release();
+	}
+	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
+	connectorArray->release();
+	
 	/*pinfo[1].connectors[0].index=0;//DDI0
 	pinfo[1].connectors[0].busId=0;
 	pinfo[1].connectors[0].pipe=0;//1 dp power 0 edp power
@@ -528,6 +543,21 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
+	
+	OSArray *connectorArray = OSArray::withCapacity(6);
+	for (int i = 0; i < 6; i++) {
+		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[p].connectors[i].index, 32));
+		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[p].connectors[i].busId, 32));
+		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[p].connectors[i].pipe, 32));
+		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[p].connectors[i].pad, 32));
+		connectorDict->setObject("type", OSNumber::withNumber(pinfo[p].connectors[i].type, 32));
+		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[p].connectors[i].flags, 32));
+		connectorArray->setObject(connectorDict);
+		connectorDict->release();
+	}
+	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
+	connectorArray->release();
 	
 	/*pinfo[p].connectors[0].index=0;
 	pinfo[p].connectors[0].busId=0;

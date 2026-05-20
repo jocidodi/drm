@@ -581,7 +581,93 @@ enum port {
 	PORT_NONE,
 };
 
+enum phy {
+	PHY_NONE = -1,
 
+	PHY_A = 0,
+	PHY_B,
+	PHY_C,
+	PHY_D,
+	PHY_E,
+	PHY_F,
+	PHY_G,
+	PHY_H,
+	PHY_I,
+
+	I915_MAX_PHYS
+};
+enum aux_ch {
+	AUX_CH_NONE = -1,
+
+	AUX_CH_A,
+	AUX_CH_B,
+	AUX_CH_C,
+	AUX_CH_D,
+	AUX_CH_E, /* ICL+ */
+	AUX_CH_F,
+	AUX_CH_G,
+	AUX_CH_H,
+	AUX_CH_I,
+
+	/* tgl+ */
+	AUX_CH_USBC1 = AUX_CH_D,
+	AUX_CH_USBC2,
+	AUX_CH_USBC3,
+	AUX_CH_USBC4,
+	AUX_CH_USBC5,
+	AUX_CH_USBC6,
+
+	/* XE_LPD repositions D/E offsets and bitfields */
+	AUX_CH_D_XELPD = AUX_CH_USBC5,
+	AUX_CH_E_XELPD,
+};
+
+static const u8 adlp_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_C] = DP_AUX_C,
+	[AUX_CH_D_XELPD] = DP_AUX_D,
+	[AUX_CH_E_XELPD] = DP_AUX_E,
+	[AUX_CH_USBC1] = DP_AUX_F,
+	[AUX_CH_USBC2] = DP_AUX_G,
+	[AUX_CH_USBC3] = DP_AUX_H,
+	[AUX_CH_USBC4] = DP_AUX_I,
+};
+
+/*
+ * ADL-S VBT uses PHY based mapping. Combo PHYs A,B,C,D,E
+ * map to DDI A,TC1,TC2,TC3,TC4 respectively.
+ */
+static const u8 adls_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_USBC1] = DP_AUX_B,
+	[AUX_CH_USBC2] = DP_AUX_C,
+	[AUX_CH_USBC3] = DP_AUX_D,
+	[AUX_CH_USBC4] = DP_AUX_E,
+};
+
+/*
+ * RKL/DG1 VBT uses PHY based mapping. Combo PHYs A,B,C,D
+ * map to DDI A,B,TC1,TC2 respectively.
+ */
+static const u8 rkl_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_USBC1] = DP_AUX_C,
+	[AUX_CH_USBC2] = DP_AUX_D,
+};
+
+static const u8 direct_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_C] = DP_AUX_C,
+	[AUX_CH_D] = DP_AUX_D, /* aka AUX_CH_USBC1 */
+	[AUX_CH_E] = DP_AUX_E, /* aka AUX_CH_USBC2 */
+	[AUX_CH_F] = DP_AUX_F, /* aka AUX_CH_USBC3 */
+	[AUX_CH_G] = DP_AUX_G, /* aka AUX_CH_USBC4 */
+	[AUX_CH_H] = DP_AUX_H, /* aka AUX_CH_USBC5 */
+	[AUX_CH_I] = DP_AUX_I, /* aka AUX_CH_USBC6 */
+};
 
 struct intel_display {
 	int version; // For DISPLAY_VER macro
@@ -593,6 +679,101 @@ struct intel_display {
 };
 
 #define DISPLAY_VER(d) ((d)->version)
+
+#define AUX_CH_NAME_BUFSIZE	6
+
+static const char *aux_ch_name(struct intel_display *display,
+				   char *buf, int size, enum aux_ch aux_ch)
+{
+	if (DISPLAY_VER(display) >= 13 && aux_ch >= AUX_CH_D_XELPD)
+		snprintf(buf, size, "AUX_CH_%c", 'A' + aux_ch - AUX_CH_D_XELPD + AUX_CH_D);
+	else if (DISPLAY_VER(display) >= 12 && aux_ch >= AUX_CH_USBC1)
+		snprintf(buf, size, "AUX_CH_USBC%c", '1' + aux_ch - AUX_CH_USBC1);
+	else
+		snprintf(buf, size, "AUX_CH_%c", 'A' + aux_ch);
+
+	return buf;
+}
+
+#define port_name(p) ((p) + '0')
+static const char *intel_ddi_encoder_name(struct intel_display *display,
+					  enum port port, char *s, int size)
+{
+	if (DISPLAY_VER(display) >= 13 && port >= PORT_D_XELPD) {
+		snprintf(s, size, "DDI_%c",
+				   port_name(port - PORT_D_XELPD + PORT_D));
+	} else if (DISPLAY_VER(display) >= 12) {
+
+		snprintf(s, size,  "DDI_%c",
+				 port_name(port));
+	} else if (DISPLAY_VER(display) >= 11) {
+
+		snprintf(s, size,  "DDI_%c",
+				   port_name(port));
+	} else {
+		snprintf(s, size,  "DDI_%c", port_name(port));
+	}
+
+	return (s);
+}
+
+static enum aux_ch map_aux_ch(struct intel_display *display, u8 aux_channel)
+{
+	const u8 *aux_ch_map;
+	int i, n_entries;
+
+	if (DISPLAY_VER(display) >= 13) {
+		aux_ch_map = adlp_aux_ch_map;
+		n_entries = ARRAY_SIZE(adlp_aux_ch_map);
+	} else if (display->platform.alderlake_s) {
+		aux_ch_map = adls_aux_ch_map;
+		n_entries = ARRAY_SIZE(adls_aux_ch_map);
+	} else if (display->platform.dg1 || display->platform.rocketlake) {
+		aux_ch_map = rkl_aux_ch_map;
+		n_entries = ARRAY_SIZE(rkl_aux_ch_map);
+	} else {
+		aux_ch_map = direct_aux_ch_map;
+		n_entries = ARRAY_SIZE(direct_aux_ch_map);
+	}
+
+	for (i = 0; i < n_entries; i++) {
+		if (aux_ch_map[i] == aux_channel)
+			return static_cast<enum aux_ch>(i);
+	}
+
+	return AUX_CH_NONE;
+}
+static const char* phy_to_string(enum phy port)
+{
+	switch (port) {
+		case PHY_A: return "PHY_A";
+		case PHY_B: return "PHY_B";
+		case PHY_C: return "PHY_C";
+		case PHY_D: return "PHY_D";
+		case PHY_E: return "PHY_E";
+		case PHY_F: return "PHY_F";
+		case PHY_G: return "PHY_G";
+		case PHY_H: return "PHY_H";
+		default: return "Unknown";
+	}
+}
+
+static enum phy intel_port_to_phy(struct intel_display *display, enum port port)
+{
+	if (DISPLAY_VER(display) >= 13 && port >= PORT_D_XELPD)
+			return static_cast<enum phy>(PHY_D + port - PORT_D_XELPD);
+		else if (DISPLAY_VER(display) >= 13 && port >= PORT_TC1)
+			return static_cast<enum phy>(PHY_F + port - PORT_TC1);
+		else if (display->platform.alderlake_s && port >= PORT_TC1)
+			return static_cast<enum phy>(PHY_B + port - PORT_TC1);
+		else if ((display->platform.dg1 || display->platform.rocketlake) && port >= PORT_TC1)
+			return static_cast<enum phy>(PHY_C + port - PORT_TC1);
+		/*else if ((display->platform.jasperlake || display->platform.elkhartlake) &&
+			 port == PORT_D)
+			return PHY_A;*/
+
+		return static_cast<enum phy>(PHY_A + port - PORT_A);
+}
 
 static enum port __dvo_port_to_port(int n_ports, int n_dvo,
 					const int port_mapping[][3], u8 dvo_port)
@@ -682,22 +863,24 @@ static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 static const char* port_to_string(enum port port)
 {
 	switch (port) {
-		case PORT_A: return "Port A";
-		case PORT_B: return "Port B";
-		case PORT_C: return "Port C";
-		case PORT_D: return "Port D";
-		case PORT_E: return "Port E";
-		case PORT_F: return "Port F";
-		case PORT_G: return "Port G";
-		case PORT_H: return "Port H";
-		case PORT_I: return "Port I";
-		case PORT_TC1: return "Port TC1";
-		case PORT_TC2: return "Port TC2";
-		case PORT_TC3: return "Port TC3";
-		case PORT_TC4: return "Port TC4";
+		case PORT_A: return "PORT_A";
+		case PORT_B: return "PORT_B";
+		case PORT_C: return "PORT_C";
+		case PORT_D: return "PORT_D";
+		case PORT_E: return "PORT_E";
+		case PORT_F: return "PORT_F";
+		case PORT_G: return "PORT_G";
+		case PORT_H: return "PORT_H";
+		case PORT_I: return "PORT_I";
+		case PORT_TC1: return "PORT_TC1";
+		case PORT_TC2: return "PORT_TC2";
+		case PORT_TC3: return "PORT_TC3";
+		case PORT_TC4: return "PORT_TC4";
 		default: return "Unknown";
 	}
 }
+
+
 static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
 	const void *block_data = find_raw_section(bdb, section_id);
@@ -745,19 +928,39 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 		bool isMTL = (model == 0xAC || model == 0xAD);
 
 
+		/* Display ver 12  \
+		func(tigerlake) \
+		func(tigerlake_uy) \
+		func(rocketlake) \
+		func(dg1) \
+		func(alderlake_s) \
+		func(alderlake_s_raptorlake_s) \
+		 Display ver 13  \
+		func(alderlake_p) \
+		func(alderlake_p_alderlake_n) \
+		func(alderlake_p_raptorlake_p) \
+		func(alderlake_p_raptorlake_u) \
+		func(dg2) \
+		func(dg2_g10) \
+		func(dg2_g11) \
+		func(dg2_g12) \*/
+		
+		//TODO: check ip ver
 		struct intel_display display_ctx;
 
-		if (isMTL|| isRKL || isADL || isRPL) {
+		if (isMTL || isADL || isRPL) {
 			display_ctx.version = 13;
-		} else if (isRealTGL) {
+		} else if (isRealTGL|| isRKL) {
 			display_ctx.version = 12;
 		} else {
-			display_ctx.version = 11;
+			display_ctx.version = 12;
 		}
 
-		display_ctx.platform.alderlake_s = isADL;
+		display_ctx.platform.alderlake_s = false; // needs detection
 		display_ctx.platform.rocketlake = isRKL;
 		display_ctx.platform.dg1 = false;
+		
+		
 
 		OSArray *connectorArray = OSArray::withCapacity(6);
 		
@@ -769,7 +972,7 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			bconnectors[i].type=ConnectorDummy;
 			bconnectors[i].flags=0;
 		}
-		int ni=0;
+
 		for (i = 0; i < child_device_num; i++) {
 			const u8 *base = (u8 *)(defs);
 			const struct child_device_config *child = reinterpret_cast<const struct child_device_config *>(
@@ -791,12 +994,18 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			bool is_edp   = is_dp && (child->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
 			bool is_dsi   = (child->device_type & DEVICE_TYPE_MIPI_OUTPUT);
 			bool is_crt   = (child->device_type & DEVICE_TYPE_ANALOG_OUTPUT);
-
+			enum phy phy = intel_port_to_phy(&display_ctx, port);
+			enum aux_ch aux_ch = map_aux_ch(&display_ctx,child->aux_channel);
+			char buf[AUX_CH_NAME_BUFSIZE+3];
+			char buf2[6];
+			
+			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
+			
 			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
 
 			connectorDict->setObject("Index", OSNumber::withNumber(i, 32));
-			
-			connectorDict->setObject("Name", OSString::withCString(port_to_string(port)));
+
+			connectorDict->setObject("Port", OSString::withCString(port_to_string(port)));
 			
 			connectorDict->setObject("DVI", is_dvi ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("HDMI", is_hdmi ? kOSBooleanTrue : kOSBooleanFalse);
@@ -804,7 +1013,9 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			connectorDict->setObject("eDP", is_edp ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("DSI", is_dsi ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("CRT", is_crt ? kOSBooleanTrue : kOSBooleanFalse);
-			
+			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(&display_ctx, port,buf2, sizeof(buf2))));
+			connectorDict->setObject("PHY", OSString::withCString(phy_to_string(phy)));
+			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(&display_ctx, buf, sizeof(buf), aux_ch)));
 			connectorDict->setObject("GMBUS", OSNumber::withNumber((unsigned long long)child->ddc_pin, 32));
 
 			connectorArray->setObject(connectorDict);
@@ -820,13 +1031,12 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			if (is_edp) flags=0x1+0x8+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
-			bconnectors[ni].index=i;
-			bconnectors[ni].busId=child->ddc_pin;
-			bconnectors[ni].pipe=port;
-			bconnectors[ni].pad=0;
-			bconnectors[ni].type=type;
-			bconnectors[ni].flags=flags;
-			ni++;
+			bconnectors[port].index=port;
+			bconnectors[port].busId=child->ddc_pin;
+			bconnectors[port].pipe=i;
+			bconnectors[port].pad=0;
+			bconnectors[port].type=type;
+			bconnectors[port].flags=flags;
 		}
 
 		igpu->setProperty("Bios_Connectors", connectorArray);
