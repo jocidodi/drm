@@ -385,9 +385,9 @@ uint64_t  Gen11::getOSInformation(void *that)
 	//pinfo[1].fVideoTurboFreq=270000000;
 	//pinfo[1].VCLK=1000*0x438;
 	
-	//NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
+	NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
 	
-	pinfo[1].connectors[0].index=0;//DDI0
+	/*pinfo[1].connectors[0].index=0;//DDI0
 	pinfo[1].connectors[0].busId=0;
 	pinfo[1].connectors[0].pipe=0;//1 dp power 0 edp power
 	pinfo[1].connectors[0].pad=0;
@@ -413,7 +413,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	pinfo[1].connectors[3].pipe=3;
 	pinfo[1].connectors[3].pad=0;
 	pinfo[1].connectors[3].type=ConnectorDummy;
-	pinfo[1].connectors[3].flags=0;
+	pinfo[1].connectors[3].flags=0;*/
 	
 	auto ret=FunctionCast(getOSInformation, callback->ogetOSInformation)(that );
 	return ret;
@@ -524,10 +524,12 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	//pinfo[p].fVideoTurboFreq=270000000;
 	//pinfo[p].VCLK=1000*0x438;
 	
-	//NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
+	NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
 	
+	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
 	
-	pinfo[p].connectors[0].index=0;
+	/*pinfo[p].connectors[0].index=0;
 	pinfo[p].connectors[0].busId=0;
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].pad=0;
@@ -553,7 +555,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	pinfo[p].connectors[3].pipe=3;
 	pinfo[p].connectors[3].pad=0;
 	pinfo[p].connectors[3].type=ConnectorDummy;
-	pinfo[p].connectors[3].flags=0;
+	pinfo[p].connectors[3].flags=0;*/
 	
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;

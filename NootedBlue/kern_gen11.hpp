@@ -42,17 +42,7 @@ struct AGDCFBOnline_t {
 	uint32_t                state;
 };
 
-enum ConnectorType : uint32_t {
-	ConnectorZero       = 0x0,
-	ConnectorDummy      = 0x1,
-	ConnectorLVDS       = 0x2,
-	ConnectorDigitalDVI = 0x4,
-	ConnectorSVID       = 0x8,
-	ConnectorVGA        = 0x10,
-	ConnectorDP         = 0x400,
-	ConnectorHDMI       = 0x800,
-	ConnectorAnalogDVI  = 0x2000
-};
+
 
 
 union ConnectorFlags {
@@ -344,14 +334,7 @@ struct PACKED FramebufferCNLCurrents {
 	uint32_t pad;
 	uint64_t valu2;
 };
-struct PACKED ConnectorInfo {
-	uint32_t index;
-	uint32_t busId;
-	uint32_t pipe;
-	uint32_t pad;
-	ConnectorType type;
-	uint32_t flags;
-};
+
 struct PACKED FramebufferICLLP {
 	uint32_t framebufferId;
 

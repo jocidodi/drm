@@ -34,6 +34,7 @@ NBlue *NBlue::callback = nullptr;
 static Gen11 gen11;
 static DYLDPatches dyldpatches;
 static HDMI agfxhda;
+static ConnectorInfo bconnectors[6];
 
 void NBlue::init() {
     callback = this;
@@ -285,6 +286,22 @@ void NBlue::setRMMIOIfNecessary() {
 		this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
 		this->rmmioPtr = reinterpret_cast<volatile uint32_t *>(this->rmmio->getVirtualAddress());
 	}
+}
+
+bool NBlue::detectConnectors(void *connectorsp) {
+	struct ConnectorInfo *cc=(struct ConnectorInfo*)connectorsp;
+	
+	for (int i = 0; i < 6; i++) {
+		cc[i].index=bconnectors[i].index;
+		cc[i].busId=bconnectors[i].busId;
+		cc[i].pipe=bconnectors[i].pipe;
+		cc[i].pad=bconnectors[i].pad;
+		cc[i].type=bconnectors[i].type;
+		cc[i].flags=bconnectors[i].flags;
+	}
+	
+
+	return true;
 }
 
 bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
@@ -742,8 +759,17 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 		display_ctx.platform.rocketlake = isRKL;
 		display_ctx.platform.dg1 = false;
 
-		OSArray *connectorArray = OSArray::withCapacity(4);
-
+		OSArray *connectorArray = OSArray::withCapacity(6);
+		
+		for (i = 0; i < 6; i++) {
+			bconnectors[i].index=i;
+			bconnectors[i].busId=0;
+			bconnectors[i].pipe=0;
+			bconnectors[i].pad=0;
+			bconnectors[i].type=ConnectorDummy;
+			bconnectors[i].flags=0;
+		}
+		int ni=0;
 		for (i = 0; i < child_device_num; i++) {
 			const u8 *base = (u8 *)(defs);
 			const struct child_device_config *child = reinterpret_cast<const struct child_device_config *>(
@@ -783,6 +809,24 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 
 			connectorArray->setObject(connectorDict);
 			connectorDict->release();
+			
+			ConnectorType type=ConnectorDummy;
+			if (is_dp) type=ConnectorDP;
+			if (is_edp) type=ConnectorLVDS;
+			if (is_hdmi) type=ConnectorHDMI;
+			
+			u32 flags=0;
+			if (is_dp) flags=0x1+0x400;
+			if (is_edp) flags=0x1+0x8+0x10;
+			if (is_hdmi) flags=0x1+0x200;
+			
+			bconnectors[ni].index=i;
+			bconnectors[ni].busId=child->ddc_pin;
+			bconnectors[ni].pipe=port;
+			bconnectors[ni].pad=0;
+			bconnectors[ni].type=type;
+			bconnectors[ni].flags=flags;
+			ni++;
 		}
 
 		igpu->setProperty("Bios_Connectors", connectorArray);

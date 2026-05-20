@@ -20,6 +20,26 @@ typedef unsigned int  IOSelect;
 #define _MASKED_BIT_ENABLE(a)	({ __typeof(a) _a = (a); _MASKED_FIELD(_a, _a); })
 #define _MASKED_BIT_DISABLE(a)	(_MASKED_FIELD((a), 0))
 
+enum ConnectorType : uint32_t {
+	ConnectorZero       = 0x0,
+	ConnectorDummy      = 0x1,
+	ConnectorLVDS       = 0x2,
+	ConnectorDigitalDVI = 0x4,
+	ConnectorSVID       = 0x8,
+	ConnectorVGA        = 0x10,
+	ConnectorDP         = 0x400,
+	ConnectorHDMI       = 0x800,
+	ConnectorAnalogDVI  = 0x2000
+};
+struct PACKED ConnectorInfo {
+	uint32_t index;
+	uint32_t busId;
+	uint32_t pipe;
+	uint32_t pad;
+	ConnectorType type;
+	uint32_t flags;
+};
+
 //! Hack
 class AppleACPIPlatformExpert : IOACPIPlatformExpert {
 	friend class NBlue;
@@ -34,6 +54,8 @@ class EXPORT PRODUCT_NAME : public IOService {
 	IOService *probe(IOService *provider, SInt32 *score) override;
 	bool start(IOService *provider) override;
 };*/
+
+
 
 class NBlue {
     friend class Gen11;
@@ -82,9 +104,7 @@ class NBlue {
 	
 
 
-int detectConnectors(void *connectorsp) {
-	return 0;
-}
+	static bool detectConnectors(void *connectorsp);
 	
 	static bool wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching);
 	mach_vm_address_t orgAddDrivers{0};
@@ -104,7 +124,7 @@ int detectConnectors(void *connectorsp) {
 	IOMemoryMap *rmmio {nullptr};
 	volatile UInt32 *rmmioPtr {nullptr};
 	OSData *vbiosData;
-
+	
 	
 };
 
