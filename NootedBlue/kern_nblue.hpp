@@ -10,7 +10,7 @@ typedef unsigned int  IOSelect;
 #include <IOKit/pci/IOPCIDevice.h>
 #include <IOKit/graphics/IOFramebuffer.h>
 #include <IOKit/acpi/IOACPIPlatformExpert.h>
-
+#include "intel_vbt_defs.h"
 
 #define BIT(n) (1<< n)
 #define REG_BIT(n) (1<< n)
@@ -62,7 +62,10 @@ class NBlue {
 	
     private:
 	
-	
+		
+		int intel_opregion_setup(IOPCIDevice *igpu);
+		struct intel_opregion opregion;
+
 	inline UInt32 readReg32(unsigned long reg) {
 		if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
 			return this->rmmioPtr[reg];
@@ -78,9 +81,7 @@ class NBlue {
 	}
 	
 
-bool getVBIOSFromOpRegion() {
-	return false;
-}
+
 int detectConnectors(void *connectorsp) {
 	return 0;
 }
@@ -93,6 +94,11 @@ int detectConnectors(void *connectorsp) {
     uint32_t pciRevision {0};
     IOPCIDevice *iGPU {nullptr};
 	bool isRealTGL = false;  
+	bool isRKL  = false;
+	bool isADL =  false;
+	bool isRPL = false;
+	bool isMTL= false;
+	
 	uint32_t cpuModel {0};
 	
 	IOMemoryMap *rmmio {nullptr};

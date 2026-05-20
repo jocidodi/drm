@@ -87,18 +87,29 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
 
+		// --- CPUID Detection ---
 		uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
 		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+		
 		uint32_t family = (eax >> 8) & 0xF;
 		uint32_t model = (eax >> 4) & 0xF;
 		uint32_t extModel = (eax >> 16) & 0xF;
 		uint32_t stepping = eax & 0xF;
-		if (family == 0x6) model |= (extModel << 4);
+		if (family == 0x6) {
+			model |= (extModel << 4);
+		}
 		this->cpuModel = model;
 		this->isRealTGL = (model == 0x8C || model == 0x8D);
-		SYSLOG("ngreen", "V52: CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",family, model, stepping, this->isRealTGL);
+		this->isRKL = (model == 0xA7);
+		this->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
+		this->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
+					   model == 0xA6 || model == 0xAA);
+		this->isMTL = (model == 0xAC || model == 0xAD);
+
+
+		SYSLOG("ngreen", "CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",family, model, stepping, this->isRealTGL);
 		
-		getVBIOSFromOpRegion();
+		if (intel_opregion_setup(this->iGPU)!=0) panic("BAD BIOS");
 		
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead32, configRead32, &orgConfigRead32);
@@ -420,5 +431,498 @@ bool NBlue::wrapApplePanelSetDisplay(IOService *that, IODisplay *display) {
 
 	bool ret = FunctionCast(wrapApplePanelSetDisplay, callback->orgApplePanelSetDisplay)(that, display);
 	return ret;
+}
+
+
+static const struct {
+	enum bdb_block_id section_id;
+	size_t min_size;
+} bdb_blocks[] = {
+	{ .section_id = BDB_GENERAL_FEATURES,
+	  .min_size = sizeof(struct bdb_general_features), },
+	{ .section_id = BDB_GENERAL_DEFINITIONS,
+	  .min_size = sizeof(struct bdb_general_definitions), },
+	{ .section_id = BDB_PSR,
+	  .min_size = sizeof(struct bdb_psr), },
+	{ .section_id = BDB_DRIVER_FEATURES,
+	  .min_size = sizeof(struct bdb_driver_features), },
+	{ .section_id = BDB_SDVO_LVDS_OPTIONS,
+	  .min_size = sizeof(struct bdb_sdvo_lvds_options), },
+	{ .section_id = BDB_SDVO_LVDS_DTD,
+	  .min_size = sizeof(struct bdb_sdvo_lvds_dtd), },
+	{ .section_id = BDB_EDP,
+	  .min_size = sizeof(struct bdb_edp), },
+	{ .section_id = BDB_LFP_OPTIONS,
+	  .min_size = sizeof(struct bdb_lfp_options), },
+
+	{ .section_id = BDB_LFP_DATA_PTRS,
+	  .min_size = sizeof(struct bdb_lfp_data_ptrs), },
+	{ .section_id = BDB_LFP_DATA,
+	  .min_size = 0, /* special case */ },
+	{ .section_id = BDB_LFP_BACKLIGHT,
+	  .min_size = sizeof(struct bdb_lfp_backlight), },
+	{ .section_id = BDB_LFP_POWER,
+	  .min_size = sizeof(struct bdb_lfp_power), },
+	{ .section_id = BDB_MIPI_CONFIG,
+	  .min_size = sizeof(struct bdb_mipi_config), },
+	{ .section_id = BDB_MIPI_SEQUENCE,
+	  .min_size = sizeof(struct bdb_mipi_sequence) },
+	{ .section_id = BDB_COMPRESSION_PARAMETERS,
+	  .min_size = sizeof(struct bdb_compression_parameters), },
+	{ .section_id = BDB_GENERIC_DTD,
+	  .min_size = sizeof(struct bdb_generic_dtd), },
+};
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+
+static u32 _get_blocksize(const u8 *block_base)
+{
+	if (*block_base == BDB_MIPI_SEQUENCE && *(block_base + 3) >= 3)
+		return *((const u32 *)(block_base + 4));
+	else
+		return *((const u16 *)(block_base + 1));
+}
+
+static const void *find_raw_section(const void *_bdb, int section_id)
+{
+	const struct bdb_header *bdb = static_cast<const struct bdb_header *>(_bdb);
+	const u8 *base = static_cast<const u8 *>(_bdb);
+	int index = 0;
+	u32 total, current_size;
+	int current_id;
+
+
+	index = (bdb->header_size) ? bdb->header_size : 16;
+	total = bdb->bdb_size;
+
+	while (index + 3 < total) {
+		current_id = *(base + index);
+		current_size = _get_blocksize(base + index);
+		index += 3;
+
+		if (index + current_size > total)
+			return NULL;
+
+		if (current_id == section_id)
+			return base + index;
+
+		index += current_size;
+	}
+
+	return NULL;
+}
+
+static size_t lfp_data_min_size(const struct bdb_header *bdb)
+{
+	const struct bdb_lfp_data_ptrs *ptrs;
+	size_t size;
+
+	ptrs = (struct bdb_lfp_data_ptrs*)find_raw_section((void*)bdb, BDB_LFP_DATA_PTRS);
+	if (!ptrs)
+		return 0;
+
+	size = sizeof(struct bdb_lfp_data);
+	if (ptrs->panel_name.table_size)
+		size = max(size, ptrs->panel_name.offset +
+			   sizeof(struct bdb_lfp_data_tail));
+
+	return size;
+}
+
+static int get_child_device_expected_size(u16 vbt_version)
+{
+	if (vbt_version > 264) return -1;
+	else if (vbt_version >= 263) return 44;
+	else if (vbt_version >= 256) return 40;
+	else if (vbt_version >= 216) return 39;
+	else if (vbt_version >= 196) return 38;
+	else if (vbt_version >= 195) return 37;
+	else if (vbt_version >= 111) return 33;
+	else if (vbt_version >= 106) return 27;
+	else return 22;
+}
+
+enum port {
+	PORT_A = 0,
+	PORT_B,
+	PORT_C,
+	PORT_D,
+	PORT_E,
+	PORT_F,
+	PORT_G,
+	PORT_H,
+	PORT_I,
+	PORT_TC1 = 10, // Type-C Port 1
+	PORT_TC2,
+	PORT_TC3,
+	PORT_TC4,
+	PORT_TC5,
+	PORT_TC6,
+	PORT_D_XELPD, // Special mapping for XeHPD
+	PORT_E_XELPD,
+	PORT_NONE,
+};
+
+
+
+struct intel_display {
+	int version; // For DISPLAY_VER macro
+	struct {
+		bool alderlake_s;
+		bool dg1;
+		bool rocketlake;
+	} platform;
+};
+
+#define DISPLAY_VER(d) ((d)->version)
+
+static enum port __dvo_port_to_port(int n_ports, int n_dvo,
+					const int port_mapping[][3], u8 dvo_port)
+{
+	int i, j;
+
+	for (i = 0; i < n_ports; i++) {
+		for (j = 0; j < n_dvo; j++) {
+			if (port_mapping[i][j] == -1)
+				break;
+
+			if (dvo_port == port_mapping[i][j])
+				return static_cast<enum port>(i);
+		}
+	}
+
+	return PORT_NONE;
+}
+
+static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
+{
+
+	static const int port_mapping[][3] = {
+		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
+		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
+		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
+		[PORT_D] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
+		[PORT_E] = { DVO_PORT_HDMIE, DVO_PORT_DPE, DVO_PORT_CRT },
+		[PORT_F] = { DVO_PORT_HDMIF, DVO_PORT_DPF, -1 },
+		[PORT_G] = { DVO_PORT_HDMIG, DVO_PORT_DPG, -1 },
+		[PORT_H] = { DVO_PORT_HDMIH, DVO_PORT_DPH, -1 },
+		[PORT_I] = { DVO_PORT_HDMII, DVO_PORT_DPI, -1 },
+	};
+
+	static const int rkl_port_mapping[][3] = {
+		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
+		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
+		[PORT_C] = { -1 },
+		[PORT_TC1] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
+		[PORT_TC2] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
+	};
+
+	static const int adls_port_mapping[][3] = {
+		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
+		[PORT_B] = { -1 },
+		[PORT_C] = { -1 },
+		[PORT_TC1] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
+		[PORT_TC2] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
+		[PORT_TC3] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
+		[PORT_TC4] = { DVO_PORT_HDMIE, DVO_PORT_DPE, -1 },
+	};
+	static const int xelpd_port_mapping[][3] = {
+		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
+		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
+		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
+		[PORT_D_XELPD] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
+		[PORT_E_XELPD] = { DVO_PORT_HDMIE, DVO_PORT_DPE, -1 },
+		[PORT_TC1] = { DVO_PORT_HDMIF, DVO_PORT_DPF, -1 },
+		[PORT_TC2] = { DVO_PORT_HDMIG, DVO_PORT_DPG, -1 },
+		[PORT_TC3] = { DVO_PORT_HDMIH, DVO_PORT_DPH, -1 },
+		[PORT_TC4] = { DVO_PORT_HDMII, DVO_PORT_DPI, -1 },
+	};
+
+
+	if (DISPLAY_VER(display) >= 13)
+		return __dvo_port_to_port(sizeof(xelpd_port_mapping) / sizeof(xelpd_port_mapping[0]),
+					  3, // array size
+					  xelpd_port_mapping,
+					  dvo_port);
+	else if (display->platform.alderlake_s)
+		return __dvo_port_to_port(sizeof(adls_port_mapping) / sizeof(adls_port_mapping[0]),
+					  3,
+					  adls_port_mapping,
+					  dvo_port);
+	else if (display->platform.dg1 || display->platform.rocketlake)
+		return __dvo_port_to_port(sizeof(rkl_port_mapping) / sizeof(rkl_port_mapping[0]),
+					  3,
+					  rkl_port_mapping,
+					  dvo_port);
+	else
+		return __dvo_port_to_port(sizeof(port_mapping) / sizeof(port_mapping[0]),
+					  3,
+					  port_mapping,
+					  dvo_port);
+}
+
+static const char* port_to_string(enum port port)
+{
+	switch (port) {
+		case PORT_A: return "Port A";
+		case PORT_B: return "Port B";
+		case PORT_C: return "Port C";
+		case PORT_D: return "Port D";
+		case PORT_E: return "Port E";
+		case PORT_F: return "Port F";
+		case PORT_G: return "Port G";
+		case PORT_H: return "Port H";
+		case PORT_I: return "Port I";
+		case PORT_TC1: return "Port TC1";
+		case PORT_TC2: return "Port TC2";
+		case PORT_TC3: return "Port TC3";
+		case PORT_TC4: return "Port TC4";
+		default: return "Unknown";
+	}
+}
+static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int section_id, size_t min_size)
+{
+	const void *block_data = find_raw_section(bdb, section_id);
+
+	if (!block_data) {
+		// Block not found is not necessarily an error for optional blocks
+		return;
+	}
+
+	u32 block_size = _get_blocksize(static_cast<const u8 *>(block_data) - 3);
+
+	if (block_size < min_size) {
+		return;
+	}
+
+
+	if (section_id == BDB_GENERAL_DEFINITIONS) {
+			const struct bdb_general_definitions *defs = static_cast<const struct bdb_general_definitions *>(block_data);
+			int entry_size = defs->child_dev_size;
+			int child_device_num;
+			int i;
+
+			int expected_size = get_child_device_expected_size(bdb->version);
+			if (expected_size > 0 && entry_size != expected_size) {
+			}
+
+			child_device_num = (block_size - sizeof(struct bdb_general_definitions)) / entry_size;
+
+		
+		uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+		uint32_t family = (eax >> 8) & 0xF;
+		uint32_t model = (eax >> 4) & 0xF;
+		uint32_t extModel = (eax >> 16) & 0xF;
+		uint32_t stepping = eax & 0xF;
+		if (family == 0x6) {
+			model |= (extModel << 4);
+		}
+		uint32_t cpuModel = model;
+		bool isRealTGL = (model == 0x8C || model == 0x8D);
+		bool isRKL = (model == 0xA7);
+		bool isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
+		bool isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
+					   model == 0xA6 || model == 0xAA);
+		bool isMTL = (model == 0xAC || model == 0xAD);
+
+
+		struct intel_display display_ctx;
+
+		if (isMTL|| isRKL || isADL || isRPL) {
+			display_ctx.version = 13;
+		} else if (isRealTGL) {
+			display_ctx.version = 12;
+		} else {
+			display_ctx.version = 11;
+		}
+
+		display_ctx.platform.alderlake_s = isADL;
+		display_ctx.platform.rocketlake = isRKL;
+		display_ctx.platform.dg1 = false;
+
+		OSArray *connectorArray = OSArray::withCapacity(4);
+
+		for (i = 0; i < child_device_num; i++) {
+			const u8 *base = (u8 *)(defs);
+			const struct child_device_config *child = reinterpret_cast<const struct child_device_config *>(
+				base + sizeof(struct bdb_general_definitions) + (i * entry_size));
+
+			if (child->device_type == 0)
+				continue;
+
+			enum port port = dvo_port_to_port(&display_ctx, child->dvo_port);
+			
+			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
+				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
+				else if (child->dvo_port == DVO_PORT_MIPIC) port = (display_ctx.version >= 11) ? PORT_B : PORT_C;
+			}
+
+			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
+			bool is_hdmi  = is_dvi && !(child->device_type & DEVICE_TYPE_NOT_HDMI_OUTPUT);
+			bool is_dp    = (child->device_type & DEVICE_TYPE_DISPLAYPORT_OUTPUT);
+			bool is_edp   = is_dp && (child->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
+			bool is_dsi   = (child->device_type & DEVICE_TYPE_MIPI_OUTPUT);
+			bool is_crt   = (child->device_type & DEVICE_TYPE_ANALOG_OUTPUT);
+
+			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+
+			connectorDict->setObject("Index", OSNumber::withNumber(i, 32));
+			
+			connectorDict->setObject("Name", OSString::withCString(port_to_string(port)));
+			
+			connectorDict->setObject("DVI", is_dvi ? kOSBooleanTrue : kOSBooleanFalse);
+			connectorDict->setObject("HDMI", is_hdmi ? kOSBooleanTrue : kOSBooleanFalse);
+			connectorDict->setObject("DP", is_dp ? kOSBooleanTrue : kOSBooleanFalse);
+			connectorDict->setObject("eDP", is_edp ? kOSBooleanTrue : kOSBooleanFalse);
+			connectorDict->setObject("DSI", is_dsi ? kOSBooleanTrue : kOSBooleanFalse);
+			connectorDict->setObject("CRT", is_crt ? kOSBooleanTrue : kOSBooleanFalse);
+			
+			connectorDict->setObject("GMBUS", OSNumber::withNumber((unsigned long long)child->ddc_pin, 32));
+
+			connectorArray->setObject(connectorDict);
+			connectorDict->release();
+		}
+
+		igpu->setProperty("Bios_Connectors", connectorArray);
+		connectorArray->release();
+
+		}
+}
+
+static void init_bdb_blocks(IOPCIDevice *igpu, const struct bdb_header *bdb)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(bdb_blocks); i++) {
+		int section_id = bdb_blocks[i].section_id;
+		size_t min_size = bdb_blocks[i].min_size;
+
+		if (section_id == BDB_LFP_DATA)
+			min_size = lfp_data_min_size(bdb);
+
+		init_bdb_block(igpu, bdb, section_id, min_size);
+	}
+}
+
+int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
+{
+	struct intel_opregion *opregion = &this->opregion;
+	u32 asls, mboxes;
+	char buf[sizeof(OPREGION_SIGNATURE)];
+	int err = 0;
+	void *base = nullptr;
+	const void *vbt = nullptr;
+	u32 vbt_size = 0;
+
+	asls = igpu->configRead32(0xFC);
+	
+	if (asls == 0) {
+		return -ENOMEM;
+	}
+
+	IOPhysicalAddress physAddr = asls;
+	base = IOMallocPageable(OPREGION_SIZE, PAGE_SIZE);
+	if (!base) {
+		return -ENOMEM;
+	}
+
+	IOMemoryDescriptor *memDesc = IOMemoryDescriptor::withPhysicalAddress(
+		physAddr, OPREGION_SIZE, kIODirectionInOut);
+	
+	if (!memDesc) {
+		IOFreePageable(base, OPREGION_SIZE);
+		return -ENOMEM;
+	}
+
+	IOMemoryMap *memMap = memDesc->map();
+	if (!memMap) {
+		memDesc->release();
+		IOFreePageable(base, OPREGION_SIZE);
+		return -ENOMEM;
+	}
+
+	mach_vm_address_t virtAddr = memMap->getVirtualAddress();
+	
+	memcpy(buf, (void *)virtAddr, sizeof(buf));
+	if (memcmp(buf, OPREGION_SIGNATURE, 16)) {
+		err = -EINVAL;
+		goto err_out;
+	}
+
+	opregion->header = reinterpret_cast<struct opregion_header *>(virtAddr);
+
+
+	mboxes = opregion->header->mboxes;
+	
+	if (mboxes & MBOX_ACPI) {
+			opregion->acpi = (struct opregion_acpi *)((uint8_t *)virtAddr + OPREGION_ACPI_OFFSET);
+			opregion->acpi->chpd = 1;
+		}
+
+		if (mboxes & MBOX_ASLE) {
+			opregion->asle = (struct opregion_asle *)((uint8_t *)virtAddr + OPREGION_ASLE_OFFSET);
+			opregion->asle->ardy = ASLE_ARDY_NOT_READY;
+		}
+
+		if (mboxes & MBOX_ASLE_EXT) {
+			opregion->asle_ext = (struct opregion_asle_ext *)((uint8_t *)virtAddr + OPREGION_ASLE_EXT_OFFSET);
+		}
+
+		if (mboxes & MBOX_BACKLIGHT) {
+		}
+
+	if (opregion->header->over.major >= 2 && opregion->asle &&
+		opregion->asle->rvda && opregion->asle->rvds) {
+		resource_size_t rvda = opregion->asle->rvda;
+
+		if (opregion->header->over.major > 2 ||
+			opregion->header->over.minor >= 1) {
+			rvda += asls;
+		}
+
+		IOMemoryDescriptor *rvdaDesc = IOMemoryDescriptor::withPhysicalAddress(
+			rvda, opregion->asle->rvds, kIODirectionInOut);
+		
+		if (rvdaDesc) {
+			IOMemoryMap *rvdaMap = rvdaDesc->map();
+			if (rvdaMap) {
+				vbt = reinterpret_cast<const void *>(rvdaMap->getVirtualAddress());
+				vbt_size = opregion->asle->rvds;
+				
+				opregion->vbt = vbt;
+				opregion->vbt_size = vbt_size;
+				opregion->rvda = rvdaMap;
+			}
+			rvdaDesc->release();
+		}
+	}
+
+	if (!opregion->vbt) {
+		vbt = (void *)((uint8_t *)virtAddr + OPREGION_VBT_OFFSET);
+		vbt_size = (mboxes & MBOX_ASLE_EXT) ?
+			OPREGION_ASLE_EXT_OFFSET : OPREGION_SIZE;
+		vbt_size -= OPREGION_VBT_OFFSET;
+		
+		opregion->vbt = vbt;
+		opregion->vbt_size = vbt_size;
+	}
+	
+	if (vbt) {
+			const struct vbt_header *vbth = reinterpret_cast<struct vbt_header *>(const_cast<void *>(vbt));
+			const char *base = static_cast<const char *>(vbt);
+			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
+
+			if (bdb) {
+				init_bdb_blocks(igpu, bdb);
+			}
+		}
+	
+
+err_out:
+	if (memMap) memMap->release();
+	if (memDesc) memDesc->release();
+	if (base) IOFreePageable(base, OPREGION_SIZE);
+	
+	return err;
 }
 

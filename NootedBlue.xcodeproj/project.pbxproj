@@ -14,6 +14,8 @@
 		2E315A622BC6EA4D008411AA /* DYLDPatches.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E315A602BC6EA4D008411AA /* DYLDPatches.cpp */; };
 		2E5BF5832BCC212F0095BDCF /* HDMI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E5BF5812BCC212F0095BDCF /* HDMI.cpp */; };
 		2E5BF5842BCC212F0095BDCF /* HDMI.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 2E5BF5822BCC212F0095BDCF /* HDMI.hpp */; };
+		2E8599252FBCFFF4001C9274 /* intel_vbt_defs.h in Headers */ = {isa = PBXBuildFile; fileRef = 2E8599232FBCFFF3001C9274 /* intel_vbt_defs.h */; };
+		2E8599262FBCFFF4001C9274 /* intel_dsi_vbt_defs.h in Headers */ = {isa = PBXBuildFile; fileRef = 2E8599242FBCFFF3001C9274 /* intel_dsi_vbt_defs.h */; };
 		2EE611B22FA6C10F00E58E2A /* Firmware.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2EE611AE2FA6C10F00E58E2A /* Firmware.cpp */; };
 		2EE611B32FA6C10F00E58E2A /* Firmware.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 2EE611AF2FA6C10F00E58E2A /* Firmware.hpp */; };
 		2EE611B42FA6C10F00E58E2A /* ZlibAlloc.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 2EE611B02FA6C10F00E58E2A /* ZlibAlloc.hpp */; };
@@ -50,6 +52,8 @@
 		2E315A602BC6EA4D008411AA /* DYLDPatches.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DYLDPatches.cpp; sourceTree = "<group>"; };
 		2E5BF5812BCC212F0095BDCF /* HDMI.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HDMI.cpp; sourceTree = "<group>"; };
 		2E5BF5822BCC212F0095BDCF /* HDMI.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = HDMI.hpp; sourceTree = "<group>"; };
+		2E8599232FBCFFF3001C9274 /* intel_vbt_defs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = intel_vbt_defs.h; sourceTree = "<group>"; };
+		2E8599242FBCFFF3001C9274 /* intel_dsi_vbt_defs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = intel_dsi_vbt_defs.h; sourceTree = "<group>"; };
 		2EE611AE2FA6C10F00E58E2A /* Firmware.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Firmware.cpp; sourceTree = "<group>"; };
 		2EE611AF2FA6C10F00E58E2A /* Firmware.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = Firmware.hpp; sourceTree = "<group>"; };
 		2EE611B02FA6C10F00E58E2A /* ZlibAlloc.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ZlibAlloc.hpp; sourceTree = "<group>"; };
@@ -128,6 +132,8 @@
 				F0BB9E532A57A0340081F5FA /* kern_patcherplus.cpp */,
 				F0BB9E542A57A0340081F5FA /* kern_patcherplus.hpp */,
 				F009B7A029E4EE3C00786AFF /* kern_start.cpp */,
+				2E8599242FBCFFF3001C9274 /* intel_dsi_vbt_defs.h */,
+				2E8599232FBCFFF3001C9274 /* intel_vbt_defs.h */,
 			);
 			path = NootedBlue;
 			sourceTree = "<group>";
@@ -190,7 +196,9 @@
 				2E1CC3E22BA5DBD9004EC8F6 /* DisplayMergeNub.h in Headers */,
 				2E5BF5842BCC212F0095BDCF /* HDMI.hpp in Headers */,
 				2EE611B42FA6C10F00E58E2A /* ZlibAlloc.hpp in Headers */,
+				2E8599262FBCFFF4001C9274 /* intel_dsi_vbt_defs.h in Headers */,
 				F0BB9E562A57A0340081F5FA /* kern_patcherplus.hpp in Headers */,
+				2E8599252FBCFFF4001C9274 /* intel_vbt_defs.h in Headers */,
 				2EE611B32FA6C10F00E58E2A /* Firmware.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
