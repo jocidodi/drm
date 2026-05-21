@@ -335,7 +335,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 //globals
 void *ccont;
-void *ccont2;
 
 void  Gen11::initPlatformWorkarounds(void *that)
 {
@@ -447,7 +446,6 @@ void Gen11::FBMemMgr_Init(void *that)
 {
 	
 	FunctionCast(FBMemMgr_Init, callback->oFBMemMgr_Init)(that);
-	ccont2=that;
 	ccont = getMember<void *>(that, 0xc40);
 
 }
@@ -472,7 +470,6 @@ unsigned long Gen11::AppleIntelScalerinit(void *that,uint param_1)
 {
 	auto ret=  FunctionCast(AppleIntelScalerinit, callback->oAppleIntelScalerinit)(that,param_1 );
 	getMember<void *>(that, 0x28) = ccont;
-	getMember<void *>(that, 0x10) = ccont2;
 	return ret;
 }
 

@@ -450,7 +450,6 @@ private:
 
 
 	
-	
 public:
 
 	void init();
