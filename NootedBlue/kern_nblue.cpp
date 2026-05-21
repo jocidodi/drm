@@ -318,7 +318,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		return true;
 	}  else if (kextBacklight.loadIndex == index) {
-		/*KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
+		KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
 	  orgApplePanelSetDisplay};
 			if (patcher.routeMultiple(kextBacklight.loadIndex, &request, 1, address, size)) {
 				const UInt8 find[] = {"F%uT%04x"};
@@ -326,7 +326,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				const LookupPatchPlus patch {&kextBacklight, find, replace, 1};
 				SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply backlight patch");
 			}
-		return true;*/
+		return true;
 } else if (kextMCCSControl.loadIndex == index) {
 		KernelPatcher::RouteRequest requests[] = {
 				{"__ZN25AppleMCCSControlGibraltar5probeEP9IOServicePi", wrapFunctionReturnZero},
@@ -1015,6 +1015,25 @@ struct intel_panel {
 };
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define DIV_ROUND_CLOSEST(x, divisor)		\
+({							\
+	__typeof__(x) __x = x;				\
+	__typeof__(divisor) __d = divisor;		\
+							\
+	(((__typeof__(x))-1) > 0 ||			\
+	 ((__typeof__(divisor))-1) > 0 ||		\
+	 (((__x) > 0) == ((__d) > 0))) ?		\
+		(((__x) + ((__d) / 2)) / (__d)) :	\
+		(((__x) - ((__d) / 2)) / (__d));	\
+})
+#define KHz(x) (1000 * (x))
+#define MHz(x) KHz(1000 * (x))
+
+static u32 bxt_hz_to_pwm(u32 pwm_freq_hz)
+{
+	return DIV_ROUND_CLOSEST(KHz(19200), pwm_freq_hz);
+}
+
 static void
 parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 			struct intel_panel *panel)
@@ -1089,7 +1108,6 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 		panel->vbt.backlight.hdr_dpcd_refresh_timeout = 30;
 
 
-	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	OSDictionary *connectorDict = OSDictionary::withCapacity(10);
 
@@ -1099,7 +1117,8 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	connectorDict->setObject("active", OSString::withCString(panel->vbt.backlight.active_low_pwm ? "low" : "high"));
 	connectorDict->setObject("min brightness", OSNumber::withNumber(panel->vbt.backlight.min_brightness, 32));
 	connectorDict->setObject("level", OSNumber::withNumber(level, 32));
-
+	connectorDict->setObject("controller", OSNumber::withNumber(panel->vbt.backlight.controller, 32));
+	
 	connectorArray->setObject(connectorDict);
 	connectorDict->release();
 

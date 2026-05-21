@@ -58,7 +58,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
 			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds2, this->oinitPlatformWorkarounds2},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
-			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},
+			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},// reg fix
 			
 			
 			
@@ -106,6 +106,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
 			
+			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
 		
@@ -133,15 +134,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		
 	
-		
-		//CamelliaTcon2 ID replace
-		static const uint8_t f1b[] = {0x11, 0x0a, 0x84, 0x41};
-		static const uint8_t r1b[] = {0x11, 0x0a, 0x82, 0x41};
-		
-		//BanksiaTcon3
-		static const uint8_t f1c[] = {0x12, 0x14, 0xc4, 0x41};
-		static const uint8_t r1c[] = {0x11, 0x0a, 0x82, 0x41};
-		
 
 		//force edp panel if pipe=1
 		static const uint8_t f6a[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
@@ -274,7 +266,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//sku
 		static const uint8_t f2[] = {0x41, 0xc1, 0xef, 0x1c, 0x44, 0x89, 0xbb, 0x50, 0x11, 0x00, 0x00};
 		static const uint8_t r2[] = {0xc7, 0x83, 0x50, 0x11, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x90};
-		//subsclices
+		//8 subslices
 		static const uint8_t f2a[] = {0x44, 0x89, 0xf8, 0xf7, 0xd0, 0xf3, 0x0f, 0xb8, 0xf0, 0x89, 0xb3, 0x88, 0x11, 0x00, 0x00};
 		static const uint8_t r2a[] = {0xc7, 0x83, 0x88, 0x11, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90};
 		//ringmask
@@ -371,7 +363,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[1].cameliav=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
-	
 		pinfo[1].fMobile=1;
 		pinfo[1].fPipeCount=3;
 		pinfo[1].fInfoPortCount=3;
@@ -416,19 +407,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	pinfo[1].connectors[1].type=ConnectorDummy;
 	pinfo[1].connectors[1].flags=0;
 	
-	pinfo[1].connectors[2].index=2;
-	pinfo[1].connectors[2].busId=0;
-	pinfo[1].connectors[2].pipe=2;
-	pinfo[1].connectors[2].pad=0;
-	pinfo[1].connectors[2].type=ConnectorDummy;
-	pinfo[1].connectors[2].flags=0;
-	
-	pinfo[1].connectors[3].index=3;
-	pinfo[1].connectors[3].busId=0;
-	pinfo[1].connectors[3].pipe=3;
-	pinfo[1].connectors[3].pad=0;
-	pinfo[1].connectors[3].type=ConnectorDummy;
-	pinfo[1].connectors[3].flags=0;*/
+*/
 	
 	auto ret=FunctionCast(getOSInformation, callback->ogetOSInformation)(that );
 	return ret;
@@ -573,19 +552,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	pinfo[p].connectors[1].flags=0;
 	
-	pinfo[p].connectors[2].index=2;
-	pinfo[p].connectors[2].busId=0;
-	pinfo[p].connectors[2].pipe=2;
-	pinfo[p].connectors[2].pad=0;
-	pinfo[p].connectors[2].type=ConnectorDummy;
-	pinfo[p].connectors[2].flags=0;
-	
-	pinfo[p].connectors[3].index=3;
-	pinfo[p].connectors[3].busId=0;
-	pinfo[p].connectors[3].pipe=3;
-	pinfo[p].connectors[3].pad=0;
-	pinfo[p].connectors[3].type=ConnectorDummy;
-	pinfo[p].connectors[3].flags=0;*/
+*/
 	
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;

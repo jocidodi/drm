@@ -448,6 +448,7 @@ private:
 	static uint64_t  getOSInformation2(void *that);
 	mach_vm_address_t ogetOSInformation2 {};
 
+
 	
 	
 public:
