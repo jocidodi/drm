@@ -61,6 +61,15 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		vfs_context_rele(ctxt);
 		if (!err) { ok=1; sle=1;}
 		
+		if (!ok) {
+			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+				const DYLDPatch patches[] = {
+					{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+				};
+				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			}
+		}
+		
 		if (ok) {
 			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
 				const DYLDPatch patches[] = {
