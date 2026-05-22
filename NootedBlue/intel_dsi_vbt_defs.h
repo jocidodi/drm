@@ -5,23 +5,178 @@
 #define __INTEL_DSI_VBT_DEFS_H__
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
 #define __packed                        __attribute__((__packed__))
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+typedef int8_t s8;
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef uint64_t resource_size_t;
 
+#define BIT(nr)            (1UL << (nr))
+#define REG_BIT(n) (1UL << (n))
+
+constexpr uint32_t REG_GENMASK(int high, int low)
+{
+	return static_cast<uint32_t>(((1ULL << (high - low + 1)) - 1ULL) << low);
+}
+template <typename T>
+inline uint32_t REG_FIELD_GET(T mask, T val)
+{
+	return static_cast<uint32_t>((val & mask) / (mask & -mask));
+}
+template <typename T>
+constexpr T BIT_TYPE(unsigned int nr)
+{
+	return static_cast<T>(1ULL << nr);
+}
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define _PICK_EVEN(__index, __a, __b) ((__a) + (__index) * ((__b) - (__a)))
+
+inline uint8_t  BIT_U8(unsigned int nr)  { return BIT_TYPE<uint8_t>(nr); }
+inline uint16_t BIT_U16(unsigned int nr) { return BIT_TYPE<uint16_t>(nr); }
+inline uint32_t BIT_U32(unsigned int nr) { return BIT_TYPE<uint32_t>(nr); }
+inline uint64_t BIT_U64(unsigned int nr) { return BIT_TYPE<uint64_t>(nr); }
+
+constexpr unsigned long GENMASK(int h, int l)
+{
+	return static_cast<unsigned long>(((1ULL << (h - l + 1)) - 1ULL) << l);
+}
+
 struct PACKED bdb_block_header {
 	u8 vid;
 	u8 _0; /* padding */
 	u16 size;
 } ;
+
+#define UTIL_PIN_CTL			(0x48400)
+#define   UTIL_PIN_POLARITY		(1 << 22)
+#define PPS_BASE			0x61200
+#define _MMIO_PPS(display, pps_idx, reg) \
+	((display)->pps.mmio_base - PPS_BASE + (reg) + (pps_idx) * 0x100)
+#define _PP_CONTROL			0x61204
+#define PP_CONTROL(display, pps_idx)	_MMIO_PPS((display), (pps_idx), _PP_CONTROL)
+#define _PP_STATUS			0x61200
+#define PP_STATUS(display, pps_idx)	_MMIO_PPS((display), (pps_idx), _PP_STATUS)
+#define _PP_ON_DELAYS			0x61208
+#define PP_ON_DELAYS(display, pps_idx)	_MMIO_PPS((display), (pps_idx), _PP_ON_DELAYS)
+#define _PP_OFF_DELAYS			0x6120C
+#define PP_OFF_DELAYS(display, pps_idx)	_MMIO_PPS((display), (pps_idx), _PP_OFF_DELAYS)
+#define _PP_DIVISOR			0x61210
+#define PP_DIVISOR(display, pps_idx)	_MMIO_PPS((display), (pps_idx), _PP_DIVISOR)
+#define SOUTH_CHICKEN1		(0xc2000)
+#define _PIPE(pipe, a, b)		_PICK_EVEN(pipe, a, b)
+#define _MMIO_PIPE(pipe, a, b)		(_PIPE(pipe, a, b))
+#define _BXT_BLC_PWM_CTL1			0xC8250
+#define _BXT_BLC_PWM_CTL2			0xC8350
+
+#define _BXT_BLC_PWM_DUTY2			0xC8358
+#define _BXT_BLC_PWM_DUTY1			0xC8258
+#define BXT_BLC_PWM_DUTY(controller)   _MMIO_PIPE(controller, \
+					_BXT_BLC_PWM_DUTY1, _BXT_BLC_PWM_DUTY2)
+#define BXT_BLC_PWM_CTL(controller)    _MMIO_PIPE(controller,		\
+					_BXT_BLC_PWM_CTL1, _BXT_BLC_PWM_CTL2)
+#define   BXT_BLC_PWM_ENABLE			(1 << 31)
+#define   BXT_BLC_PWM_POLARITY			(1 << 29)
+#define  ICP_SECOND_PPS_IO_SELECT	REG_BIT(2)
+#define SFUSE_STRAP			(0xc2014)
+#define  SFUSE_STRAP_RAW_FREQUENCY	(1 << 8)
+#define  CNP_RAWCLK_DIV(div)	((div) << 16)
+#define  CNP_RAWCLK_DEN(den)	((den) << 26)
+#define  ICP_RAWCLK_NUM(num)	((num) << 11)
+#define PCH_RAWCLK_FREQ         (0xc6204)
+#define _BXT_BLC_PWM_FREQ1			0xC8254
+#define _BXT_BLC_PWM_FREQ2			0xC8354
+#define BXT_BLC_PWM_FREQ(controller)   _MMIO_PIPE(controller, \
+					_BXT_BLC_PWM_FREQ1, _BXT_BLC_PWM_FREQ2)
+
+#define  PANEL_POWER_UP_DELAY_MASK	REG_GENMASK(28, 16)
+#define  PANEL_LIGHT_ON_DELAY_MASK	REG_GENMASK(12, 0)
+#define  PANEL_POWER_DOWN_DELAY_MASK	REG_GENMASK(28, 16)
+#define  PANEL_LIGHT_OFF_DELAY_MASK	REG_GENMASK(12, 0)
+#define  PP_REFERENCE_DIVIDER_MASK	REG_GENMASK(31, 8)
+#define  PANEL_POWER_CYCLE_DELAY_MASK	REG_GENMASK(4, 0)
+#define  BXT_POWER_CYCLE_DELAY_MASK	REG_GENMASK(8, 4)
+
+enum ConnectorType : uint32_t {
+	ConnectorZero       = 0x0,
+	ConnectorDummy      = 0x1,
+	ConnectorLVDS       = 0x2,
+	ConnectorDigitalDVI = 0x4,
+	ConnectorSVID       = 0x8,
+	ConnectorVGA        = 0x10,
+	ConnectorDP         = 0x400,
+	ConnectorHDMI       = 0x800,
+	ConnectorAnalogDVI  = 0x2000
+};
+struct PACKED ConnectorInfo {
+	uint32_t index;
+	uint32_t busId;
+	uint32_t pipe;
+	uint32_t pad;
+	ConnectorType type;
+	uint32_t flags;
+};
+
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define DIV_ROUND_CLOSEST(x, divisor)		\
+({							\
+	__typeof__(x) __x = x;				\
+	__typeof__(divisor) __d = divisor;		\
+							\
+	(((__typeof__(x))-1) > 0 ||			\
+	 ((__typeof__(divisor))-1) > 0 ||		\
+	 (((__x) > 0) == ((__d) > 0))) ?		\
+		(((__x) + ((__d) / 2)) / (__d)) :	\
+		(((__x) - ((__d) / 2)) / (__d));	\
+})
+#define KHz(x) (1000 * (x))
+#define MHz(x) KHz(1000 * (x))
+
+enum intel_backlight_type {
+	INTEL_BACKLIGHT_PMIC,
+	INTEL_BACKLIGHT_LPSS,
+	INTEL_BACKLIGHT_DISPLAY_DDI,
+	INTEL_BACKLIGHT_DSI_DCS,
+	INTEL_BACKLIGHT_PANEL_DRIVER_INTERFACE,
+	INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE,
+};
+
+
+# define DP_TRAIN_PRE_EMPHASIS_MASK	    (3 << 3)
+# define DP_TRAIN_PRE_EMPH_LEVEL_0		(0 << 3)
+# define DP_TRAIN_PRE_EMPH_LEVEL_1		(1 << 3)
+# define DP_TRAIN_PRE_EMPH_LEVEL_2		(2 << 3)
+# define DP_TRAIN_PRE_EMPH_LEVEL_3		(3 << 3)
+# define DP_TRAIN_VOLTAGE_SWING_MASK	    0x3
+# define DP_TRAIN_VOLTAGE_SWING_SHIFT	    0
+# define DP_TRAIN_MAX_SWING_REACHED	    (1 << 2)
+# define DP_TRAIN_VOLTAGE_SWING_LEVEL_0 (0 << 0)
+# define DP_TRAIN_VOLTAGE_SWING_LEVEL_1 (1 << 0)
+# define DP_TRAIN_VOLTAGE_SWING_LEVEL_2 (2 << 0)
+# define DP_TRAIN_VOLTAGE_SWING_LEVEL_3 (3 << 0)
+
+#define port_name(p) ((p) + '0')
+#define DISPLAY_VER(d) ((d)->version)
+#define AUX_CH_NAME_BUFSIZE	6
+
+#define __bf_shf(x) (__builtin_ffsll(x) - 1)
+#define REG_FIELD_PREP(__mask, __val)						\
+	((uint32_t)((((__typeof(__mask))(__val) << __bf_shf(__mask)) & (__mask))))
+
+#define  PANEL_UNLOCK_MASK		REG_GENMASK(31, 16)
+#define  PANEL_UNLOCK_REGS		REG_FIELD_PREP(PANEL_UNLOCK_MASK, 0xabcd)
+#define  PANEL_POWER_RESET		REG_BIT(1)
+#define  PANEL_POWER_ON			REG_BIT(0)
+
+
+
 
 #define BDB_CHILD_DEVICE_CONFIG	40
 
@@ -317,6 +472,6 @@ struct mipi_pps_data {
 } __packed;
 
 #ifdef __cplusplus
-}
+//}
 #endif
 #endif /* __INTEL_DSI_VBT_DEFS_H__ */

@@ -36,7 +36,7 @@
 #define _INTEL_VBT_DEFS_H_
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
 #include "intel_dsi_vbt_defs.h"
@@ -1675,7 +1675,342 @@ struct bdb_prd_table_new {
 	struct prd_entry_new list[];				/* 217+ */
 } __packed;
 
+
+
+
+
+
+static const struct {
+	enum bdb_block_id section_id;
+	size_t min_size;
+} bdb_blocks[] = {
+	{ .section_id = BDB_GENERAL_FEATURES,
+	  .min_size = sizeof(struct bdb_general_features), },
+	{ .section_id = BDB_GENERAL_DEFINITIONS,
+	  .min_size = sizeof(struct bdb_general_definitions), },
+	{ .section_id = BDB_PSR,
+	  .min_size = sizeof(struct bdb_psr), },
+	{ .section_id = BDB_DRIVER_FEATURES,
+	  .min_size = sizeof(struct bdb_driver_features), },
+	{ .section_id = BDB_SDVO_LVDS_OPTIONS,
+	  .min_size = sizeof(struct bdb_sdvo_lvds_options), },
+	{ .section_id = BDB_SDVO_LVDS_DTD,
+	  .min_size = sizeof(struct bdb_sdvo_lvds_dtd), },
+	{ .section_id = BDB_EDP,
+	  .min_size = sizeof(struct bdb_edp), },
+	{ .section_id = BDB_LFP_OPTIONS,
+	  .min_size = sizeof(struct bdb_lfp_options), },
+
+	{ .section_id = BDB_LFP_DATA_PTRS,
+	  .min_size = sizeof(struct bdb_lfp_data_ptrs), },
+	{ .section_id = BDB_LFP_DATA,
+	  .min_size = 0, /* special case */ },
+	{ .section_id = BDB_LFP_BACKLIGHT,
+	  .min_size = sizeof(struct bdb_lfp_backlight), },
+	{ .section_id = BDB_LFP_POWER,
+	  .min_size = sizeof(struct bdb_lfp_power), },
+	{ .section_id = BDB_MIPI_CONFIG,
+	  .min_size = sizeof(struct bdb_mipi_config), },
+	{ .section_id = BDB_MIPI_SEQUENCE,
+	  .min_size = sizeof(struct bdb_mipi_sequence) },
+	{ .section_id = BDB_COMPRESSION_PARAMETERS,
+	  .min_size = sizeof(struct bdb_compression_parameters), },
+	{ .section_id = BDB_GENERIC_DTD,
+	  .min_size = sizeof(struct bdb_generic_dtd), },
+};
+
+
+enum port {
+	PORT_A = 0,
+	PORT_B,
+	PORT_C,
+	PORT_D,
+	PORT_E,
+	PORT_F,
+	PORT_G,
+	PORT_H,
+	PORT_I,
+	PORT_TC1 = 10, // Type-C Port 1
+	PORT_TC2,
+	PORT_TC3,
+	PORT_TC4,
+	PORT_TC5,
+	PORT_TC6,
+	PORT_D_XELPD, // Special mapping for XeHPD
+	PORT_E_XELPD,
+	PORT_NONE,
+};
+
+enum phy {
+	PHY_NONE = -1,
+
+	PHY_A = 0,
+	PHY_B,
+	PHY_C,
+	PHY_D,
+	PHY_E,
+	PHY_F,
+	PHY_G,
+	PHY_H,
+	PHY_I,
+
+	I915_MAX_PHYS
+};
+enum aux_ch {
+	AUX_CH_NONE = -1,
+
+	AUX_CH_A,
+	AUX_CH_B,
+	AUX_CH_C,
+	AUX_CH_D,
+	AUX_CH_E, /* ICL+ */
+	AUX_CH_F,
+	AUX_CH_G,
+	AUX_CH_H,
+	AUX_CH_I,
+
+	/* tgl+ */
+	AUX_CH_USBC1 = AUX_CH_D,
+	AUX_CH_USBC2,
+	AUX_CH_USBC3,
+	AUX_CH_USBC4,
+	AUX_CH_USBC5,
+	AUX_CH_USBC6,
+
+	/* XE_LPD repositions D/E offsets and bitfields */
+	AUX_CH_D_XELPD = AUX_CH_USBC5,
+	AUX_CH_E_XELPD,
+};
+
+static const u8 adlp_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_C] = DP_AUX_C,
+	[AUX_CH_D_XELPD] = DP_AUX_D,
+	[AUX_CH_E_XELPD] = DP_AUX_E,
+	[AUX_CH_USBC1] = DP_AUX_F,
+	[AUX_CH_USBC2] = DP_AUX_G,
+	[AUX_CH_USBC3] = DP_AUX_H,
+	[AUX_CH_USBC4] = DP_AUX_I,
+};
+
+
+static const u8 adls_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_USBC1] = DP_AUX_B,
+	[AUX_CH_USBC2] = DP_AUX_C,
+	[AUX_CH_USBC3] = DP_AUX_D,
+	[AUX_CH_USBC4] = DP_AUX_E,
+};
+
+
+static const u8 rkl_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_USBC1] = DP_AUX_C,
+	[AUX_CH_USBC2] = DP_AUX_D,
+};
+
+static const u8 direct_aux_ch_map[] = {
+	[AUX_CH_A] = DP_AUX_A,
+	[AUX_CH_B] = DP_AUX_B,
+	[AUX_CH_C] = DP_AUX_C,
+	[AUX_CH_D] = DP_AUX_D, /* aka AUX_CH_USBC1 */
+	[AUX_CH_E] = DP_AUX_E, /* aka AUX_CH_USBC2 */
+	[AUX_CH_F] = DP_AUX_F, /* aka AUX_CH_USBC3 */
+	[AUX_CH_G] = DP_AUX_G, /* aka AUX_CH_USBC4 */
+	[AUX_CH_H] = DP_AUX_H, /* aka AUX_CH_USBC5 */
+	[AUX_CH_I] = DP_AUX_I, /* aka AUX_CH_USBC6 */
+};
+
+struct pps_registers {
+	u32 pp_ctrl;
+	u32 pp_stat;
+	u32 pp_on;
+	u32 pp_off;
+	u32 pp_div;
+};
+struct intel_pps_delays {
+	u16 power_up;      /* eDP: T1+T3,   LVDS: T1+T2 */
+	u16 backlight_on;  /* eDP: T8,      LVDS: T5 */
+	u16 backlight_off; /* eDP: T9,      LVDS: T6/TX */
+	u16 power_down;    /* eDP: T10,     LVDS: T3 */
+	u16 power_cycle;   /* eDP: T11+T12, LVDS: T7+T4 */
+};
+
+struct intel_vbt_panel_data {
+	void *lfp_vbt_mode; /* if any */
+	void *sdvo_lvds_vbt_mode; /* if any */
+	
+	/* Feature bits */
+	int panel_type;
+	unsigned int lvds_dither:1;
+	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
+	
+	bool vrr;
+	
+	u8 seamless_drrs_min_refresh_rate;
+	//enum drrs_type drrs_type;
+	
+	struct {
+		int max_link_rate;
+		int rate;
+		int lanes;
+		int preemphasis;
+		int vswing;
+		int bpp;
+		struct intel_pps_delays pps;
+		u8 drrs_msa_timing_delay;
+		bool low_vswing;
+		bool hobl;
+		bool dsc_disable;
+		bool pipe_joiner_enable;
+	} edp;
+	
+	struct {
+		bool enable;
+		bool full_link;
+		bool require_aux_wakeup;
+		int idle_frames;
+		int tp1_wakeup_time_us;
+		int tp2_tp3_wakeup_time_us;
+		int psr2_tp2_tp3_wakeup_time_us;
+	} psr;
+	
+	struct {
+		u16 pwm_freq_hz;
+		u16 brightness_precision_bits;
+		u16 hdr_dpcd_refresh_timeout;
+		bool present;
+		bool active_low_pwm;
+		u8 min_brightness;	/* min_brightness/255 of max */
+		s8 controller;		/* brightness controller number */
+		enum intel_backlight_type type;
+	} backlight;
+	
+};
+
+
+
+struct intel_pps {
+	int panel_power_up_delay;
+	int panel_power_down_delay;
+	int panel_power_cycle_delay;
+	int backlight_on_delay;
+	int backlight_off_delay;
+	//struct delayed_work panel_vdd_work;
+	bool want_panel_vdd;
+	bool initializing;
+	unsigned long last_power_on;
+	unsigned long last_backlight_off;
+	//ktime_t panel_power_off_time;
+	//struct ref_tracker *vdd_wakeref;
+	u32 mmio_base;
+	union {
+		/*
+		 * Pipe whose power sequencer is currently locked into
+		 * this port. Only relevant on VLV/CHV.
+		 */
+		//enum pipe vlv_pps_pipe;
+
+		/*
+		 * Power sequencer index. Only relevant on BXT+.
+		 */
+		int pps_idx;
+	};
+
+	/*
+	 * Pipe currently driving the port. Used for preventing
+	 * the use of the PPS for any pipe currentrly driving
+	 * external DP as that will mess things up on VLV.
+	 */
+	//enum pipe vlv_active_pipe;
+	/*
+	 * Set if the sequencer may be reset due to a power transition,
+	 * requiring a reinitialization. Only relevant on BXT+.
+	 */
+	bool bxt_pps_reset;
+	struct intel_pps_delays pps_delays;
+	struct intel_pps_delays bios_pps_delays;
+};
+
+struct intel_panel {
+	/* Simple drm_panel */
+	void *base;
+
+	/* Fixed EDID for eDP and LVDS. May hold ERR_PTR for invalid EDID. */
+	void *fixed_edid;
+
+	//struct list_head fixed_modes;
+
+	
+	/* backlight */
+	struct {
+		bool present;
+		u32 level;
+		u32 min;
+		u32 max;
+		bool enabled;
+		bool combination_mode;	/* gen 2/4 only */
+		bool active_low_pwm;
+		bool alternate_pwm_increment;	/* lpt+ */
+
+		/* PWM chip */
+		u32 pwm_level_min;
+		u32 pwm_level_max;
+		bool pwm_enabled;
+		bool util_pin_active_low;	/* bxt+ */
+		u8 controller;		/* bxt+ only */
+		void *pwm;
+		//struct pwm_state pwm_state;
+
+		/* DPCD backlight */
+		union {
+			struct {
+				//struct drm_edp_backlight_info info;
+				bool luminance_control_support;
+			} vesa;
+			struct {
+				bool sdr_uses_aux;
+				bool supports_2084_decode;
+				bool supports_2020_gamut;
+				bool supports_segmented_backlight;
+				bool supports_sdp_colorimetry;
+				bool supports_tone_mapping;
+			} intel_cap;
+		} edp;
+
+		///struct backlight_device *device;
+
+		//const struct intel_panel_bl_funcs *funcs;
+		//const struct intel_panel_bl_funcs *pwm_funcs;
+		//void (*power)(struct intel_connector *, bool enable);
+	} backlight;
+
+	
+	struct intel_vbt_panel_data vbt;
+	struct intel_pps pps;
+	
+	u32 rawclk_freq;
+	struct pps_registers regs;
+};
+
+struct intel_display {
+	int version; // For DISPLAY_VER macro
+	struct {
+		bool alderlake_s;
+		bool dg1;
+		bool rocketlake;
+	} platform;
+	struct {
+		u32 mmio_base;
+	} pps;
+	struct intel_panel panel;
+	ConnectorInfo bconnectors[6];
+};
+
+
 #ifdef __cplusplus
-}
+//}
 #endif
 #endif /* _INTEL_VBT_DEFS_H_ */

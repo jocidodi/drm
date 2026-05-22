@@ -34,7 +34,7 @@ NBlue *NBlue::callback = nullptr;
 static Gen11 gen11;
 static DYLDPatches dyldpatches;
 static HDMI agfxhda;
-static ConnectorInfo bconnectors[6];
+
 
 void NBlue::init() {
     callback = this;
@@ -109,6 +109,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 
 
 		SYSLOG("ngreen", "CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",family, model, stepping, this->isRealTGL);
+		
 		
 		if (intel_opregion_setup(this->iGPU)!=0) panic("BAD BIOS");
 		
@@ -288,21 +289,6 @@ void NBlue::setRMMIOIfNecessary() {
 	}
 }
 
-bool NBlue::detectConnectors(void *connectorsp) {
-	struct ConnectorInfo *cc=(struct ConnectorInfo*)connectorsp;
-	
-	for (int i = 0; i < 6; i++) {
-		cc[i].index=bconnectors[i].index;
-		cc[i].busId=bconnectors[i].busId;
-		cc[i].pipe=bconnectors[i].pipe;
-		cc[i].pad=bconnectors[i].pad;
-		cc[i].type=bconnectors[i].type;
-		cc[i].flags=bconnectors[i].flags;
-	}
-	
-
-	return true;
-}
 
 bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
 	
@@ -451,46 +437,7 @@ bool NBlue::wrapApplePanelSetDisplay(IOService *that, IODisplay *display) {
 }
 
 
-static const struct {
-	enum bdb_block_id section_id;
-	size_t min_size;
-} bdb_blocks[] = {
-	{ .section_id = BDB_GENERAL_FEATURES,
-	  .min_size = sizeof(struct bdb_general_features), },
-	{ .section_id = BDB_GENERAL_DEFINITIONS,
-	  .min_size = sizeof(struct bdb_general_definitions), },
-	{ .section_id = BDB_PSR,
-	  .min_size = sizeof(struct bdb_psr), },
-	{ .section_id = BDB_DRIVER_FEATURES,
-	  .min_size = sizeof(struct bdb_driver_features), },
-	{ .section_id = BDB_SDVO_LVDS_OPTIONS,
-	  .min_size = sizeof(struct bdb_sdvo_lvds_options), },
-	{ .section_id = BDB_SDVO_LVDS_DTD,
-	  .min_size = sizeof(struct bdb_sdvo_lvds_dtd), },
-	{ .section_id = BDB_EDP,
-	  .min_size = sizeof(struct bdb_edp), },
-	{ .section_id = BDB_LFP_OPTIONS,
-	  .min_size = sizeof(struct bdb_lfp_options), },
 
-	{ .section_id = BDB_LFP_DATA_PTRS,
-	  .min_size = sizeof(struct bdb_lfp_data_ptrs), },
-	{ .section_id = BDB_LFP_DATA,
-	  .min_size = 0, /* special case */ },
-	{ .section_id = BDB_LFP_BACKLIGHT,
-	  .min_size = sizeof(struct bdb_lfp_backlight), },
-	{ .section_id = BDB_LFP_POWER,
-	  .min_size = sizeof(struct bdb_lfp_power), },
-	{ .section_id = BDB_MIPI_CONFIG,
-	  .min_size = sizeof(struct bdb_mipi_config), },
-	{ .section_id = BDB_MIPI_SEQUENCE,
-	  .min_size = sizeof(struct bdb_mipi_sequence) },
-	{ .section_id = BDB_COMPRESSION_PARAMETERS,
-	  .min_size = sizeof(struct bdb_compression_parameters), },
-	{ .section_id = BDB_GENERIC_DTD,
-	  .min_size = sizeof(struct bdb_generic_dtd), },
-};
-
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 
 static u32 _get_blocksize(const u8 *block_base)
@@ -559,129 +506,6 @@ static int get_child_device_expected_size(u16 vbt_version)
 	else if (vbt_version >= 106) return 27;
 	else return 22;
 }
-
-enum port {
-	PORT_A = 0,
-	PORT_B,
-	PORT_C,
-	PORT_D,
-	PORT_E,
-	PORT_F,
-	PORT_G,
-	PORT_H,
-	PORT_I,
-	PORT_TC1 = 10, // Type-C Port 1
-	PORT_TC2,
-	PORT_TC3,
-	PORT_TC4,
-	PORT_TC5,
-	PORT_TC6,
-	PORT_D_XELPD, // Special mapping for XeHPD
-	PORT_E_XELPD,
-	PORT_NONE,
-};
-
-enum phy {
-	PHY_NONE = -1,
-
-	PHY_A = 0,
-	PHY_B,
-	PHY_C,
-	PHY_D,
-	PHY_E,
-	PHY_F,
-	PHY_G,
-	PHY_H,
-	PHY_I,
-
-	I915_MAX_PHYS
-};
-enum aux_ch {
-	AUX_CH_NONE = -1,
-
-	AUX_CH_A,
-	AUX_CH_B,
-	AUX_CH_C,
-	AUX_CH_D,
-	AUX_CH_E, /* ICL+ */
-	AUX_CH_F,
-	AUX_CH_G,
-	AUX_CH_H,
-	AUX_CH_I,
-
-	/* tgl+ */
-	AUX_CH_USBC1 = AUX_CH_D,
-	AUX_CH_USBC2,
-	AUX_CH_USBC3,
-	AUX_CH_USBC4,
-	AUX_CH_USBC5,
-	AUX_CH_USBC6,
-
-	/* XE_LPD repositions D/E offsets and bitfields */
-	AUX_CH_D_XELPD = AUX_CH_USBC5,
-	AUX_CH_E_XELPD,
-};
-
-static const u8 adlp_aux_ch_map[] = {
-	[AUX_CH_A] = DP_AUX_A,
-	[AUX_CH_B] = DP_AUX_B,
-	[AUX_CH_C] = DP_AUX_C,
-	[AUX_CH_D_XELPD] = DP_AUX_D,
-	[AUX_CH_E_XELPD] = DP_AUX_E,
-	[AUX_CH_USBC1] = DP_AUX_F,
-	[AUX_CH_USBC2] = DP_AUX_G,
-	[AUX_CH_USBC3] = DP_AUX_H,
-	[AUX_CH_USBC4] = DP_AUX_I,
-};
-
-/*
- * ADL-S VBT uses PHY based mapping. Combo PHYs A,B,C,D,E
- * map to DDI A,TC1,TC2,TC3,TC4 respectively.
- */
-static const u8 adls_aux_ch_map[] = {
-	[AUX_CH_A] = DP_AUX_A,
-	[AUX_CH_USBC1] = DP_AUX_B,
-	[AUX_CH_USBC2] = DP_AUX_C,
-	[AUX_CH_USBC3] = DP_AUX_D,
-	[AUX_CH_USBC4] = DP_AUX_E,
-};
-
-/*
- * RKL/DG1 VBT uses PHY based mapping. Combo PHYs A,B,C,D
- * map to DDI A,B,TC1,TC2 respectively.
- */
-static const u8 rkl_aux_ch_map[] = {
-	[AUX_CH_A] = DP_AUX_A,
-	[AUX_CH_B] = DP_AUX_B,
-	[AUX_CH_USBC1] = DP_AUX_C,
-	[AUX_CH_USBC2] = DP_AUX_D,
-};
-
-static const u8 direct_aux_ch_map[] = {
-	[AUX_CH_A] = DP_AUX_A,
-	[AUX_CH_B] = DP_AUX_B,
-	[AUX_CH_C] = DP_AUX_C,
-	[AUX_CH_D] = DP_AUX_D, /* aka AUX_CH_USBC1 */
-	[AUX_CH_E] = DP_AUX_E, /* aka AUX_CH_USBC2 */
-	[AUX_CH_F] = DP_AUX_F, /* aka AUX_CH_USBC3 */
-	[AUX_CH_G] = DP_AUX_G, /* aka AUX_CH_USBC4 */
-	[AUX_CH_H] = DP_AUX_H, /* aka AUX_CH_USBC5 */
-	[AUX_CH_I] = DP_AUX_I, /* aka AUX_CH_USBC6 */
-};
-
-struct intel_display {
-	int version; // For DISPLAY_VER macro
-	struct {
-		bool alderlake_s;
-		bool dg1;
-		bool rocketlake;
-	} platform;
-};
-
-#define DISPLAY_VER(d) ((d)->version)
-
-#define AUX_CH_NAME_BUFSIZE	6
-
 static const char *aux_ch_name(struct intel_display *display,
 				   char *buf, int size, enum aux_ch aux_ch)
 {
@@ -695,7 +519,7 @@ static const char *aux_ch_name(struct intel_display *display,
 	return buf;
 }
 
-#define port_name(p) ((p) + '0')
+
 static const char *intel_ddi_encoder_name(struct intel_display *display,
 					  enum port port, char *s, int size)
 {
@@ -899,139 +723,270 @@ static int vbt_get_panel_type(const struct bdb_header *bdb)
 
 	return lfp_options->panel_type;
 }
-enum intel_backlight_type {
-	INTEL_BACKLIGHT_PMIC,
-	INTEL_BACKLIGHT_LPSS,
-	INTEL_BACKLIGHT_DISPLAY_DDI,
-	INTEL_BACKLIGHT_DSI_DCS,
-	INTEL_BACKLIGHT_PANEL_DRIVER_INTERFACE,
-	INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE,
-};
-struct intel_vbt_panel_data {
-	void *lfp_vbt_mode; /* if any */
-	void *sdvo_lvds_vbt_mode; /* if any */
-	
-	/* Feature bits */
-	int panel_type;
-	unsigned int lvds_dither:1;
-	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
-	
-	bool vrr;
-	
-	u8 seamless_drrs_min_refresh_rate;
-	//enum drrs_type drrs_type;
-	
-	struct {
-		int max_link_rate;
-		int rate;
-		int lanes;
-		int preemphasis;
-		int vswing;
-		int bpp;
-		//struct intel_pps_delays pps;
-		u8 drrs_msa_timing_delay;
-		bool low_vswing;
-		bool hobl;
-		bool dsc_disable;
-		bool pipe_joiner_enable;
-	} edp;
-	
-	struct {
-		bool enable;
-		bool full_link;
-		bool require_aux_wakeup;
-		int idle_frames;
-		int tp1_wakeup_time_us;
-		int tp2_tp3_wakeup_time_us;
-		int psr2_tp2_tp3_wakeup_time_us;
-	} psr;
-	
-	struct {
-		u16 pwm_freq_hz;
-		u16 brightness_precision_bits;
-		u16 hdr_dpcd_refresh_timeout;
-		bool present;
-		bool active_low_pwm;
-		u8 min_brightness;	/* min_brightness/255 of max */
-		s8 controller;		/* brightness controller number */
-		enum intel_backlight_type type;
-	} backlight;
-	
-};
 
-struct intel_panel {
-	/* Simple drm_panel */
-	void *base;
 
-	/* Fixed EDID for eDP and LVDS. May hold ERR_PTR for invalid EDID. */
-	void *fixed_edid;
-
-	//struct list_head fixed_modes;
-
-	/* backlight */
-	struct {
-		bool present;
-		u32 level;
-		u32 min;
-		u32 max;
-		bool enabled;
-		bool combination_mode;	/* gen 2/4 only */
-		bool active_low_pwm;
-		bool alternate_pwm_increment;	/* lpt+ */
-
-		/* PWM chip */
-		u32 pwm_level_min;
-		u32 pwm_level_max;
-		bool pwm_enabled;
-		bool util_pin_active_low;	/* bxt+ */
-		u8 controller;		/* bxt+ only */
-		void *pwm;
-		//struct pwm_state pwm_state;
-
-		/* DPCD backlight */
-		union {
-			struct {
-				//struct drm_edp_backlight_info info;
-				bool luminance_control_support;
-			} vesa;
-			struct {
-				bool sdr_uses_aux;
-				bool supports_2084_decode;
-				bool supports_2020_gamut;
-				bool supports_segmented_backlight;
-				bool supports_sdp_colorimetry;
-				bool supports_tone_mapping;
-			} intel_cap;
-		} edp;
-
-		///struct backlight_device *device;
-
-		//const struct intel_panel_bl_funcs *funcs;
-		//const struct intel_panel_bl_funcs *pwm_funcs;
-		//void (*power)(struct intel_connector *, bool enable);
-	} backlight;
-
-	struct intel_vbt_panel_data vbt;
-};
-
-#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-#define DIV_ROUND_CLOSEST(x, divisor)		\
-({							\
-	__typeof__(x) __x = x;				\
-	__typeof__(divisor) __d = divisor;		\
-							\
-	(((__typeof__(x))-1) > 0 ||			\
-	 ((__typeof__(divisor))-1) > 0 ||		\
-	 (((__x) > 0) == ((__d) > 0))) ?		\
-		(((__x) + ((__d) / 2)) / (__d)) :	\
-		(((__x) - ((__d) / 2)) / (__d));	\
-})
-#define KHz(x) (1000 * (x))
-#define MHz(x) KHz(1000 * (x))
 
 static u32 bxt_hz_to_pwm(u32 pwm_freq_hz)
 {
 	return DIV_ROUND_CLOSEST(KHz(19200), pwm_freq_hz);
+}
+
+static u32 cnp_hz_to_pwm(u32 rawclk_freq, u32 pwm_freq_hz)
+{
+
+	return DIV_ROUND_CLOSEST(KHz(rawclk_freq),pwm_freq_hz);
+}
+
+static uint32_t scale(uint32_t source_val,
+					  uint32_t source_min, uint32_t source_max,
+					  uint32_t target_min, uint32_t target_max)
+{
+	if (source_val < source_min) {
+		source_val = source_min;
+	} else if (source_val > source_max) {
+		source_val = source_max;
+	}
+	uint64_t source_range = static_cast<uint64_t>(source_max) - source_min;
+	uint64_t target_range = static_cast<uint64_t>(target_max) - target_min;
+
+	uint64_t target_val = (static_cast<uint64_t>(source_val) - source_min) * target_range;
+
+	target_val = (target_val + (source_range / 2)) / source_range;
+
+	target_val += target_min;
+
+	return static_cast<uint32_t>(target_val);
+}
+
+
+
+static int cnp_rawclk()
+{
+	int divider, fraction;
+	u32 rawclk;
+
+	if (NBlue::callback->readReg32( SFUSE_STRAP) & SFUSE_STRAP_RAW_FREQUENCY) {
+		/* 24 MHz */
+		divider = 24000;
+		fraction = 0;
+	} else {
+		/* 19.2 MHz */
+		divider = 19000;
+		fraction = 200;
+	}
+
+	rawclk = CNP_RAWCLK_DIV(divider / 1000);
+	if (fraction) {
+		int numerator = 1;
+
+		rawclk |= CNP_RAWCLK_DEN(DIV_ROUND_CLOSEST(numerator * 1000,
+							   fraction) - 1);
+		//if (INTEL_PCH_TYPE(display) >= PCH_ICP)
+			rawclk |= ICP_RAWCLK_NUM(numerator);
+	}
+	
+	NBlue::callback->writeReg32( PCH_RAWCLK_FREQ, rawclk);
+	return divider + fraction;
+}
+
+static bool cnp_backlight_controller_is_valid( int controller)
+{
+	if (controller < 0 || controller >= 2)
+		return false;
+
+	if (controller == 1)
+		return NBlue::callback->readReg32( SOUTH_CHICKEN1) & ICP_SECOND_PPS_IO_SELECT;
+
+	return true;
+}
+
+
+static void bxt_set_backlight(struct intel_panel *panel, u32 level)
+{
+	NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(panel->backlight.controller), level);
+}
+
+static void cnp_enable_backlight(struct intel_panel *panel, u32 level)
+{
+	u32 pwm_ctl;
+
+	pwm_ctl = NBlue::callback->readReg32( BXT_BLC_PWM_CTL(panel->backlight.controller));
+	if (pwm_ctl & BXT_BLC_PWM_ENABLE) {
+		pwm_ctl &= ~BXT_BLC_PWM_ENABLE;
+		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(panel->backlight.controller),
+				   pwm_ctl);
+	}
+
+	NBlue::callback->writeReg32( BXT_BLC_PWM_FREQ(panel->backlight.controller),
+			   panel->backlight.pwm_level_max);
+
+	bxt_set_backlight(panel, level);
+
+	pwm_ctl = 0;
+	if (panel->backlight.active_low_pwm)
+		pwm_ctl |= BXT_BLC_PWM_POLARITY;
+	
+	NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(panel->backlight.controller), pwm_ctl);
+	NBlue::callback->readReg32( BXT_BLC_PWM_CTL(panel->backlight.controller));
+	NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(panel->backlight.controller),
+			   pwm_ctl | BXT_BLC_PWM_ENABLE);
+}
+
+static unsigned int panel_bits(unsigned int value, int panel_type, int num_bits)
+{
+	return (value >> (panel_type * num_bits)) & (BIT(num_bits) - 1);
+}
+
+static void vbt_edp_to_pps_delays(struct intel_pps_delays *pps,
+				  const struct edp_power_seq *edp_pps)
+{
+	pps->power_up = edp_pps->t1_t3;
+	pps->backlight_on = edp_pps->t8;
+	pps->backlight_off = edp_pps->t9;
+	pps->power_down = edp_pps->t10;
+	pps->power_cycle = edp_pps->t11_t12;
+}
+static bool panel_bool(unsigned int value, int panel_type)
+{
+	return panel_bits(value, panel_type, 1);
+}
+
+static void
+parse_edp(const struct bdb_header *bdb,
+		  struct intel_panel *panel)
+{
+	const struct bdb_edp *edp;
+	const struct edp_fast_link_params *edp_link_params;
+	int panel_type = panel->vbt.panel_type;
+
+	edp = (struct bdb_edp *)find_raw_section(bdb, BDB_EDP);
+	
+	if (!edp)
+		return;
+
+	switch (panel_bits(edp->color_depth, panel_type, 2)) {
+	case EDP_18BPP:
+		panel->vbt.edp.bpp = 18;
+		break;
+	case EDP_24BPP:
+		panel->vbt.edp.bpp = 24;
+		break;
+	case EDP_30BPP:
+		panel->vbt.edp.bpp = 30;
+		break;
+	}
+
+	edp_link_params = &edp->fast_link_params[panel_type];
+
+	vbt_edp_to_pps_delays(&panel->vbt.edp.pps,
+				  &edp->power_seqs[panel_type]);
+
+	if (bdb->version >= 224) {
+		panel->vbt.edp.rate =
+			edp->edp_fast_link_training_rate[panel_type] * 20;
+	} else {
+		switch (edp_link_params->rate) {
+		case EDP_RATE_1_62:
+			panel->vbt.edp.rate = 162000;
+			break;
+		case EDP_RATE_2_7:
+			panel->vbt.edp.rate = 270000;
+			break;
+		case EDP_RATE_5_4:
+			panel->vbt.edp.rate = 540000;
+			break;
+		default:
+			break;
+		}
+	}
+
+	switch (edp_link_params->lanes) {
+	case EDP_LANE_1:
+		panel->vbt.edp.lanes = 1;
+		break;
+	case EDP_LANE_2:
+		panel->vbt.edp.lanes = 2;
+		break;
+	case EDP_LANE_4:
+		panel->vbt.edp.lanes = 4;
+		break;
+	default:
+		break;
+	}
+
+
+	
+	switch (edp_link_params->preemphasis) {
+	case EDP_PREEMPHASIS_NONE:
+		panel->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_0;
+		break;
+	case EDP_PREEMPHASIS_3_5dB:
+		panel->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_1;
+		break;
+	case EDP_PREEMPHASIS_6dB:
+		panel->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_2;
+		break;
+	case EDP_PREEMPHASIS_9_5dB:
+		panel->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_3;
+		break;
+	default:
+		break;
+	}
+
+	switch (edp_link_params->vswing) {
+	case EDP_VSWING_0_4V:
+		panel->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_0;
+		break;
+	case EDP_VSWING_0_6V:
+		panel->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_1;
+		break;
+	case EDP_VSWING_0_8V:
+		panel->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_2;
+		break;
+	case EDP_VSWING_1_2V:
+		panel->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
+		break;
+	default:
+		break;
+	}
+
+	if (bdb->version >= 173) {
+		u8 vswing;
+
+		/* Don't read from VBT if module parameter has valid value*/
+		if (0/*display->params.edp_vswing*/) {
+			//panel->vbt.edp.low_vswing =
+				//display->params.edp_vswing == 1;
+		} else {
+			vswing = (edp->edp_vswing_preemph >> (panel_type * 4)) & 0xF;
+			panel->vbt.edp.low_vswing = vswing == 0;
+		}
+	}
+
+	panel->vbt.edp.drrs_msa_timing_delay =
+		panel_bits(edp->sdrrs_msa_timing_delay, panel_type, 2);
+
+	if (bdb->version >= 244)
+		panel->vbt.edp.max_link_rate =
+			edp->edp_max_port_link_rate[panel_type] * 20;
+
+	if (bdb->version >= 251)
+		panel->vbt.edp.dsc_disable =
+			panel_bool(edp->edp_dsc_disable, panel_type);
+
+	if (bdb->version >= 261)
+		panel->vbt.edp.pipe_joiner_enable =
+			panel_bool(edp->pipe_joiner_enable, panel_type);
+}
+
+static int pps_units_to_msecs(int val)
+{
+	return DIV_ROUND_UP(val, 10);
+}
+static int msecs_to_pps_units(int msecs)
+{
+	/* PPS uses 100us units */
+	return msecs * 10;
 }
 
 static void
@@ -1042,7 +997,7 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	const struct lfp_backlight_data_entry *entry;
 	int panel_type = vbt_get_panel_type(bdb);
 	u16 level;
-	
+
 	panel->vbt.panel_type=panel_type;
 
 	backlight_data = (struct bdb_lfp_backlight *)find_raw_section(bdb, BDB_LFP_BACKLIGHT);
@@ -1106,18 +1061,108 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 			DIV_ROUND_UP(backlight_data->hdr_dpcd_refresh_timeout[panel_type], 100);
 	else
 		panel->vbt.backlight.hdr_dpcd_refresh_timeout = 30;
+	
+	
 
+	panel->pps.pps_idx=panel->vbt.backlight.controller;
+	
+	if (panel->backlight.controller == 1) {
+		u32 val = NBlue::callback->readReg32( UTIL_PIN_CTL);
+		panel->backlight.util_pin_active_low =val & UTIL_PIN_POLARITY;
+	}
+	
+	
+	panel->rawclk_freq= cnp_rawclk();
+	
+	u32 pwm_ctl = NBlue::callback->readReg32(BXT_BLC_PWM_CTL(panel->backlight.controller));
+	panel->backlight.active_low_pwm = pwm_ctl & BXT_BLC_PWM_POLARITY;
+	panel->backlight.pwm_level_max = NBlue::callback->readReg32( BXT_BLC_PWM_FREQ(panel->backlight.controller));
 
-	OSArray *connectorArray = OSArray::withCapacity(6);
-	OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+	if (!panel->backlight.pwm_level_max)
+		panel->backlight.pwm_level_max = cnp_hz_to_pwm(panel->rawclk_freq,panel->vbt.backlight.pwm_freq_hz);
+	
+	int val = static_cast<int>(panel->vbt.backlight.min_brightness);
+	int vmin = (val < 0) ? 0 : (val > 64 ? 64 : val);
+	
+	panel->backlight.pwm_level_min = scale(vmin, 0, 255, 0, panel->backlight.pwm_level_max);
+	
+	panel->backlight.level=panel->backlight.pwm_level_max-(5*panel->vbt.backlight.min_brightness)*0x100;
+	
+	panel->backlight.pwm_enabled = pwm_ctl & BXT_BLC_PWM_ENABLE;
+	
+	
+	u32 pp_on, pp_off, pp_ctl, power_cycle_delay;
+	
+	panel->regs.pp_ctrl = PP_CONTROL(panel, panel->pps.pps_idx);
+	panel->regs.pp_stat = PP_STATUS(panel, panel->pps.pps_idx);
+	panel->regs.pp_on = PP_ON_DELAYS(panel, panel->pps.pps_idx);
+	panel->regs.pp_off = PP_OFF_DELAYS(panel, panel->pps.pps_idx);
+	panel->regs.pp_div = PP_DIVISOR(panel, panel->pps.pps_idx);
+	
+	
+	pp_ctl = NBlue::callback->readReg32(panel->regs.pp_ctrl);
+	pp_on = NBlue::callback->readReg32( panel->regs.pp_on);
+	pp_off = NBlue::callback->readReg32( panel->regs.pp_off);
+	
+	panel->pps.bios_pps_delays.power_up = REG_FIELD_GET(PANEL_POWER_UP_DELAY_MASK, pp_on);
+	panel->pps.bios_pps_delays.backlight_on = REG_FIELD_GET(PANEL_LIGHT_ON_DELAY_MASK, pp_on);
+	panel->pps.bios_pps_delays.backlight_off = REG_FIELD_GET(PANEL_LIGHT_OFF_DELAY_MASK, pp_off);
+	panel->pps.bios_pps_delays.power_down = REG_FIELD_GET(PANEL_POWER_DOWN_DELAY_MASK, pp_off);
+
+	if (NBlue::callback->readReg32(panel->regs.pp_div)) {
+		u32 pp_div;
+		pp_div = NBlue::callback->readReg32( panel->regs.pp_div);
+		power_cycle_delay = REG_FIELD_GET(PANEL_POWER_CYCLE_DELAY_MASK, pp_div);
+	} else {
+		power_cycle_delay = REG_FIELD_GET(BXT_POWER_CYCLE_DELAY_MASK, pp_ctl);
+	}
+	
+	panel->pps.bios_pps_delays.power_cycle = power_cycle_delay ? (power_cycle_delay - 1) * 1000 : 0;
+	
+	
+	struct intel_pps_delays bios, vbt;
+	
+	parse_edp(bdb,panel);
+	vbt = panel->vbt.edp.pps;
+	bios = panel->pps.bios_pps_delays;
+	
+	panel->pps.panel_power_up_delay = pps_units_to_msecs(max(bios.power_up, vbt.power_up));
+	panel->pps.backlight_on_delay = pps_units_to_msecs(max(bios.backlight_on, vbt.backlight_on));
+	panel->pps.backlight_off_delay = pps_units_to_msecs(max(bios.backlight_off, vbt.backlight_off));
+	panel->pps.panel_power_down_delay = pps_units_to_msecs(max(bios.power_down, vbt.power_down));
+	panel->pps.panel_power_cycle_delay = pps_units_to_msecs(max(bios.power_cycle, vbt.power_cycle));
+	
+	struct intel_pps_delays *finalb = &panel->pps.pps_delays;
+	finalb->power_up=max(bios.power_up, vbt.power_up);
+	finalb->backlight_on=max(bios.backlight_on, vbt.backlight_on);
+	finalb->backlight_off=max(bios.backlight_off, vbt.backlight_off);
+	finalb->power_down=max(bios.power_down, vbt.power_down);
+	finalb->power_cycle = roundup(panel->pps.panel_power_cycle_delay, msecs_to_pps_units(100));
+	
+	OSArray *connectorArray = OSArray::withCapacity(1);
+	OSDictionary *connectorDict = OSDictionary::withCapacity(30);
 
 	connectorDict->setObject("panel_type", OSNumber::withNumber(panel_type, 32));
-	connectorDict->setObject("frequency hz", OSNumber::withNumber(panel->vbt.backlight.pwm_freq_hz, 32));
-
-	connectorDict->setObject("active", OSString::withCString(panel->vbt.backlight.active_low_pwm ? "low" : "high"));
-	connectorDict->setObject("min brightness", OSNumber::withNumber(panel->vbt.backlight.min_brightness, 32));
-	connectorDict->setObject("level", OSNumber::withNumber(level, 32));
-	connectorDict->setObject("controller", OSNumber::withNumber(panel->vbt.backlight.controller, 32));
+	connectorDict->setObject("levelX", OSNumber::withNumber(panel->backlight.level, 32));
+	connectorDict->setObject("vbt.pwm_freq_hz", OSNumber::withNumber(panel->vbt.backlight.pwm_freq_hz, 32));
+	connectorDict->setObject("vbt.controller", OSNumber::withNumber(panel->vbt.backlight.controller, 32));
+	connectorDict->setObject("vbt.min_brightness", OSNumber::withNumber(panel->vbt.backlight.min_brightness, 32));
+	connectorDict->setObject("pwm_enabled", OSNumber::withNumber(panel->backlight.pwm_enabled, 32));
+	connectorDict->setObject("pwm_level_min", OSNumber::withNumber(panel->backlight.pwm_level_min, 32));
+	connectorDict->setObject("pwm_level_max", OSNumber::withNumber(panel->backlight.pwm_level_max, 32));
+	connectorDict->setObject("active_low_pwm", OSNumber::withNumber(panel->backlight.active_low_pwm , 32));
+	
+	connectorDict->setObject("pps->panel_power_up_delay", OSNumber::withNumber(panel->pps.panel_power_up_delay, 32));
+	connectorDict->setObject("pps->backlight_on_delay", OSNumber::withNumber(panel->pps.panel_power_down_delay, 32));
+	connectorDict->setObject("pps->panel_power_cycle_delay", OSNumber::withNumber(panel->pps.panel_power_cycle_delay, 32));
+	connectorDict->setObject("pps->backlight_on_delay", OSNumber::withNumber(panel->pps.backlight_on_delay, 32));
+	connectorDict->setObject("pps->backlight_off_delay", OSNumber::withNumber(panel->pps.backlight_off_delay, 32));
+	
+	connectorDict->setObject("vbt.edp.bpp", OSNumber::withNumber(panel->vbt.edp.bpp, 32));
+	connectorDict->setObject("vbt.edp.rate", OSNumber::withNumber(panel->vbt.edp.rate, 32));
+	connectorDict->setObject("vbt.edp.lanes", OSNumber::withNumber(panel->vbt.edp.lanes, 32));
+	
+	
 	
 	connectorArray->setObject(connectorDict);
 	connectorDict->release();
@@ -1174,50 +1219,29 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 					   model == 0xA6 || model == 0xAA);
 		bool isMTL = (model == 0xAC || model == 0xAD);
 
-
-		/* Display ver 12  \
-		func(tigerlake) \
-		func(tigerlake_uy) \
-		func(rocketlake) \
-		func(dg1) \
-		func(alderlake_s) \
-		func(alderlake_s_raptorlake_s) \
-		 Display ver 13  \
-		func(alderlake_p) \
-		func(alderlake_p_alderlake_n) \
-		func(alderlake_p_raptorlake_p) \
-		func(alderlake_p_raptorlake_u) \
-		func(dg2) \
-		func(dg2_g10) \
-		func(dg2_g11) \
-		func(dg2_g12) \*/
-		
-		//TODO: check ip ver
-		struct intel_display display_ctx;
-
 		if (isMTL || isADL || isRPL) {
-			display_ctx.version = 13;
+			NBlue::callback->display_ctx.version = 13;
 		} else if (isRealTGL|| isRKL) {
-			display_ctx.version = 12;
+			NBlue::callback->display_ctx.version = 12;
 		} else {
-			display_ctx.version = 12;
+			NBlue::callback->display_ctx.version = 12;
 		}
 
-		display_ctx.platform.alderlake_s = false; // needs detection
-		display_ctx.platform.rocketlake = isRKL;
-		display_ctx.platform.dg1 = false;
-		
-		
+		NBlue::callback->display_ctx.platform.alderlake_s = false; // needs detection
+		NBlue::callback->display_ctx.platform.rocketlake = isRKL;
+		NBlue::callback->display_ctx.platform.dg1 = false;
+		NBlue::callback->display_ctx.pps.mmio_base = PPS_BASE;
+		NBlue::callback->display_ctx.panel.pps.mmio_base = PPS_BASE;
 
 		OSArray *connectorArray = OSArray::withCapacity(6);
 		
 		for (i = 0; i < 6; i++) {
-			bconnectors[i].index=i;
-			bconnectors[i].busId=0;
-			bconnectors[i].pipe=0;
-			bconnectors[i].pad=0;
-			bconnectors[i].type=ConnectorDummy;
-			bconnectors[i].flags=0;
+			NBlue::callback->display_ctx.bconnectors[i].index=i;
+			NBlue::callback->display_ctx.bconnectors[i].busId=0;
+			NBlue::callback->display_ctx.bconnectors[i].pipe=0;
+			NBlue::callback->display_ctx.bconnectors[i].pad=0;
+			NBlue::callback->display_ctx.bconnectors[i].type=ConnectorDummy;
+			NBlue::callback->display_ctx.bconnectors[i].flags=0;
 		}
 
 		for (i = 0; i < child_device_num; i++) {
@@ -1228,11 +1252,11 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			if (child->device_type == 0)
 				continue;
 
-			enum port port = dvo_port_to_port(&display_ctx, child->dvo_port);
+			enum port port = dvo_port_to_port(&NBlue::callback->display_ctx, child->dvo_port);
 			
 			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
 				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
-				else if (child->dvo_port == DVO_PORT_MIPIC) port = (display_ctx.version >= 11) ? PORT_B : PORT_C;
+				else if (child->dvo_port == DVO_PORT_MIPIC) port = (NBlue::callback->display_ctx.version >= 11) ? PORT_B : PORT_C;
 			}
 
 			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
@@ -1241,13 +1265,12 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			bool is_edp   = is_dp && (child->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
 			bool is_dsi   = (child->device_type & DEVICE_TYPE_MIPI_OUTPUT);
 			bool is_crt   = (child->device_type & DEVICE_TYPE_ANALOG_OUTPUT);
-			enum phy phy = intel_port_to_phy(&display_ctx, port);
-			enum aux_ch aux_ch = map_aux_ch(&display_ctx,child->aux_channel);
+			enum phy phy = intel_port_to_phy(&NBlue::callback->display_ctx, port);
+			enum aux_ch aux_ch = map_aux_ch(&NBlue::callback->display_ctx,child->aux_channel);
 			char buf[AUX_CH_NAME_BUFSIZE+3];
 			char buf2[6];
-			struct intel_panel panel;
 			
-			parse_lfp_backlight(igpu,bdb,&panel);
+			parse_lfp_backlight(igpu,bdb,&NBlue::callback->display_ctx.panel);
 			
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
 			
@@ -1263,9 +1286,9 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			connectorDict->setObject("eDP", is_edp ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("DSI", is_dsi ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("CRT", is_crt ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(&display_ctx, port,buf2, sizeof(buf2))));
+			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(&NBlue::callback->display_ctx, port,buf2, sizeof(buf2))));
 			connectorDict->setObject("PHY", OSString::withCString(phy_to_string(phy)));
-			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(&display_ctx, buf, sizeof(buf), aux_ch)));
+			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(&NBlue::callback->display_ctx, buf, sizeof(buf), aux_ch)));
 			connectorDict->setObject("GMBUS", OSNumber::withNumber((unsigned long long)child->ddc_pin, 32));
 
 			connectorArray->setObject(connectorDict);
@@ -1281,12 +1304,12 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			if (is_edp) flags=0x1+0x8+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
-			bconnectors[port].index=port;
-			bconnectors[port].busId=child->ddc_pin;
-			bconnectors[port].pipe=i;
-			bconnectors[port].pad=0;
-			bconnectors[port].type=type;
-			bconnectors[port].flags=flags;
+			NBlue::callback->display_ctx.bconnectors[port].index=port;
+			NBlue::callback->display_ctx.bconnectors[port].busId=child->ddc_pin;
+			NBlue::callback->display_ctx.bconnectors[port].pipe=i;
+			NBlue::callback->display_ctx.bconnectors[port].pad=0;
+			NBlue::callback->display_ctx.bconnectors[port].type=type;
+			NBlue::callback->display_ctx.bconnectors[port].flags=flags;
 		}
 
 		igpu->setProperty("Bios_Connectors", connectorArray);

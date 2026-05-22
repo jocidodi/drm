@@ -375,7 +375,15 @@ uint64_t  Gen11::getOSInformation(void *that)
 	//pinfo[1].fVideoTurboFreq=270000000;
 	//pinfo[1].VCLK=1000*0x438;
 	
-	NBlue::callback->detectConnectors((void*)pinfo[1].connectors);
+	int p=1;
+	for (int i = 0; i < 6; i++) {
+		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
+		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
+		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
+		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
+		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
+		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
+	}
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -515,7 +523,16 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	//pinfo[p].fVideoTurboFreq=270000000;
 	//pinfo[p].VCLK=1000*0x438;
 	
-	NBlue::callback->detectConnectors((void*)pinfo[p].connectors);
+	
+	for (int i = 0; i < 6; i++) {
+		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
+		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
+		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
+		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
+		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
+		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
+	}
+	
 	
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
