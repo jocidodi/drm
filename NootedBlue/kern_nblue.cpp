@@ -1120,24 +1120,42 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	panel->pps.bios_pps_delays.power_cycle = power_cycle_delay ? (power_cycle_delay - 1) * 1000 : 0;
 	
 	
-	struct intel_pps_delays bios, vbt;
+	struct intel_pps_delays bios, vbt, spec;
+	
+	spec.power_up = msecs_to_pps_units(10 + 200);
+	spec.backlight_on = msecs_to_pps_units(50);
+	spec.backlight_off = msecs_to_pps_units(50);
+	spec.power_down = msecs_to_pps_units(500);
+	spec.power_cycle = msecs_to_pps_units(10 + 500);
 	
 	parse_edp(bdb,panel);
 	vbt = panel->vbt.edp.pps;
 	bios = panel->pps.bios_pps_delays;
 	
-	panel->pps.panel_power_up_delay = pps_units_to_msecs(max(bios.power_up, vbt.power_up));
-	panel->pps.backlight_on_delay = pps_units_to_msecs(max(bios.backlight_on, vbt.backlight_on));
-	panel->pps.backlight_off_delay = pps_units_to_msecs(max(bios.backlight_off, vbt.backlight_off));
-	panel->pps.panel_power_down_delay = pps_units_to_msecs(max(bios.power_down, vbt.power_down));
-	panel->pps.panel_power_cycle_delay = pps_units_to_msecs(max(bios.power_cycle, vbt.power_cycle));
-	
 	struct intel_pps_delays *finalb = &panel->pps.pps_delays;
-	finalb->power_up=max(bios.power_up, vbt.power_up);
-	finalb->backlight_on=max(bios.backlight_on, vbt.backlight_on);
-	finalb->backlight_off=max(bios.backlight_off, vbt.backlight_off);
-	finalb->power_down=max(bios.power_down, vbt.power_down);
-	finalb->power_cycle = roundup(panel->pps.panel_power_cycle_delay, msecs_to_pps_units(100));
+	
+#define assign_final(field)	finalb->field = (max(bios.field, vbt.field) == 0 ? \
+					   spec.field : \
+					   max(bios.field, vbt.field))
+	assign_final(power_up);
+	assign_final(backlight_on);
+	assign_final(backlight_off);
+	assign_final(power_down);
+	assign_final(power_cycle);
+#undef assign_final
+	
+	
+	panel->pps.panel_power_up_delay = pps_units_to_msecs(finalb->power_up);
+	panel->pps.backlight_on_delay = pps_units_to_msecs(finalb->backlight_on);
+	panel->pps.backlight_off_delay = pps_units_to_msecs(finalb->backlight_off);
+	panel->pps.panel_power_down_delay = pps_units_to_msecs(finalb->power_down);
+	panel->pps.panel_power_cycle_delay = pps_units_to_msecs(finalb->power_cycle);
+	
+	//linux hacks
+	finalb->backlight_on = 1;
+	finalb->backlight_off = 1;
+	finalb->power_cycle = roundup(finalb->power_cycle, msecs_to_pps_units(100));
+	
 	
 	OSArray *connectorArray = OSArray::withCapacity(1);
 	OSDictionary *connectorDict = OSDictionary::withCapacity(30);
@@ -1153,7 +1171,7 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	connectorDict->setObject("active_low_pwm", OSNumber::withNumber(panel->backlight.active_low_pwm , 32));
 	
 	connectorDict->setObject("pps->panel_power_up_delay", OSNumber::withNumber(panel->pps.panel_power_up_delay, 32));
-	connectorDict->setObject("pps->backlight_on_delay", OSNumber::withNumber(panel->pps.panel_power_down_delay, 32));
+	connectorDict->setObject("pps->panel_power_down_delay", OSNumber::withNumber(panel->pps.panel_power_down_delay, 32));
 	connectorDict->setObject("pps->panel_power_cycle_delay", OSNumber::withNumber(panel->pps.panel_power_cycle_delay, 32));
 	connectorDict->setObject("pps->backlight_on_delay", OSNumber::withNumber(panel->pps.backlight_on_delay, 32));
 	connectorDict->setObject("pps->backlight_off_delay", OSNumber::withNumber(panel->pps.backlight_off_delay, 32));
