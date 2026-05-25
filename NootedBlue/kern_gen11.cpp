@@ -108,9 +108,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
 			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
-		
-			
-			{"__ZN24AppleIntelBaseController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
+			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
+			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
 			
 			
 		};
@@ -118,6 +117,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
+				{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
 				{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 				{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
@@ -129,6 +129,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
+				{"__ZN24AppleIntelBaseController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
+				{"__ZN24AppleIntelBaseController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
 				{"__ZN24AppleIntelBaseController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 				{"__ZN21AppleIntelFramebuffer4initEP24AppleIntelBaseControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 				{"__ZN24AppleIntelBaseController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
@@ -359,6 +361,10 @@ uint64_t  Gen11::getOSInformation(void *that)
 {
 	
 	if (NBlue::callback->intel_opregion_setup(NBlue::callback->iGPU)!=0) panic("BAD BIOS");
+	
+	//if (intel_display_wa(display, INTEL_DISPLAY_WA_14010480278))
+	//	NBlue::callback->intel_de_rmw( 0x46530, 0, REG_BIT(27));
+	
 	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xce4)=1; //PHYA
@@ -602,10 +608,15 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 		getMember<uint32_t>(that, 0xe6c)=NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
 		
 		//bkllvl
-		getMember<uint32_t>(that, 0xe64)=0xffff;
+		if (getMember<uint32_t>(that, 0xe64)<NBlue::callback->display_ctx.panel.backlight.level)
+		getMember<uint32_t>(that, 0xe64)=NBlue::callback->display_ctx.panel.backlight.level;
+		
+		if (getMember<uint32_t>(that, 0xe68)>NBlue::callback->display_ctx.panel.backlight.level)
+			getMember<uint32_t>(that, 0xe64)=getMember<uint32_t>(that, 0xe68);
 		
 		//bkllvl_saved
-		getMember<uint32_t>(that, 0xe68)=0xffff;
+		if (getMember<uint32_t>(that, 0xe68)<NBlue::callback->display_ctx.panel.backlight.level)
+		getMember<uint32_t>(that, 0xe68)=NBlue::callback->display_ctx.panel.backlight.level;
 		
 		
 		u32 pwm_ctl;
@@ -620,7 +631,7 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 		NBlue::callback->writeReg32( BXT_BLC_PWM_FREQ(NBlue::callback->display_ctx.panel.backlight.controller),
 									NBlue::callback->display_ctx.panel.backlight.pwm_level_max);
 
-		NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), 0xffff);
+		NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), NBlue::callback->display_ctx.panel.backlight.level);
 
 		pwm_ctl = 0;
 		if (NBlue::callback->display_ctx.panel.backlight.active_low_pwm)
@@ -682,7 +693,10 @@ void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 
 	getMember<uint32_t>(that, 0xd78)=PCH_PP_ON_DELAYS;
 	getMember<uint32_t>(that, 0xd7c)=PCH_PP_OFF_DELAYS;
+	
+	
 	getMember<uint32_t>(that, 0xd80) = NBlue::callback->readReg32(regs.pp_ctrl);
+	
 
 }
 
@@ -700,3 +714,48 @@ void Gen11::raWriteRegister32(void *that,unsigned long param_1, UInt32 param_2)
 	
 };
 
+uint32_t Gen11::enableVDDForAux(void *that,void *param_1)
+{
+	auto ret= FunctionCast(enableVDDForAux, callback->oenableVDDForAux)( that,param_1);
+
+	if (ret==0xe00002eb) {
+		if (getMember<bool>(that, 0xe62) == true) {
+			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
+			r->setProperty("AAPL,LCD-PowerState-ON", true);
+		}
+	}
+	return ret;
+
+};
+
+IOReturn Gen11::getAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
+										  unsigned long *value)
+{
+	const auto ret = FunctionCast(getAttributeForConnection, callback->ogetAttributeForConnection)(
+																										   framebuffer, connectIndex, attribute, value);
+	if (attribute != 'bklt') { return ret; }
+	
+	unsigned long v=NBlue::callback->display_ctx.panel.backlight.level;
+	if (getMember<uint32_t>(ccont2, 0xe64)<v)  getMember<uint32_t>(ccont2, 0xe64)=v;
+	
+	*value=getMember<uint32_t>(ccont2, 0xe64);
+	value[1] = 0;
+	value[2] = 0xffff;
+	
+	return kIOReturnSuccess;
+};
+
+IOReturn Gen11::wrapSetAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
+											  unsigned long value)
+{
+	const auto ret = FunctionCast(wrapSetAttributeForConnection, callback->owrapSetAttributeForConnection)(
+																										   framebuffer, connectIndex, attribute, value);
+	if (attribute != 'bklt') { return ret; }
+	
+	
+	if (value<NBlue::callback->display_ctx.panel.backlight.level)  value=NBlue::callback->display_ctx.panel.backlight.level;
+	
+	NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), value);
+	getMember<uint32_t>(ccont2, 0xe64)=value;
+	return kIOReturnSuccess;
+};

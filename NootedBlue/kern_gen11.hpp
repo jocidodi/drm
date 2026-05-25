@@ -434,6 +434,16 @@ private:
 	static void hwGetCRTC(void *that,void *param_1,void *param_2);
 	mach_vm_address_t ohwGetCRTC {};
 	
+	static uint32_t enableVDDForAux(void *that,void *param_1);
+	mach_vm_address_t oenableVDDForAux {};
+	
+	static IOReturn wrapSetAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
+												  unsigned long value);
+	mach_vm_address_t owrapSetAttributeForConnection {};
+	
+	static IOReturn getAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
+											  unsigned long *value);
+	mach_vm_address_t ogetAttributeForConnection {};
 	
 public:
 
