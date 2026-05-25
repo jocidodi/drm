@@ -37,6 +37,7 @@ class NBlue {
     public:
     static NBlue *callback;
 	intel_display display_ctx;
+	IOPCIDevice *iGPU {nullptr};
 	
     void init();
     void processPatcher(KernelPatcher &patcher);
@@ -54,30 +55,18 @@ class NBlue {
 	mach_vm_address_t orgApplePanelSetDisplay {0};
 	static bool wrapApplePanelSetDisplay(IOService *that, IODisplay *display);
 	
-	UInt32 stolen_size;
-	uint32_t framebufferId {0};
-	
+
    
-	
+	void parse_backlight();
 		
 		int intel_opregion_setup(IOPCIDevice *igpu);
 		struct intel_opregion opregion;
 
-	inline UInt32 readReg32(unsigned long reg) {
-		if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
-			return this->rmmioPtr[reg];
-		} else {
-			return 0;
-		}
-	}
+	UInt32 readReg32(unsigned long reg);
+
+	void writeReg32(unsigned long reg, UInt32 val);
 	
-	inline void writeReg32(unsigned long reg, UInt32 val) {
-		if ((reg * sizeof(uint32_t)) < this->rmmio->getLength()) {
-			this->rmmioPtr[reg] = val;
-		}
-	}
-	
-	inline uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
+	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
 	{
 		uint32_t old, val;
 
@@ -96,19 +85,10 @@ private:
     uint32_t deviceId {0};
     uint16_t revision {0};
     uint32_t pciRevision {0};
-    IOPCIDevice *iGPU {nullptr};
-	bool isRealTGL = false;  
-	bool isRKL  = false;
-	bool isADL =  false;
-	bool isRPL = false;
-	bool isMTL= false;
-	
-	uint32_t cpuModel {0};
-	
+    
 	IOMemoryMap *rmmio {nullptr};
 	volatile UInt32 *rmmioPtr {nullptr};
-	OSData *vbiosData;
-	
+	int32_t rmmioLen;
 	
 };
 

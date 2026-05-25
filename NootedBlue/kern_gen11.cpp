@@ -106,6 +106,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
 			
+			{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
+			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
+		
+			
+			{"__ZN24AppleIntelBaseController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
+			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
@@ -123,6 +129,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
+				{"__ZN24AppleIntelBaseController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 				{"__ZN21AppleIntelFramebuffer4initEP24AppleIntelBaseControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 				{"__ZN24AppleIntelBaseController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN24AppleIntelBaseController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
@@ -335,6 +342,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 //globals
 void *ccont;
+void *ccont2;
 
 void  Gen11::initPlatformWorkarounds(void *that)
 {
@@ -349,6 +357,9 @@ void  Gen11::initPlatformWorkarounds(void *that)
 }
 uint64_t  Gen11::getOSInformation(void *that)
 {
+	
+	if (NBlue::callback->intel_opregion_setup(NBlue::callback->iGPU)!=0) panic("BAD BIOS");
+	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xce4)=1; //PHYA
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
@@ -450,12 +461,14 @@ bool Gen11::dofalse()
 	return false;
 }
 
+
+
 void Gen11::FBMemMgr_Init(void *that)
 {
 	
 	FunctionCast(FBMemMgr_Init, callback->oFBMemMgr_Init)(that);
 	ccont = getMember<void *>(that, 0xc40);
-
+	ccont2=that;
 }
 
 uint32_t Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint param_2)
@@ -496,6 +509,8 @@ void  Gen11::initPlatformWorkarounds2(void *that)
 }
 uint64_t  Gen11::getOSInformation2(void *that)
 {
+	if (NBlue::callback->intel_opregion_setup(NBlue::callback->iGPU)!=0) panic("BAD BIOS");
+	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xc9c)=1;
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList2);
@@ -571,4 +586,117 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;
 }
+
+int bk=2;
+
+void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
+{
+	FunctionCast(hwGetCRTC, callback->ohwGetCRTC)(that,param_1,param_2 );
+	
+	if (bk==1){
+		
+		uint32_t lf=NBlue::callback->display_ctx.panel.backlight.level*0xffff;
+		lf=lf/NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
+		
+		//bklfrequency
+		getMember<uint32_t>(that, 0xe6c)=NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
+		
+		//bkllvl
+		getMember<uint32_t>(that, 0xe64)=0xffff;
+		
+		//bkllvl_saved
+		getMember<uint32_t>(that, 0xe68)=0xffff;
+		
+		
+		u32 pwm_ctl;
+
+		pwm_ctl = NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller));
+		if (pwm_ctl & BXT_BLC_PWM_ENABLE) {
+			pwm_ctl &= ~BXT_BLC_PWM_ENABLE;
+			NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller),
+					   pwm_ctl);
+		}
+
+		NBlue::callback->writeReg32( BXT_BLC_PWM_FREQ(NBlue::callback->display_ctx.panel.backlight.controller),
+									NBlue::callback->display_ctx.panel.backlight.pwm_level_max);
+
+		NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), 0xffff);
+
+		pwm_ctl = 0;
+		if (NBlue::callback->display_ctx.panel.backlight.active_low_pwm)
+			pwm_ctl |= BXT_BLC_PWM_POLARITY;
+
+		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller), pwm_ctl);
+		NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller));
+		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller),
+				   pwm_ctl | BXT_BLC_PWM_ENABLE);
+
+	}
+
+}
+
+
+void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
+{
+	
+	if (bk==2){
+		NBlue::callback->parse_backlight();
+		bk=1;
+	}
+	
+	
+	getMember<uint32_t>(that, 0xd48)= param_1;
+	
+	struct intel_pps_delays p = NBlue::callback->display_ctx.panel.pps.pps_delays;
+	
+	getMember<uint32_t>(that, 0x1550)= p.backlight_on;
+	getMember<uint32_t>(that, 0x1554)= p.backlight_off;
+	getMember<uint32_t>(that, 0x1558) = p.power_up;
+	getMember<uint32_t>(that, 0x155c)= p.power_down;
+	getMember<uint32_t>(that, 0x1560)= p.power_cycle;
+	
+	struct pps_registers regs=NBlue::callback->display_ctx.panel.regs;
+	
+	
+	uint32_t PCH_PP_ON_DELAYS = REG_FIELD_PREP(PANEL_POWER_UP_DELAY_MASK, p.power_up) |
+		REG_FIELD_PREP(PANEL_LIGHT_ON_DELAY_MASK, p.backlight_on);
+	uint32_t PCH_PP_OFF_DELAYS = REG_FIELD_PREP(PANEL_LIGHT_OFF_DELAY_MASK, p.backlight_off) |
+		REG_FIELD_PREP(PANEL_POWER_DOWN_DELAY_MASK, p.power_down);
+
+	NBlue::callback->writeReg32(regs.pp_on, PCH_PP_ON_DELAYS);
+	NBlue::callback->writeReg32(regs.pp_off, PCH_PP_OFF_DELAYS);
+
+	int div = NBlue::callback->display_ctx.panel.rawclk_freq / 1000;
+	
+	if (NBlue::callback->readReg32(regs.pp_div)!=-1)
+		NBlue::callback->writeReg32( regs.pp_div,
+				   REG_FIELD_PREP(PP_REFERENCE_DIVIDER_MASK,
+						  (100 * div) / 2 - 1) |
+				   REG_FIELD_PREP(PANEL_POWER_CYCLE_DELAY_MASK,
+						  DIV_ROUND_UP(p.power_cycle, 1000) + 1));
+	else
+		NBlue::callback->intel_de_rmw( regs.pp_ctrl, BXT_POWER_CYCLE_DELAY_MASK,
+				 REG_FIELD_PREP(BXT_POWER_CYCLE_DELAY_MASK,
+						DIV_ROUND_UP(p.power_cycle, 1000) + 1));
+	
+
+	getMember<uint32_t>(that, 0xd78)=PCH_PP_ON_DELAYS;
+	getMember<uint32_t>(that, 0xd7c)=PCH_PP_OFF_DELAYS;
+	getMember<uint32_t>(that, 0xd80) = NBlue::callback->readReg32(regs.pp_ctrl);
+
+}
+
+
+uint32_t Gen11::raReadRegister32(void *that,unsigned long param_1)
+{
+	if (that==nullptr) that=ccont;
+	auto ret=FunctionCast(raReadRegister32, callback->oraReadRegister32)(that,param_1);
+	return ret;
+};
+void Gen11::raWriteRegister32(void *that,unsigned long param_1, UInt32 param_2)
+{
+	if (that==nullptr) that=ccont;
+	FunctionCast(raWriteRegister32, callback->oraWriteRegister32)( that,param_1,param_2);
+	
+};
 

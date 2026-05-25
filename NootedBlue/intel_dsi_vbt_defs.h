@@ -49,15 +49,48 @@ constexpr unsigned long GENMASK(int h, int l)
 	return static_cast<unsigned long>(((1ULL << (h - l + 1)) - 1ULL) << l);
 }
 
+
+#define REG_FIELD_PREP(mask, val) (((val) << (__builtin_ffsll(mask) - 1)) & (mask))
+
 struct PACKED bdb_block_header {
 	u8 vid;
 	u8 _0; /* padding */
 	u16 size;
-} ;
+};
+
+struct list_head {
+	struct list_head *next, *prev;
+};
+
+#define container_of(ptr, type, member) ({          \
+	const __typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+
+#define list_entry_is_head(pos, head, member) \
+	(&(pos)->member == (head))
+
+#define list_next_entry(pos, member) \
+	list_entry((pos)->member.next, __typeof(*(pos)), member)
+
+#define list_for_each_entry(pos, head, member)				\
+	for (pos = list_first_entry(head, __typeof(*pos), member);	\
+		 !list_entry_is_head(pos, head, member);			\
+		 pos = list_next_entry(pos, member))
+
+
+
+
 
 #define UTIL_PIN_CTL			(0x48400)
 #define   UTIL_PIN_POLARITY		(1 << 22)
 #define PPS_BASE			0x61200
+#define PCH_PPS_BASE			0xC7200
 #define _MMIO_PPS(display, pps_idx, reg) \
 	((display)->pps.mmio_base - PPS_BASE + (reg) + (pps_idx) * 0x100)
 #define _PP_CONTROL			0x61204
@@ -166,16 +199,23 @@ enum intel_backlight_type {
 #define DISPLAY_VER(d) ((d)->version)
 #define AUX_CH_NAME_BUFSIZE	6
 
-#define __bf_shf(x) (__builtin_ffsll(x) - 1)
-#define REG_FIELD_PREP(__mask, __val)						\
-	((uint32_t)((((__typeof(__mask))(__val) << __bf_shf(__mask)) & (__mask))))
+#define  _MMIO(x) (x)
+#define SOUTH_DSPCLK_GATE_D	_MMIO(0xc2020)
+#define  PCH_GMBUSUNIT_CLOCK_GATE_DISABLE (1 << 31)
+#define  PCH_DPLUNIT_CLOCK_GATE_DISABLE (1 << 30)
+#define  PCH_DPLSUNIT_CLOCK_GATE_DISABLE (1 << 29)
+#define  PCH_DPMGUNIT_CLOCK_GATE_DISABLE (1 << 15)
+#define  PCH_CPUNIT_CLOCK_GATE_DISABLE (1 << 14)
+#define  CNP_PWM_CGE_GATING_DISABLE (1 << 13)
+#define  PCH_LP_PARTITION_LEVEL_DISABLE  (1 << 12)
 
 #define  PANEL_UNLOCK_MASK		REG_GENMASK(31, 16)
 #define  PANEL_UNLOCK_REGS		REG_FIELD_PREP(PANEL_UNLOCK_MASK, 0xabcd)
 #define  PANEL_POWER_RESET		REG_BIT(1)
 #define  PANEL_POWER_ON			REG_BIT(0)
 
-
+#define IS_DISPLAY_VER(__display, from, until) \
+	(DISPLAY_VER(__display) >= (from) && DISPLAY_VER(__display) <= (until))
 
 
 #define BDB_CHILD_DEVICE_CONFIG	40

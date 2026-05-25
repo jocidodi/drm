@@ -54,8 +54,7 @@ void NBlue::init() {
         nullptr, 0,
         [](void *user, KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
             static_cast<NBlue *>(user)->processKext(patcher, index, address, size);
-        },
-        this);
+        },this);
 	
 }
 
@@ -68,13 +67,13 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
         this->iGPU = OSDynamicCast(IOPCIDevice, devInfo->videoBuiltin);
         PANIC_COND(!this->iGPU, "nblue", "videoBuiltin is not IOPCIDevice");
 		
+		WIOKit::renameDevice(this->iGPU, "IGPU");
+		WIOKit::awaitPublishing(this->iGPU);
+		
 		//this->iGPU->enablePCIPowerManagement(kPCIPMCSPowerStateD0);
 		this->iGPU->setBusMasterEnable(true);
 		this->iGPU->setMemoryEnable(true);
 		//this->iGPU->setIOEnable(true);
-		
-		WIOKit::renameDevice(this->iGPU, "IGPU");
-		WIOKit::awaitPublishing(this->iGPU);
 		
         static uint8_t builtin[] = {0x00};
 		
@@ -83,36 +82,10 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
 		this->iGPU->setProperty("model", const_cast<char *>("Intel Iris Xe Graphics"), 23);
 			
-		setRMMIOIfNecessary();
 
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
 
-		// --- CPUID Detection ---
-		uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
-		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
-		
-		uint32_t family = (eax >> 8) & 0xF;
-		uint32_t model = (eax >> 4) & 0xF;
-		uint32_t extModel = (eax >> 16) & 0xF;
-		uint32_t stepping = eax & 0xF;
-		if (family == 0x6) {
-			model |= (extModel << 4);
-		}
-		this->cpuModel = model;
-		this->isRealTGL = (model == 0x8C || model == 0x8D);
-		this->isRKL = (model == 0xA7);
-		this->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
-		this->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
-					   model == 0xA6 || model == 0xAA);
-		this->isMTL = (model == 0xAC || model == 0xAD);
-
-
-		SYSLOG("ngreen", "CPU family=0x%x model=0x%x stepping=%u isRealTGL=%d",family, model, stepping, this->isRealTGL);
-		
-		
-		if (intel_opregion_setup(this->iGPU)!=0) panic("BAD BIOS");
-		
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead32, configRead32, &orgConfigRead32);
 
@@ -129,36 +102,13 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 										this->orgAddDrivers};
 	PANIC_COND(!patcher.routeMultipleLong(KernelPatcher::KernelID, &request, 1), "DriverInjector",
 			   "Failed to route addDrivers");
+	
+
+	
 }
 
 bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching)
 {
-	if (1)
-	{
-		static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
-		static uint8_t builtin3[] = {0x5d, 0x8A, 0x00, 0x00};
-		int ok=0;
-		vnode_t vnode = NULLVP;
-		vfs_context_t ctxt = vfs_context_create(nullptr);
-		errno_t err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
-		if (!err) vnode_put(vnode);
-		vfs_context_rele(ctxt);
-		if (!err) ok=1;
-		
-		//tgl
-		if (ok)
-		{
-			builtin2[2]=0x49;
-			builtin2[3]=0x9A;
-			builtin3[0]=0x49;
-			builtin3[1]=0x9A;
-		}
-		
-		NBlue::callback->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
-		NBlue::callback->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
-	}
-	
-	
 	
 	OSArray *tdrivers= array;
 	bool doNub=doNubMatching;
@@ -171,9 +121,34 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 	if (!err) ok=1;
 	
 	
-	
-	
 	if (ok) { //not running mac os installer
+		
+		
+		if (1)
+		{
+			static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
+			static uint8_t builtin3[] = {0x5d, 0x8A, 0x00, 0x00};
+			int ok=0;
+			vnode_t vnode = NULLVP;
+			vfs_context_t ctxt = vfs_context_create(nullptr);
+			errno_t err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
+			if (!err) vnode_put(vnode);
+			vfs_context_rele(ctxt);
+			if (!err) ok=1;
+			
+			//tgl
+			if (ok)
+			{
+				builtin2[2]=0x49;
+				builtin2[3]=0x9A;
+				builtin3[0]=0x49;
+				builtin3[1]=0x9A;
+			}
+			
+			NBlue::callback->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
+			NBlue::callback->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
+		}
+		
 	
 		int tcap=0;
 		if (ok) {
@@ -455,7 +430,6 @@ static const void *find_raw_section(const void *_bdb, int section_id)
 	int index = 0;
 	u32 total, current_size;
 	int current_id;
-
 
 	index = (bdb->header_size) ? bdb->header_size : 16;
 	total = bdb->bdb_size;
@@ -989,10 +963,27 @@ static int msecs_to_pps_units(int msecs)
 	return msecs * 10;
 }
 
+static  u32 ilk_get_pp_control(struct intel_panel *panel)
+{
+	u32 control;
+
+	//lockdep_assert_held(&display->pps.mutex);
+	control = NBlue::callback->readReg32(panel->regs.pp_ctrl);
+	if ((control & PANEL_UNLOCK_MASK) != PANEL_UNLOCK_REGS) {
+		control &= ~PANEL_UNLOCK_MASK;
+		control |= PANEL_UNLOCK_REGS;
+	}
+	return control;
+}
+
+
+
+
 static void
-parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
+parse_lfp_backlight(struct intel_display *display,
 			struct intel_panel *panel)
 {
+	const struct bdb_header *bdb=display->bdb;
 	const struct bdb_lfp_backlight *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
 	int panel_type = vbt_get_panel_type(bdb);
@@ -1017,7 +1008,7 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 
 	panel->vbt.backlight.type = INTEL_BACKLIGHT_DISPLAY_DDI;
 	panel->vbt.backlight.controller = 0;
-	if (bdb->version >= 191) {
+	if (display->vbt.version >= 191) {
 		const struct lfp_backlight_control_method *method;
 
 		method = &backlight_data->backlight_control[panel_type];
@@ -1029,14 +1020,14 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	panel->vbt.backlight.pwm_freq_hz = entry->pwm_freq_hz;
 	panel->vbt.backlight.active_low_pwm = entry->active_low_pwm;
 
-	if (bdb->version >= 234) {
+	if (display->vbt.version >= 234) {
 		u16 min_level;
 		bool scale;
 
 		level = backlight_data->brightness_level[panel_type].level;
 		min_level = backlight_data->brightness_min_level[panel_type].level;
 
-		if (bdb->version >= 236)
+		if (display->vbt.version >= 236)
 			scale = backlight_data->brightness_precision_bits[panel_type] == 16;
 		else
 			scale = level > 255;
@@ -1056,14 +1047,17 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 		panel->vbt.backlight.min_brightness = entry->min_brightness;
 	}
 
-	if (bdb->version >= 239)
+	if (display->vbt.version >= 239)
 		panel->vbt.backlight.hdr_dpcd_refresh_timeout =
 			DIV_ROUND_UP(backlight_data->hdr_dpcd_refresh_timeout[panel_type], 100);
 	else
 		panel->vbt.backlight.hdr_dpcd_refresh_timeout = 30;
 	
 	
-
+	panel->backlight.controller = panel->vbt.backlight.controller;
+	if (!cnp_backlight_controller_is_valid( panel->backlight.controller)) {
+		panel->backlight.controller = 0;
+	}
 	panel->pps.pps_idx=panel->vbt.backlight.controller;
 	
 	if (panel->backlight.controller == 1) {
@@ -1090,8 +1084,11 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	
 	panel->backlight.pwm_enabled = pwm_ctl & BXT_BLC_PWM_ENABLE;
 	
+	//cnp_enable_backlight()
+	//bxt_set_backlight()
 	
-	u32 pp_on, pp_off, pp_ctl, power_cycle_delay;
+	
+	u32 pp_on, pp_off, pp_ctl, power_cycle_delay,pp_div,pp_sta;
 	
 	panel->regs.pp_ctrl = PP_CONTROL(panel, panel->pps.pps_idx);
 	panel->regs.pp_stat = PP_STATUS(panel, panel->pps.pps_idx);
@@ -1103,13 +1100,15 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	pp_ctl = NBlue::callback->readReg32(panel->regs.pp_ctrl);
 	pp_on = NBlue::callback->readReg32( panel->regs.pp_on);
 	pp_off = NBlue::callback->readReg32( panel->regs.pp_off);
+	pp_div = NBlue::callback->readReg32( panel->regs.pp_div);
+	pp_sta = NBlue::callback->readReg32( panel->regs.pp_stat);
 	
 	panel->pps.bios_pps_delays.power_up = REG_FIELD_GET(PANEL_POWER_UP_DELAY_MASK, pp_on);
 	panel->pps.bios_pps_delays.backlight_on = REG_FIELD_GET(PANEL_LIGHT_ON_DELAY_MASK, pp_on);
 	panel->pps.bios_pps_delays.backlight_off = REG_FIELD_GET(PANEL_LIGHT_OFF_DELAY_MASK, pp_off);
 	panel->pps.bios_pps_delays.power_down = REG_FIELD_GET(PANEL_POWER_DOWN_DELAY_MASK, pp_off);
 
-	if (NBlue::callback->readReg32(panel->regs.pp_div)) {
+	if (NBlue::callback->readReg32(panel->regs.pp_div)!=-1) {
 		u32 pp_div;
 		pp_div = NBlue::callback->readReg32( panel->regs.pp_div);
 		power_cycle_delay = REG_FIELD_GET(PANEL_POWER_CYCLE_DELAY_MASK, pp_div);
@@ -1119,14 +1118,13 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	
 	panel->pps.bios_pps_delays.power_cycle = power_cycle_delay ? (power_cycle_delay - 1) * 1000 : 0;
 	
-	
 	struct intel_pps_delays bios, vbt, spec;
 	
 	spec.power_up = msecs_to_pps_units(10 + 200);
 	spec.backlight_on = msecs_to_pps_units(50);
 	spec.backlight_off = msecs_to_pps_units(50);
 	spec.power_down = msecs_to_pps_units(500);
-	spec.power_cycle = msecs_to_pps_units(10 + 500);
+	spec.power_cycle = msecs_to_pps_units(10+500);
 	
 	parse_edp(bdb,panel);
 	vbt = panel->vbt.edp.pps;
@@ -1151,47 +1149,54 @@ parse_lfp_backlight(IOPCIDevice *igpu, const struct bdb_header *bdb,
 	panel->pps.panel_power_down_delay = pps_units_to_msecs(finalb->power_down);
 	panel->pps.panel_power_cycle_delay = pps_units_to_msecs(finalb->power_cycle);
 	
-	//linux hacks
-	finalb->backlight_on = 1;
-	finalb->backlight_off = 1;
 	finalb->power_cycle = roundup(finalb->power_cycle, msecs_to_pps_units(100));
 	
-	
 	OSArray *connectorArray = OSArray::withCapacity(1);
-	OSDictionary *connectorDict = OSDictionary::withCapacity(30);
+	OSDictionary *connectorDict = OSDictionary::withCapacity(40);
+	
 
 	connectorDict->setObject("panel_type", OSNumber::withNumber(panel_type, 32));
+	connectorDict->setObject("pp_ctl", OSNumber::withNumber(pp_ctl, 32));
+	connectorDict->setObject("pp_status", OSNumber::withNumber(pp_sta, 32));
+	connectorDict->setObject("pp_on", OSNumber::withNumber(pp_on, 32));
+	connectorDict->setObject("pp_off", OSNumber::withNumber(pp_off, 32));
+	connectorDict->setObject("pp_div", OSNumber::withNumber(pp_div, 32));
+	connectorDict->setObject("panel->rawclk_freq", OSNumber::withNumber(panel->rawclk_freq, 32));
 	connectorDict->setObject("levelX", OSNumber::withNumber(panel->backlight.level, 32));
 	connectorDict->setObject("vbt.pwm_freq_hz", OSNumber::withNumber(panel->vbt.backlight.pwm_freq_hz, 32));
 	connectorDict->setObject("vbt.controller", OSNumber::withNumber(panel->vbt.backlight.controller, 32));
 	connectorDict->setObject("vbt.min_brightness", OSNumber::withNumber(panel->vbt.backlight.min_brightness, 32));
+	connectorDict->setObject("vbt.edp.bpp", OSNumber::withNumber(panel->vbt.edp.bpp, 32));
+	connectorDict->setObject("vbt.edp.rate", OSNumber::withNumber(panel->vbt.edp.rate, 32));
+	connectorDict->setObject("vbt.edp.lanes", OSNumber::withNumber(panel->vbt.edp.lanes, 32));
+	
 	connectorDict->setObject("pwm_enabled", OSNumber::withNumber(panel->backlight.pwm_enabled, 32));
 	connectorDict->setObject("pwm_level_min", OSNumber::withNumber(panel->backlight.pwm_level_min, 32));
 	connectorDict->setObject("pwm_level_max", OSNumber::withNumber(panel->backlight.pwm_level_max, 32));
 	connectorDict->setObject("active_low_pwm", OSNumber::withNumber(panel->backlight.active_low_pwm , 32));
 	
-	connectorDict->setObject("pps->panel_power_up_delay", OSNumber::withNumber(panel->pps.panel_power_up_delay, 32));
-	connectorDict->setObject("pps->panel_power_down_delay", OSNumber::withNumber(panel->pps.panel_power_down_delay, 32));
-	connectorDict->setObject("pps->panel_power_cycle_delay", OSNumber::withNumber(panel->pps.panel_power_cycle_delay, 32));
-	connectorDict->setObject("pps->backlight_on_delay", OSNumber::withNumber(panel->pps.backlight_on_delay, 32));
-	connectorDict->setObject("pps->backlight_off_delay", OSNumber::withNumber(panel->pps.backlight_off_delay, 32));
+	connectorDict->setObject("pps->power_up", OSNumber::withNumber(panel->pps.pps_delays.power_up, 32));
+	connectorDict->setObject("pps->power_down", OSNumber::withNumber(panel->pps.pps_delays.power_down, 32));
+	connectorDict->setObject("pps->power_cycle", OSNumber::withNumber(panel->pps.pps_delays.power_cycle, 32));
+	connectorDict->setObject("pps->backlight_on", OSNumber::withNumber(panel->pps.pps_delays.backlight_on, 32));
+	connectorDict->setObject("pps->backlight_off", OSNumber::withNumber(panel->pps.pps_delays.backlight_off, 32));
 	
-	connectorDict->setObject("vbt.edp.bpp", OSNumber::withNumber(panel->vbt.edp.bpp, 32));
-	connectorDict->setObject("vbt.edp.rate", OSNumber::withNumber(panel->vbt.edp.rate, 32));
-	connectorDict->setObject("vbt.edp.lanes", OSNumber::withNumber(panel->vbt.edp.lanes, 32));
+	connectorDict->setObject("pps->round", OSNumber::withNumber(DIV_ROUND_UP(panel->pps.pps_delays.power_cycle, 1000) + 1, 32));
 	
 	
 	
 	connectorArray->setObject(connectorDict);
 	connectorDict->release();
 
-	igpu->setProperty("PANEL", connectorArray);
+	NBlue::callback->iGPU->setProperty("PANEL", connectorArray);
 	connectorArray->release();
 	
 	
 }
 
-static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int section_id, size_t min_size)
+
+
+static void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
 	const void *block_data = find_raw_section(bdb, section_id);
 
@@ -1230,36 +1235,37 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			model |= (extModel << 4);
 		}
 		uint32_t cpuModel = model;
-		bool isRealTGL = (model == 0x8C || model == 0x8D);
-		bool isRKL = (model == 0xA7);
-		bool isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
-		bool isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
+		display->isRealTGL = (model == 0x8C || model == 0x8D);
+		display->isRKL = (model == 0xA7);
+		display->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
+		display->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
 					   model == 0xA6 || model == 0xAA);
-		bool isMTL = (model == 0xAC || model == 0xAD);
+		display->isMTL = (model == 0xAC || model == 0xAD);
 
-		if (isMTL || isADL || isRPL) {
-			NBlue::callback->display_ctx.version = 13;
-		} else if (isRealTGL|| isRKL) {
-			NBlue::callback->display_ctx.version = 12;
+		if (display->isMTL || display->isADL || display->isRPL) {
+			display->version = 13;
+		} else if (display->isRealTGL|| display->isRKL) {
+			display->version = 12;
 		} else {
-			NBlue::callback->display_ctx.version = 12;
+			display->version = 12;
 		}
 
-		NBlue::callback->display_ctx.platform.alderlake_s = false; // needs detection
-		NBlue::callback->display_ctx.platform.rocketlake = isRKL;
-		NBlue::callback->display_ctx.platform.dg1 = false;
-		NBlue::callback->display_ctx.pps.mmio_base = PPS_BASE;
-		NBlue::callback->display_ctx.panel.pps.mmio_base = PPS_BASE;
-
+		display->platform.alderlake_s = false; // needs detection
+		display->platform.rocketlake = display->isRKL;
+		display->platform.dg1 = false;
+		display->pps.mmio_base = PCH_PPS_BASE;
+		display->panel.pps.mmio_base = PCH_PPS_BASE;
+		display->bdb=bdb;
+		
 		OSArray *connectorArray = OSArray::withCapacity(6);
 		
 		for (i = 0; i < 6; i++) {
-			NBlue::callback->display_ctx.bconnectors[i].index=i;
-			NBlue::callback->display_ctx.bconnectors[i].busId=0;
-			NBlue::callback->display_ctx.bconnectors[i].pipe=0;
-			NBlue::callback->display_ctx.bconnectors[i].pad=0;
-			NBlue::callback->display_ctx.bconnectors[i].type=ConnectorDummy;
-			NBlue::callback->display_ctx.bconnectors[i].flags=0;
+			display->bconnectors[i].index=i;
+			display->bconnectors[i].busId=0;
+			display->bconnectors[i].pipe=0;
+			display->bconnectors[i].pad=0;
+			display->bconnectors[i].type=ConnectorDummy;
+			display->bconnectors[i].flags=0;
 		}
 
 		for (i = 0; i < child_device_num; i++) {
@@ -1270,11 +1276,11 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			if (child->device_type == 0)
 				continue;
 
-			enum port port = dvo_port_to_port(&NBlue::callback->display_ctx, child->dvo_port);
+			enum port port = dvo_port_to_port(display, child->dvo_port);
 			
 			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
 				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
-				else if (child->dvo_port == DVO_PORT_MIPIC) port = (NBlue::callback->display_ctx.version >= 11) ? PORT_B : PORT_C;
+				else if (child->dvo_port == DVO_PORT_MIPIC) port = (display->version >= 11) ? PORT_B : PORT_C;
 			}
 
 			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
@@ -1283,12 +1289,10 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			bool is_edp   = is_dp && (child->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
 			bool is_dsi   = (child->device_type & DEVICE_TYPE_MIPI_OUTPUT);
 			bool is_crt   = (child->device_type & DEVICE_TYPE_ANALOG_OUTPUT);
-			enum phy phy = intel_port_to_phy(&NBlue::callback->display_ctx, port);
-			enum aux_ch aux_ch = map_aux_ch(&NBlue::callback->display_ctx,child->aux_channel);
+			enum phy phy = intel_port_to_phy(display, port);
+			enum aux_ch aux_ch = map_aux_ch(display,child->aux_channel);
 			char buf[AUX_CH_NAME_BUFSIZE+3];
 			char buf2[6];
-			
-			parse_lfp_backlight(igpu,bdb,&NBlue::callback->display_ctx.panel);
 			
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
 			
@@ -1304,9 +1308,9 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			connectorDict->setObject("eDP", is_edp ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("DSI", is_dsi ? kOSBooleanTrue : kOSBooleanFalse);
 			connectorDict->setObject("CRT", is_crt ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(&NBlue::callback->display_ctx, port,buf2, sizeof(buf2))));
+			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(display, port,buf2, sizeof(buf2))));
 			connectorDict->setObject("PHY", OSString::withCString(phy_to_string(phy)));
-			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(&NBlue::callback->display_ctx, buf, sizeof(buf), aux_ch)));
+			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(display, buf, sizeof(buf), aux_ch)));
 			connectorDict->setObject("GMBUS", OSNumber::withNumber((unsigned long long)child->ddc_pin, 32));
 
 			connectorArray->setObject(connectorDict);
@@ -1322,21 +1326,21 @@ static void init_bdb_block(IOPCIDevice *igpu, const struct bdb_header *bdb, int 
 			if (is_edp) flags=0x1+0x8+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
-			NBlue::callback->display_ctx.bconnectors[port].index=port;
-			NBlue::callback->display_ctx.bconnectors[port].busId=child->ddc_pin;
-			NBlue::callback->display_ctx.bconnectors[port].pipe=i;
-			NBlue::callback->display_ctx.bconnectors[port].pad=0;
-			NBlue::callback->display_ctx.bconnectors[port].type=type;
-			NBlue::callback->display_ctx.bconnectors[port].flags=flags;
+			display->bconnectors[port].index=port;
+			display->bconnectors[port].busId=child->ddc_pin;
+			display->bconnectors[port].pipe=i;
+			display->bconnectors[port].pad=0;
+			display->bconnectors[port].type=type;
+			display->bconnectors[port].flags=flags;
 		}
 
-		igpu->setProperty("Bios_Connectors", connectorArray);
+		NBlue::callback->iGPU->setProperty("Bios_Connectors", connectorArray);
 		connectorArray->release();
 
 		}
 }
 
-static void init_bdb_blocks(IOPCIDevice *igpu, const struct bdb_header *bdb)
+static void init_bdb_blocks(struct intel_display *display, const struct bdb_header *bdb)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(bdb_blocks); i++) {
 		int section_id = bdb_blocks[i].section_id;
@@ -1345,9 +1349,11 @@ static void init_bdb_blocks(IOPCIDevice *igpu, const struct bdb_header *bdb)
 		if (section_id == BDB_LFP_DATA)
 			min_size = lfp_data_min_size(bdb);
 
-		init_bdb_block(igpu, bdb, section_id, min_size);
+		init_bdb_block(display, bdb, section_id, min_size);
 	}
 }
+
+
 
 int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
 {
@@ -1458,7 +1464,8 @@ int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
 			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
 
 			if (bdb) {
-				init_bdb_blocks(igpu, bdb);
+				display_ctx.vbt.version = bdb->version;
+				init_bdb_blocks(&display_ctx, bdb);
 			}
 		}
 	
@@ -1471,3 +1478,28 @@ err_out:
 	return err;
 }
 
+void NBlue::parse_backlight()
+{
+	parse_lfp_backlight(&display_ctx,&display_ctx.panel);
+}
+
+UInt32 NBlue::readReg32(unsigned long reg) {
+	
+	if (Gen11::callback)
+	return Gen11::callback->raReadRegister32(nullptr,reg);
+	
+	if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
+		return this->rmmioPtr[reg];
+	} else {
+		return 0;
+	}
+}
+
+void NBlue::writeReg32(unsigned long reg, UInt32 val) {
+	if (Gen11::callback)
+	return Gen11::callback->raWriteRegister32(nullptr,reg,val);
+	
+	if ((reg * sizeof(uint32_t)) < this->rmmio->getLength()) {
+		this->rmmioPtr[reg] = val;
+	}
+}

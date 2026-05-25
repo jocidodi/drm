@@ -1994,6 +1994,44 @@ struct intel_panel {
 	u32 rawclk_freq;
 	struct pps_registers regs;
 };
+enum drm_panel_orientation {
+	DRM_MODE_PANEL_ORIENTATION_UNKNOWN = -1,
+	DRM_MODE_PANEL_ORIENTATION_NORMAL = 0,
+	DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP,
+	DRM_MODE_PANEL_ORIENTATION_LEFT_UP,
+	DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
+};
+struct intel_vbt_data {
+	/* bdb version */
+	u16 version;
+
+	/* Feature bits */
+	unsigned int int_tv_support:1;
+	unsigned int int_crt_support:1;
+	unsigned int lvds_use_ssc:1;
+	unsigned int int_lvds_support:1;
+	unsigned int display_clock_mode:1;
+	unsigned int fdi_rx_polarity_inverted:1;
+	int lvds_ssc_freq;
+	enum drm_panel_orientation orientation;
+
+	bool override_afc_startup;
+	u8 override_afc_startup_val;
+
+	int crt_ddc_pin;
+
+	struct list_head display_devices;
+	struct list_head bdb_blocks;
+
+	struct sdvo_device_mapping {
+		u8 initialized;
+		u8 dvo_port;
+		u8 target_addr;
+		u8 dvo_wiring;
+		u8 i2c_pin;
+		u8 ddc_pin;
+	} sdvo_mappings[2];
+};
 
 struct intel_display {
 	int version; // For DISPLAY_VER macro
@@ -2007,6 +2045,19 @@ struct intel_display {
 	} pps;
 	struct intel_panel panel;
 	ConnectorInfo bconnectors[6];
+	bool isRealTGL = false;
+	bool isRKL  = false;
+	bool isADL =  false;
+	bool isRPL = false;
+	bool isMTL= false;
+	const struct bdb_header *bdb;
+	struct intel_vbt_data vbt;
+};
+
+struct bdb_block_entry {
+	struct list_head node;
+	enum bdb_block_id section_id;
+	u8 data[];
 };
 
 

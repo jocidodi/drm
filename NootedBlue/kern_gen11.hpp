@@ -389,7 +389,7 @@ struct IGHwCsDesc {
 
 
 class Gen11 {
-
+	friend class NBlue;
 private:
 	
 	void* gPlatformInformationList{nullptr};
@@ -422,8 +422,18 @@ private:
 
 	static uint64_t  getOSInformation2(void *that);
 	mach_vm_address_t ogetOSInformation2 {};
-
-
+	
+	static void hwSetPanelPowerConfig(void *that,uint param_1);
+	mach_vm_address_t ohwSetPanelPowerConfig {};
+	
+	static void raWriteRegister32(void *that,unsigned long param_1, UInt32 param_2);
+	mach_vm_address_t oraWriteRegister32 {};
+	static uint32_t raReadRegister32(void *that,unsigned long param_1);
+	mach_vm_address_t oraReadRegister32 {};
+	
+	static void hwGetCRTC(void *that,void *param_1,void *param_2);
+	mach_vm_address_t ohwGetCRTC {};
+	
 	
 public:
 
