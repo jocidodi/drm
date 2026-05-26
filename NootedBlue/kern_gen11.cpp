@@ -549,7 +549,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	int p=0x5;
 	
 	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
 	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
 	FB_FLAG_FRAMEBUFFER_COMPRESSION;
 	
@@ -580,9 +580,9 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
 	
-	
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
+	
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
