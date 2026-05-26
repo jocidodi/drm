@@ -261,6 +261,7 @@ void NBlue::setRMMIOIfNecessary() {
 	if (UNLIKELY(!this->rmmio || !this->rmmio->getLength())) {
 		this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
 		this->rmmioPtr = reinterpret_cast<volatile uint32_t *>(this->rmmio->getVirtualAddress());
+		this->rmmioLen=this->rmmio->getLength();
 	}
 }
 
@@ -415,7 +416,7 @@ bool NBlue::wrapApplePanelSetDisplay(IOService *that, IODisplay *display) {
 
 
 
-static u32 _get_blocksize(const u8 *block_base)
+u32 _get_blocksize(const u8 *block_base)
 {
 	if (*block_base == BDB_MIPI_SEQUENCE && *(block_base + 3) >= 3)
 		return *((const u32 *)(block_base + 4));
@@ -423,7 +424,7 @@ static u32 _get_blocksize(const u8 *block_base)
 		return *((const u16 *)(block_base + 1));
 }
 
-static const void *find_raw_section(const void *_bdb, int section_id)
+const void *find_raw_section(const void *_bdb, int section_id)
 {
 	const struct bdb_header *bdb = static_cast<const struct bdb_header *>(_bdb);
 	const u8 *base = static_cast<const u8 *>(_bdb);
@@ -451,7 +452,7 @@ static const void *find_raw_section(const void *_bdb, int section_id)
 	return NULL;
 }
 
-static size_t lfp_data_min_size(const struct bdb_header *bdb)
+size_t lfp_data_min_size(const struct bdb_header *bdb)
 {
 	const struct bdb_lfp_data_ptrs *ptrs;
 	size_t size;
@@ -468,7 +469,7 @@ static size_t lfp_data_min_size(const struct bdb_header *bdb)
 	return size;
 }
 
-static int get_child_device_expected_size(u16 vbt_version)
+int get_child_device_expected_size(u16 vbt_version)
 {
 	if (vbt_version > 264) return -1;
 	else if (vbt_version >= 263) return 44;
@@ -480,7 +481,7 @@ static int get_child_device_expected_size(u16 vbt_version)
 	else if (vbt_version >= 106) return 27;
 	else return 22;
 }
-static const char *aux_ch_name(struct intel_display *display,
+const char *aux_ch_name(struct intel_display *display,
 				   char *buf, int size, enum aux_ch aux_ch)
 {
 	if (DISPLAY_VER(display) >= 13 && aux_ch >= AUX_CH_D_XELPD)
@@ -494,7 +495,7 @@ static const char *aux_ch_name(struct intel_display *display,
 }
 
 
-static const char *intel_ddi_encoder_name(struct intel_display *display,
+const char *intel_ddi_encoder_name(struct intel_display *display,
 					  enum port port, char *s, int size)
 {
 	if (DISPLAY_VER(display) >= 13 && port >= PORT_D_XELPD) {
@@ -515,7 +516,7 @@ static const char *intel_ddi_encoder_name(struct intel_display *display,
 	return (s);
 }
 
-static enum aux_ch map_aux_ch(struct intel_display *display, u8 aux_channel)
+enum aux_ch map_aux_ch(struct intel_display *display, u8 aux_channel)
 {
 	const u8 *aux_ch_map;
 	int i, n_entries;
@@ -541,7 +542,7 @@ static enum aux_ch map_aux_ch(struct intel_display *display, u8 aux_channel)
 
 	return AUX_CH_NONE;
 }
-static const char* phy_to_string(enum phy port)
+const char* phy_to_string(enum phy port)
 {
 	switch (port) {
 		case PHY_A: return "PHY_A";
@@ -556,7 +557,7 @@ static const char* phy_to_string(enum phy port)
 	}
 }
 
-static enum phy intel_port_to_phy(struct intel_display *display, enum port port)
+enum phy intel_port_to_phy(struct intel_display *display, enum port port)
 {
 	if (DISPLAY_VER(display) >= 13 && port >= PORT_D_XELPD)
 			return static_cast<enum phy>(PHY_D + port - PORT_D_XELPD);
@@ -573,7 +574,7 @@ static enum phy intel_port_to_phy(struct intel_display *display, enum port port)
 		return static_cast<enum phy>(PHY_A + port - PORT_A);
 }
 
-static enum port __dvo_port_to_port(int n_ports, int n_dvo,
+enum port __dvo_port_to_port(int n_ports, int n_dvo,
 					const int port_mapping[][3], u8 dvo_port)
 {
 	int i, j;
@@ -591,10 +592,10 @@ static enum port __dvo_port_to_port(int n_ports, int n_dvo,
 	return PORT_NONE;
 }
 
-static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
+enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 {
 
-	static const int port_mapping[][3] = {
+	const int port_mapping[][3] = {
 		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
 		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
 		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
@@ -606,7 +607,7 @@ static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 		[PORT_I] = { DVO_PORT_HDMII, DVO_PORT_DPI, -1 },
 	};
 
-	static const int rkl_port_mapping[][3] = {
+	const int rkl_port_mapping[][3] = {
 		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
 		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
 		[PORT_C] = { -1 },
@@ -614,7 +615,7 @@ static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 		[PORT_TC2] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
 	};
 
-	static const int adls_port_mapping[][3] = {
+	const int adls_port_mapping[][3] = {
 		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
 		[PORT_B] = { -1 },
 		[PORT_C] = { -1 },
@@ -623,7 +624,7 @@ static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 		[PORT_TC3] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
 		[PORT_TC4] = { DVO_PORT_HDMIE, DVO_PORT_DPE, -1 },
 	};
-	static const int xelpd_port_mapping[][3] = {
+	const int xelpd_port_mapping[][3] = {
 		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
 		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
 		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
@@ -658,7 +659,7 @@ static enum port dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 					  dvo_port);
 }
 
-static const char* port_to_string(enum port port)
+const char* port_to_string(enum port port)
 {
 	switch (port) {
 		case PORT_A: return "PORT_A";
@@ -679,7 +680,7 @@ static const char* port_to_string(enum port port)
 }
 
 
-static int vbt_get_panel_type(const struct bdb_header *bdb)
+int vbt_get_panel_type(const struct bdb_header *bdb)
 {
 	const struct bdb_lfp_options *lfp_options;
 
@@ -700,18 +701,18 @@ static int vbt_get_panel_type(const struct bdb_header *bdb)
 
 
 
-static u32 bxt_hz_to_pwm(u32 pwm_freq_hz)
+u32 bxt_hz_to_pwm(u32 pwm_freq_hz)
 {
 	return DIV_ROUND_CLOSEST(KHz(19200), pwm_freq_hz);
 }
 
-static u32 cnp_hz_to_pwm(u32 rawclk_freq, u32 pwm_freq_hz)
+u32 cnp_hz_to_pwm(u32 rawclk_freq, u32 pwm_freq_hz)
 {
 
 	return DIV_ROUND_CLOSEST(KHz(rawclk_freq),pwm_freq_hz);
 }
 
-static uint32_t scale(uint32_t source_val,
+uint32_t scale(uint32_t source_val,
 					  uint32_t source_min, uint32_t source_max,
 					  uint32_t target_min, uint32_t target_max)
 {
@@ -734,7 +735,7 @@ static uint32_t scale(uint32_t source_val,
 
 
 
-static int cnp_rawclk()
+int cnp_rawclk()
 {
 	int divider, fraction;
 	u32 rawclk;
@@ -763,7 +764,7 @@ static int cnp_rawclk()
 	return divider + fraction;
 }
 
-static bool cnp_backlight_controller_is_valid( int controller)
+bool cnp_backlight_controller_is_valid( int controller)
 {
 	if (controller < 0 || controller >= 2)
 		return false;
@@ -775,12 +776,12 @@ static bool cnp_backlight_controller_is_valid( int controller)
 }
 
 
-static void bxt_set_backlight(struct intel_panel *panel, u32 level)
+void bxt_set_backlight(struct intel_panel *panel, u32 level)
 {
 	NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(panel->backlight.controller), level);
 }
 
-static void cnp_enable_backlight(struct intel_panel *panel, u32 level)
+void cnp_enable_backlight(struct intel_panel *panel, u32 level)
 {
 	u32 pwm_ctl;
 
@@ -806,12 +807,12 @@ static void cnp_enable_backlight(struct intel_panel *panel, u32 level)
 			   pwm_ctl | BXT_BLC_PWM_ENABLE);
 }
 
-static unsigned int panel_bits(unsigned int value, int panel_type, int num_bits)
+unsigned int panel_bits(unsigned int value, int panel_type, int num_bits)
 {
 	return (value >> (panel_type * num_bits)) & (BIT(num_bits) - 1);
 }
 
-static void vbt_edp_to_pps_delays(struct intel_pps_delays *pps,
+void vbt_edp_to_pps_delays(struct intel_pps_delays *pps,
 				  const struct edp_power_seq *edp_pps)
 {
 	pps->power_up = edp_pps->t1_t3;
@@ -820,12 +821,12 @@ static void vbt_edp_to_pps_delays(struct intel_pps_delays *pps,
 	pps->power_down = edp_pps->t10;
 	pps->power_cycle = edp_pps->t11_t12;
 }
-static bool panel_bool(unsigned int value, int panel_type)
+bool panel_bool(unsigned int value, int panel_type)
 {
 	return panel_bits(value, panel_type, 1);
 }
 
-static void
+void
 parse_edp(const struct bdb_header *bdb,
 		  struct intel_panel *panel)
 {
@@ -953,17 +954,17 @@ parse_edp(const struct bdb_header *bdb,
 			panel_bool(edp->pipe_joiner_enable, panel_type);
 }
 
-static int pps_units_to_msecs(int val)
+int pps_units_to_msecs(int val)
 {
 	return DIV_ROUND_UP(val, 10);
 }
-static int msecs_to_pps_units(int msecs)
+int msecs_to_pps_units(int msecs)
 {
 	/* PPS uses 100us units */
 	return msecs * 10;
 }
 
-static  u32 ilk_get_pp_control(struct intel_panel *panel)
+ u32 ilk_get_pp_control(struct intel_panel *panel)
 {
 	u32 control;
 
@@ -979,7 +980,7 @@ static  u32 ilk_get_pp_control(struct intel_panel *panel)
 
 
 
-static void
+void
 parse_lfp_backlight(struct intel_display *display,
 			struct intel_panel *panel)
 {
@@ -1196,7 +1197,7 @@ parse_lfp_backlight(struct intel_display *display,
 
 
 
-static void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
+void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
 	const void *block_data = find_raw_section(bdb, section_id);
 
@@ -1223,39 +1224,6 @@ static void init_bdb_block(struct intel_display *display, const struct bdb_heade
 			}
 
 			child_device_num = (block_size - sizeof(struct bdb_general_definitions)) / entry_size;
-
-		
-		uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
-		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
-		uint32_t family = (eax >> 8) & 0xF;
-		uint32_t model = (eax >> 4) & 0xF;
-		uint32_t extModel = (eax >> 16) & 0xF;
-		uint32_t stepping = eax & 0xF;
-		if (family == 0x6) {
-			model |= (extModel << 4);
-		}
-		uint32_t cpuModel = model;
-		display->isRealTGL = (model == 0x8C || model == 0x8D);
-		display->isRKL = (model == 0xA7);
-		display->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
-		display->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
-					   model == 0xA6 || model == 0xAA);
-		display->isMTL = (model == 0xAC || model == 0xAD);
-
-		if (display->isMTL || display->isADL || display->isRPL) {
-			display->version = 13;
-		} else if (display->isRealTGL|| display->isRKL) {
-			display->version = 12;
-		} else {
-			display->version = 12;
-		}
-
-		display->platform.alderlake_s = false; // needs detection
-		display->platform.rocketlake = display->isRKL;
-		display->platform.dg1 = false;
-		display->pps.mmio_base = PCH_PPS_BASE;
-		display->panel.pps.mmio_base = PCH_PPS_BASE;
-		display->bdb=bdb;
 		
 		OSArray *connectorArray = OSArray::withCapacity(6);
 		
@@ -1340,24 +1308,25 @@ static void init_bdb_block(struct intel_display *display, const struct bdb_heade
 		}
 }
 
-static void init_bdb_blocks(struct intel_display *display, const struct bdb_header *bdb)
+void init_bdb_blocks(struct intel_display *display)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(bdb_blocks); i++) {
 		int section_id = bdb_blocks[i].section_id;
 		size_t min_size = bdb_blocks[i].min_size;
 
 		if (section_id == BDB_LFP_DATA)
-			min_size = lfp_data_min_size(bdb);
+			min_size = lfp_data_min_size(display->bdb);
 
-		init_bdb_block(display, bdb, section_id, min_size);
+		init_bdb_block(display, display->bdb, section_id, min_size);
 	}
 }
 
 
 
-int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
+int NBlue::intel_opregion_setup()
 {
-	struct intel_opregion *opregion = &this->opregion;
+	intel_display *display=&display_ctx;
+	struct intel_opregion *opregion = &display->opregion;
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
 	int err = 0;
@@ -1365,7 +1334,7 @@ int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
 	const void *vbt = nullptr;
 	u32 vbt_size = 0;
 
-	asls = igpu->configRead32(0xFC);
+	asls = NBlue::callback->iGPU->configRead32(0xFC);
 	
 	if (asls == 0) {
 		return -ENOMEM;
@@ -1464,8 +1433,39 @@ int NBlue::intel_opregion_setup(IOPCIDevice *igpu)
 			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
 
 			if (bdb) {
-				display_ctx.vbt.version = bdb->version;
-				init_bdb_blocks(&display_ctx, bdb);
+				uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+				asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
+				uint32_t family = (eax >> 8) & 0xF;
+				uint32_t model = (eax >> 4) & 0xF;
+				uint32_t extModel = (eax >> 16) & 0xF;
+				uint32_t stepping = eax & 0xF;
+				if (family == 0x6) {
+					model |= (extModel << 4);
+				}
+				uint32_t cpuModel = model;
+				display->isRealTGL = (model == 0x8C || model == 0x8D);
+				display->isRKL = (model == 0xA7);
+				display->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
+				display->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
+							   model == 0xA6 || model == 0xAA);
+				display->isMTL = (model == 0xAC || model == 0xAD);
+
+				if (display->isMTL || display->isADL || display->isRPL) {
+					display->version = 13;
+				} else if (display->isRealTGL|| display->isRKL) {
+					display->version = 12;
+				} else {
+					display->version = 12;
+				}
+
+				display->platform.alderlake_s = false; // needs detection
+				display->platform.rocketlake = display->isRKL;
+				display->platform.dg1 = false;
+				display->pps.mmio_base = PCH_PPS_BASE;
+				display->panel.pps.mmio_base = PCH_PPS_BASE;
+				display->vbt.version = bdb->version;
+				display->bdb=bdb;
+				init_bdb_blocks(display);
 			}
 		}
 	
@@ -1484,11 +1484,12 @@ void NBlue::parse_backlight()
 }
 
 UInt32 NBlue::readReg32(unsigned long reg) {
-	
 	if (Gen11::callback)
 	return Gen11::callback->raReadRegister32(nullptr,reg);
 	
-	if (reg * sizeof(uint32_t) < this->rmmio->getLength()) {
+	//panic("X");
+
+	if (reg < rmmioLen-4) {
 		return this->rmmioPtr[reg];
 	} else {
 		return 0;
@@ -1499,7 +1500,19 @@ void NBlue::writeReg32(unsigned long reg, UInt32 val) {
 	if (Gen11::callback)
 	return Gen11::callback->raWriteRegister32(nullptr,reg,val);
 	
-	if ((reg * sizeof(uint32_t)) < this->rmmio->getLength()) {
+	//panic("X");
+	
+	
+	if (reg < rmmioLen-4) {
 		this->rmmioPtr[reg] = val;
 	}
+}
+
+uint32_t NBlue::intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
+{
+	uint32_t old, val;
+	old = readReg32( reg);
+	val = (old & ~clear) | set;
+	writeReg32( reg, val);
+	return old;
 }

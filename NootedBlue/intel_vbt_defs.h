@@ -2052,6 +2052,7 @@ struct intel_display {
 	bool isMTL= false;
 	const struct bdb_header *bdb;
 	struct intel_vbt_data vbt;
+	struct intel_opregion opregion;
 };
 
 struct bdb_block_entry {

@@ -35,14 +35,30 @@ class NBlue {
 	friend class DYLDPatches;
 
     public:
+	
     static NBlue *callback;
 	intel_display display_ctx;
 	IOPCIDevice *iGPU {nullptr};
+	
+	uint32_t deviceId {0};
+	uint16_t revision {0};
+	uint32_t pciRevision {0};
+	
+	IOMemoryMap *rmmio {nullptr};
+	volatile UInt32 *rmmioPtr {nullptr};
+	unsigned long rmmioLen;
 	
     void init();
     void processPatcher(KernelPatcher &patcher);
     bool processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
 	void setRMMIOIfNecessary();
+	
+	void parse_backlight();
+	int intel_opregion_setup();
+	UInt32 readReg32(unsigned long reg);
+	void writeReg32(unsigned long reg, UInt32 val);
+	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set);
+	
 	
 	static uint16_t configRead16(IORegistryEntry *service, uint32_t space, uint8_t offset);
 	static uint32_t configRead32(IORegistryEntry *service, uint32_t space, uint8_t offset);
@@ -55,40 +71,12 @@ class NBlue {
 	mach_vm_address_t orgApplePanelSetDisplay {0};
 	static bool wrapApplePanelSetDisplay(IOService *that, IODisplay *display);
 	
-
-   
-	void parse_backlight();
-		
-		int intel_opregion_setup(IOPCIDevice *igpu);
-		struct intel_opregion opregion;
-
-	UInt32 readReg32(unsigned long reg);
-
-	void writeReg32(unsigned long reg, UInt32 val);
-	
-	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
-	{
-		uint32_t old, val;
-
-		old = readReg32( reg);
-		val = (old & ~clear) | set;
-		writeReg32( reg, val);
-		return old;
-	}
-	
-private:
-
+//private:
 	
 	static bool wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching);
 	mach_vm_address_t orgAddDrivers{0};
 	
-    uint32_t deviceId {0};
-    uint16_t revision {0};
-    uint32_t pciRevision {0};
     
-	IOMemoryMap *rmmio {nullptr};
-	volatile UInt32 *rmmioPtr {nullptr};
-	int32_t rmmioLen;
 	
 };
 

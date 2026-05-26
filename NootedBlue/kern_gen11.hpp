@@ -445,6 +445,15 @@ private:
 											  unsigned long *value);
 	mach_vm_address_t ogetAttributeForConnection {};
 	
+
+
+	
+	
+	
+	
+	
+	
+	
 public:
 
 	void init();
