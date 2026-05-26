@@ -394,7 +394,6 @@ private:
 	
 	void* gPlatformInformationList{nullptr};
 	void* kIGHwCsDesc {};
-	void* gPlatformInformationList2{nullptr};
 	
 	static void  initPlatformWorkarounds(void *that);
 	mach_vm_address_t oinitPlatformWorkarounds {};
@@ -417,9 +416,6 @@ private:
 	static unsigned long AppleIntelScalerinit(void *that,uint param_1);
 	mach_vm_address_t oAppleIntelScalerinit {};
 	
-	static void  initPlatformWorkarounds2(void *that);
-	mach_vm_address_t oinitPlatformWorkarounds2 {};
-
 	static uint64_t  getOSInformation2(void *that);
 	mach_vm_address_t ogetOSInformation2 {};
 	

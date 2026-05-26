@@ -27,6 +27,10 @@ static KernelPatcher::KextInfo kextG11HWTe {"com.xxxxx.driver.AppleIntelTGLGraph
 	KernelPatcher::KextInfo::Unloaded};
 
 
+//globals
+void *ccont;
+void *ccont2;
+int bk=2;
 bool kexticl=false;
 bool kexttgld=false;
 bool kexttglp=false;
@@ -53,14 +57,14 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		NBlue::callback->setRMMIOIfNecessary();
 		
 		SolveRequestPlus solveRequests[] = {
-			{"_gPlatformInformationList", this->gPlatformInformationList2},
+			{"_gPlatformInformationList", this->gPlatformInformationList},
 			
 		};
 		PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		
 		RouteRequestPlus requests[] = {
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
-			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds2, this->oinitPlatformWorkarounds2},
+			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
 			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},// reg fix
 			
@@ -76,12 +80,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//platform id
-		static const uint8_t f15[]= {0x00,0x00, 0x00, 0x5d, 0x8a};
-		static const uint8_t r15[]= {0x00,0x00, 0x00, 0x49, 0x9a};
+		static const uint8_t f1[]= {0x00};
+		static const uint8_t r1[]= {0x00};
 
 		LookupPatchPlus const patches[] = {
-			{&kextG11FB, f15, r15, arrsize(f15),    1},
+			{&kextG11FB, f1, r1, arrsize(f1),    1},
 		};
 		//PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
@@ -98,6 +101,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		if (!prod) isprod=true;
 		kexttgld=!isprod;
 		kexttglp=isprod;
+		
 		if (isprod) {
 			SolveRequestPlus solveRequests[] = {
 				{"_gPlatformInformationList", this->gPlatformInformationList},
@@ -357,21 +361,33 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 }
 
 
-//globals
-void *ccont;
-void *ccont2;
-int bk=2;
+
 
 void  Gen11::initPlatformWorkarounds(void *that)
 {
-	//PlatformWorkarounds
-	getMember<volatile uint32_t>(that, 0xc5c)=
-	FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_ENABLE_SLICE_FEATURES|*/
-	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
-	
-	//ig boot flags
-	getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
-	
+	if (kexticl)
+	{
+		//PlatformWorkarounds
+		getMember<volatile uint32_t>(that, 0xc1c)=
+	 /*FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/
+		/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|*/
+		FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/
+		FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
+		
+		//ig boot flags
+		getMember<volatile uint32_t>(that, 0xc10)=/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
+		
+	}
+	else
+	{
+		//PlatformWorkarounds
+		getMember<volatile uint32_t>(that, 0xc5c)=
+		FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_ENABLE_SLICE_FEATURES|*/
+		FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
+		
+		//ig boot flags
+		getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
+	}
 }
 uint64_t  Gen11::getOSInformation(void *that)
 {
@@ -386,29 +402,30 @@ uint64_t  Gen11::getOSInformation(void *that)
 	getMember<int32_t>(that, 0xce4)=1; //PHYA
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
-	pinfo[1].fInfoFlags=
+	int p=1;
+	pinfo[p].fInfoFlags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ALLOW_CONNECTOR_RECOVER
 	/*|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
-		pinfo[1].cameliav=0;
+		pinfo[p].cameliav=0;
 		//CamelliaTcon2=2 BanksiaTcon=3
 	
-		pinfo[1].fMobile=1;
-		pinfo[1].fPipeCount=3;
-		pinfo[1].fInfoPortCount=3;
-		pinfo[1].fInfoFramebufferCount=2;
+		pinfo[p].fMobile=1;
+		pinfo[p].fPipeCount=3;
+		pinfo[p].fInfoPortCount=3;
+		pinfo[p].fInfoFramebufferCount=2;
 
-		pinfo[1].fSliceCount=1;
-		pinfo[1].fmaxEuCount=8;
-		pinfo[1].fsubslices=8;
+		pinfo[p].fSliceCount=1;
+		pinfo[p].fmaxEuCount=8;
+		pinfo[p].fsubslices=8;
 	
-	//pinfo[1].fInfoFBCompressionMemorySize=	0xc00000;
-	//pinfo[1].fVideoTurboFreq=270000000;
-	//pinfo[1].VCLK=1000*0x438;
+	//pinfo[p].fInfoFBCompressionMemorySize=	0xc00000;
+	//pinfo[p].fVideoTurboFreq=270000000;
+	//pinfo[p].VCLK=1000*0x438;
 	
-	int p=1;
+	
 	for (int i = 0; i < 6; i++) {
 		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
 		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
@@ -433,19 +450,19 @@ uint64_t  Gen11::getOSInformation(void *that)
 	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
 	connectorArray->release();
 	
-	/*pinfo[1].connectors[0].index=0;//DDI0
-	pinfo[1].connectors[0].busId=0;
-	pinfo[1].connectors[0].pipe=0;//1 dp power 0 edp power
-	pinfo[1].connectors[0].pad=0;
-	pinfo[1].connectors[0].type=ConnectorLVDS;
-	pinfo[1].connectors[0].flags=0x1+0x8+0x10;
+	/*pinfo[p].connectors[0].index=0;//DDI0
+	pinfo[p].connectors[0].busId=0;
+	pinfo[p].connectors[0].pipe=0;//1 dp power 0 edp power
+	pinfo[p].connectors[0].pad=0;
+	pinfo[p].connectors[0].type=ConnectorLVDS;
+	pinfo[p].connectors[0].flags=0x1+0x8+0x10;
 	
-	pinfo[1].connectors[1].index=1;//DDI1
-	pinfo[1].connectors[1].busId=0;
-	pinfo[1].connectors[1].pipe=1;
-	pinfo[1].connectors[1].pad=0;
-	pinfo[1].connectors[1].type=ConnectorDummy;
-	pinfo[1].connectors[1].flags=0;
+	pinfo[p].connectors[1].index=1;//DDI1
+	pinfo[p].connectors[1].busId=0;
+	pinfo[p].connectors[1].pipe=1;
+	pinfo[p].connectors[1].pad=0;
+	pinfo[p].connectors[1].type=ConnectorDummy;
+	pinfo[p].connectors[1].flags=0;
 	
 */
 	
@@ -518,19 +535,7 @@ unsigned long Gen11::AppleIntelScalerinit(void *that,uint param_1)
 	return ret;
 }
 
-void  Gen11::initPlatformWorkarounds2(void *that)
-{
-	//PlatformWorkarounds
-	getMember<volatile uint32_t>(that, 0xc1c)=
- /*FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/
-	/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|*/
-	FB_FLAG_ALTERNATE_PWM_INCREMENT1|/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/
-	FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
-	
-	//ig boot flags
-	getMember<volatile uint32_t>(that, 0xc10)=/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
-	
-}
+
 uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
@@ -540,7 +545,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xc9c)=1;
-	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList2);
+	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x5;
 	
 	pinfo[p].flags=
@@ -620,11 +625,12 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 {
 	FunctionCast(hwGetCRTC, callback->ohwGetCRTC)(that,param_1,param_2 );
 	
+	if (bk==2){
+		NBlue::callback->parse_backlight();
+		bk=1;
+	}
+	
 	if (bk==1){
-		
-		uint32_t lf=NBlue::callback->display_ctx.panel.backlight.level*0xffff;
-		lf=lf/NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
-		
 		
 		//bklfrequency
 		getMember<uint32_t>(that, kexticl ? 0xe54 : kexttgld ? 0xe6c : 0x60)=NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
