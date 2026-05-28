@@ -35,6 +35,7 @@ bool kexticl=false;
 bool kexttgld=false;
 bool kexttglp=false;
 
+
 Gen11 *Gen11::callback = nullptr;
 
 void Gen11::init() {
@@ -58,35 +59,53 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		SolveRequestPlus solveRequests[] = {
 			{"_gPlatformInformationList", this->gPlatformInformationList},
-			
 		};
 		PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		
 		RouteRequestPlus requests[] = {
-			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",dofalse},
+			
 			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
 			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},// reg fix
-			
 			{"__ZN31AppleIntelFramebufferController14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
 			{"__ZN31AppleIntelFramebufferController15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
-			
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
 			{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 			{"__ZN31AppleIntelFramebufferController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
 			{"__ZN31AppleIntelFramebufferController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
+			{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
+			{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
+			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
+			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",dovoid},
+			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		static const uint8_t f1[]= {0x00};
-		static const uint8_t r1[]= {0x00};
+		//TRANS_CLK_SEL
+		static const uint8_t f1[]= {0x83, 0x79, 0x08, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x74, 0x04};
+		static const uint8_t r1[]= {0x83, 0x79, 0x08, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0xeb, 0x04};
+		
+		//linktrainig bad hack
+		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
+		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
+		
+		//force edp panel if pipe=1
+		static const uint8_t f6a[]= {0x49, 0x8b, 0x85, 0x40, 0x04, 0x00, 0x00, 0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
+		static const uint8_t r6a[]= {0x49, 0x8b, 0x85, 0x40, 0x04, 0x00, 0x00, 0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
+		
+		static const uint8_t f6b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x46};
+		static const uint8_t r6b[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
 
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f1, r1, arrsize(f1),    1},
+			{&kextG11FB, f25, r25, arrsize(f25),    7},
+			{&kextG11FB, f6a, r6a, arrsize(f6a),    1},
+			{&kextG11FB, f6b, r6b, arrsize(f6b),    1},
+			
 		};
-		//PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
+		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
 		DBGLOG("nblue", "Loaded AppleIntelICLLPGraphicsFramebuffer!");
 		return true;
@@ -121,12 +140,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
-			
 			{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
 			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
-			
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
+			
 			
 			
 		};
@@ -134,6 +152,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
+				
+				{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
+				{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 				{"__ZN31AppleIntelFramebufferController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
 				{"__ZN31AppleIntelFramebufferController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 				{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
@@ -148,6 +169,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
+				
+				{"__ZN24AppleIntelBaseController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
+				{"__ZN24AppleIntelBaseController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 				{"__ZN24AppleIntelBaseController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
 				{"__ZN24AppleIntelBaseController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 				{"__ZN24AppleIntelBaseController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
@@ -166,9 +190,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//force edp panel if pipe=1
 		static const uint8_t f6a[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
 		static const uint8_t r6a[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
+		
+		static const uint8_t f6b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
+		static const uint8_t r6b[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
 
 		static const uint8_t f6ap[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
 		static const uint8_t r6ap[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
+		
+		static const uint8_t f6bp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
+		static const uint8_t r6bp[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
 		
 		//ReadRegister64
 		static const uint8_t f7[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0xca, 0xf5, 0x0c, 0x00};
@@ -239,8 +269,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
-				
 				{&kextG11FBT, f6ap, r6ap, arrsize(f6ap),	1},
+				{&kextG11FBT, f6bp, r6bp, arrsize(f6bp),	1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
@@ -257,8 +287,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
-
 				{&kextG11FBT, f6a, r6a, arrsize(f6a),	1},
+				{&kextG11FBT, f6b, r6b, arrsize(f6b),	1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
@@ -284,14 +314,16 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 		 
 		 RouteRequestPlus requests[] = {
+			 
 			 {"__ZN16IntelAccelerator19PAVPCommandCallbackE22PAVPSessionCommandID_tjPjb", wrapPavpSessionCallback, this->orgPavpSessionCallback},
 			 {"__ZL27ContextStatusBufferValidateRK15IGHwCsExecList5PK28SGfxContextStatusBufferEntry.cold.2", dovoid},
-			 
+			 {"__ZN16IntelAccelerator18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount2, this->osetAsyncSliceCount2},
+			 {"__ZN16IntelAccelerator14setSliceConfigE13IGSliceConfig",setSliceConfig, this->osetSliceConfig},
 			 
 		 };
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//sku
+		//sku = 8
 		static const uint8_t f2[] = {0x41, 0xc1, 0xef, 0x1c, 0x44, 0x89, 0xbb, 0x50, 0x11, 0x00, 0x00};
 		static const uint8_t r2[] = {0xc7, 0x83, 0x50, 0x11, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x90};
 		//8 subslices
@@ -326,24 +358,38 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		 RouteRequestPlus requests[] = {
 			 
 			 {"__ZN16IntelAccelerator19PAVPCommandCallbackE22PAVPSessionCommandID_tjPjb", wrapPavpSessionCallback, this->orgPavpSessionCallback},
+			 {"__ZN16IntelAccelerator18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount2, this->osetAsyncSliceCount2},
+			 {"__ZN16IntelAccelerator14setSliceConfigE13IGSliceConfig",setSliceConfig, this->osetSliceConfig},
+			 
+			 
 		 };
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//sku bypass IntelAccelerator::getGPUInfo
+		// 8 subslices
+		static const uint8_t f2[] = {0x8b, 0x5d, 0xd0, 0xf3, 0x0f, 0xb8, 0xf3, 0x01, 0xf6, 0x41, 0x89, 0xb7, 0x58, 0x11, 0x00, 0x00};
+		static const uint8_t r2[] = {0x8b, 0x5d, 0xd0, 0x41, 0xc7, 0x87, 0x58, 0x11, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x90, 0x90};
+		
+		// 8 MaxEUPerSubSlice
+		static const uint8_t f2a[] = {0xbe, 0x08, 0x00, 0x00, 0x00, 0x29, 0xde, 0x41, 0x89, 0xb7, 0x6c, 0x11, 0x00, 0x00};
+		static const uint8_t r2a[] = {0xbe, 0x08, 0x00, 0x00, 0x00, 0x90, 0x90, 0x41, 0x89, 0xb7, 0x6c, 0x11, 0x00, 0x00};
+		
+		//sku =2  getGPUInfo
 		static const uint8_t f3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x7f, 0x15, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0x74, 0x2d};
 		static const uint8_t r3[] = {0x8b, 0x3e, 0x81, 0xff, 0xee, 0xbe, 0xaf, 0xde, 0x90, 0x90, 0x81, 0xff, 0x86, 0x80, 0x40, 0x9a, 0xeb, 0x2d};
 		
-		// 12 to 10 subslices + L3BankCount = 8
+		// 12 to 8 subslices + L3BankCount = 8
 		static const uint8_t f3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0c};
-		static const uint8_t r3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x0a};
+		static const uint8_t r3a[] = {0x83, 0xfe, 0x01, 0x75, 0x59, 0x83, 0xfa, 0x08};
 		
 		
-		//blit3d mem alloc patch
+		//blit3d mem align patch
 		static const uint8_t f5[] = {0x40, 0xd2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 		static const uint8_t r5[] = {0x00, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 		
 		
 			LookupPatchPlus const patches[] = {
+				{&kext, f2, r2, arrsize(f2),	1},
+				{&kext, f2a, r2a, arrsize(f2a),	1},
 				{&kext, f3, r3, arrsize(f3),	1},
 				{&kext, f3a, r3a, arrsize(f3a),	1},
 				{&kext, f5, r5, arrsize(f5),	1},
@@ -394,18 +440,16 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 	
-	//if (intel_display_wa(display, INTEL_DISPLAY_WA_14010480278))
-	//	NBlue::callback->intel_de_rmw( 0x46530, 0, REG_BIT(27));
-	
-	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xce4)=1; //PHYA
+	getMember<uint8_t>(that, 0x1b12)=1; //dither
+	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
 	int p=1;
 	pinfo[p].fInfoFlags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ALLOW_CONNECTOR_RECOVER
-	/*|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
+	|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
@@ -421,7 +465,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].fmaxEuCount=8;
 		pinfo[p].fsubslices=8;
 	
-	//pinfo[p].fInfoFBCompressionMemorySize=	0xc00000;
+	pinfo[p].fInfoFBCompressionMemorySize=	0xB6D000;
 	//pinfo[p].fVideoTurboFreq=270000000;
 	//pinfo[p].VCLK=1000*0x438;
 	
@@ -434,6 +478,9 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
+	
+	pinfo[p].connectors[0].pipe=1; // dp power
+	pinfo[p].connectors[0].flags=0x1+0x10;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -540,18 +587,17 @@ uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 	
-	//if (intel_display_wa(display, INTEL_DISPLAY_WA_14010480278))
-	//	NBlue::callback->intel_de_rmw( 0x46530, 0, REG_BIT(27));
-	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xc9c)=1;
+	getMember<uint8_t>(that, 0x1b36)=1; //dither
+	
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x5;
 	
 	pinfo[p].flags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
 	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
-	FB_FLAG_FRAMEBUFFER_COMPRESSION;
+	FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL;
 	
 	
 		pinfo[p].camelliaVersion=0;
@@ -566,9 +612,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].fEuCount=8;
 		pinfo[p].fSubSliceCount=8;
 	
-	//pinfo[p].fInfoFBCompressionMemorySize=	0xc00000;
 	//pinfo[p].fVideoTurboFreq=270000000;
-	//pinfo[p].VCLK=1000*0x438;
 	
 	
 	for (int i = 0; i < 6; i++) {
@@ -580,8 +624,12 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
 	
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
+	pinfo[p].currents[0].valu2=(uint64_t)&gDPVcc0_85V;
+	pinfo[p].currents[1].valu2=(uint64_t)&gDPVcc0_85V;
+	pinfo[p].currents[2].valu2=(uint64_t)&gDPVcc0_85V;
+	
+	pinfo[p].connectors[0].pipe=1; // dp power
+	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero icl
 	
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -806,3 +854,60 @@ IOReturn Gen11::wrapSetAttributeForConnection(void* framebuffer, int32_t connect
 	return kIOReturnSuccess;
 };
 
+
+
+void Gen11::updateSliceConfig(void *that, uint32_t val)
+{
+	IGSliceConfig requestedConfig;
+	requestedConfig.raw = val;
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(int(requestedConfig.getSubSliceCount()/2));
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(4);
+	
+	if (requestedConfig.getEUCount()>8) requestedConfig.setEUCount(8);
+	
+	FunctionCast(updateSliceConfig, callback->oupdateSliceConfig)( that,requestedConfig.raw);
+}
+
+void Gen11::setAsyncSliceCount(void *that, uint32_t val)
+{
+	IGSliceConfig requestedConfig;
+	requestedConfig.raw = val;
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(int(requestedConfig.getSubSliceCount()/2));
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(4);
+	
+	if (requestedConfig.getEUCount()>8) requestedConfig.setEUCount(8);
+	
+	FunctionCast(setAsyncSliceCount, callback->osetAsyncSliceCount)( that,requestedConfig.raw);
+}
+
+unsigned long  Gen11::setSliceConfig(void *that, uint32_t val)
+{
+	IGSliceConfig requestedConfig;
+	requestedConfig.raw = val;
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(int(requestedConfig.getSubSliceCount()/2));
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(4);
+	
+	if (requestedConfig.getEUCount()>8) requestedConfig.setEUCount(8);
+	
+	return FunctionCast(setSliceConfig, callback->osetSliceConfig)( that,requestedConfig.raw);
+}
+
+void Gen11::setAsyncSliceCount2(void *that, uint32_t val)
+{
+	IGSliceConfig requestedConfig;
+	requestedConfig.raw = val;
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(int(requestedConfig.getSubSliceCount()/2));
+	if (requestedConfig.getSubSliceCount()>4) requestedConfig.setSubSliceCount(4);
+	
+	if (requestedConfig.getEUCount()>8) requestedConfig.setEUCount(8);
+	
+	FunctionCast(setAsyncSliceCount2, callback->osetAsyncSliceCount2)( that,requestedConfig.raw);
+}
+
+uint64_t Gen11::hwSetPanelPower(void *that,uint param_1)
+{
+	auto ret=FunctionCast(hwSetPanelPower, callback->ohwSetPanelPower)( that,param_1);
+	IOFramebuffer *s = (IOFramebuffer*)getMember<void *>(that, 0xd18);
+	if (s) s->setProperty("AAPL,LCD-PowerState-ON", param_1==2 ? :true, false);
+	return ret;
+}
