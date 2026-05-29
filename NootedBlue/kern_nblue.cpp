@@ -1291,15 +1291,15 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			u32 flags=0;
 			if (is_dp) flags=0x1+0x400;
-			if (is_edp) flags=0x1+0x8+0x10;
+			if (is_edp) flags=0x0+0x8+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
-			display->bconnectors[port].index=port;
-			display->bconnectors[port].busId=child->ddc_pin;
-			display->bconnectors[port].pipe=i;
-			display->bconnectors[port].pad=0;
-			display->bconnectors[port].type=type;
-			display->bconnectors[port].flags=flags;
+			display->bconnectors[i].index=i;
+			display->bconnectors[i].busId=child->ddc_pin;
+			display->bconnectors[i].pipe=port;
+			display->bconnectors[i].pad=0;
+			display->bconnectors[i].type=type;
+			display->bconnectors[i].flags=flags;
 		}
 
 		NBlue::callback->iGPU->setProperty("Bios_Connectors", connectorArray);

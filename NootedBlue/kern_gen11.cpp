@@ -78,31 +78,33 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",dovoid},
+			{"__ZN31AppleIntelFramebufferController13probeBootPipeEPbPN17AppleIntelPortHAL3DDIE",dozero},
+			
 			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//TRANS_CLK_SEL
-		static const uint8_t f1[]= {0x83, 0x79, 0x08, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x74, 0x04};
-		static const uint8_t r1[]= {0x83, 0x79, 0x08, 0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0xeb, 0x04};
-		
-		//linktrainig bad hack
+		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
+		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 		
-		//force edp panel if pipe=1
-		static const uint8_t f6a[]= {0x49, 0x8b, 0x85, 0x40, 0x04, 0x00, 0x00, 0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
-		static const uint8_t r6a[]= {0x49, 0x8b, 0x85, 0x40, 0x04, 0x00, 0x00, 0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
+		//clock
+		static const uint8_t f6c[]= {0xc1, 0xe0, 0x1d, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
+		static const uint8_t r6c[]= {0xc1, 0xe0, 0x1c, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
 		
-		static const uint8_t f6b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x46};
-		static const uint8_t r6b[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-
+		static const uint8_t f6c2[]= {0xb8, 0x00, 0x00, 0x00, 0x00, 0x74, 0x04};
+		static const uint8_t r6c2[]= {0xb8, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90};
+		
+		//force frame 0
+		static const uint8_t f6d[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
+		static const uint8_t r6d[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
+		
 		LookupPatchPlus const patches[] = {
-			{&kextG11FB, f1, r1, arrsize(f1),    1},
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
-			{&kextG11FB, f6a, r6a, arrsize(f6a),    1},
-			{&kextG11FB, f6b, r6b, arrsize(f6b),    1},
+			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
+			{&kextG11FB, f6c2, r6c2, arrsize(f6c2),    1},
+			{&kextG11FB, f6d, r6d, arrsize(f6d),    1},
 			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
@@ -187,18 +189,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 	
 
-		//force edp panel if pipe=1
-		static const uint8_t f6a[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
-		static const uint8_t r6a[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
-		
-		static const uint8_t f6b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
-		static const uint8_t r6b[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-
-		static const uint8_t f6ap[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
-		static const uint8_t r6ap[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
-		
-		static const uint8_t f6bp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
-		static const uint8_t r6bp[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
 		
 		//ReadRegister64
 		static const uint8_t f7[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0xca, 0xf5, 0x0c, 0x00};
@@ -260,17 +250,16 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f24d[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
 		static const uint8_t r24d[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
 		
-		//linktrainig bad hack
+		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
+		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 
 
 
 		
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
-				{&kextG11FBT, f6ap, r6ap, arrsize(f6ap),	1},
-				{&kextG11FBT, f6bp, r6bp, arrsize(f6bp),	1},
+
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
@@ -287,8 +276,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
-				{&kextG11FBT, f6a, r6a, arrsize(f6a),	1},
-				{&kextG11FBT, f6b, r6b, arrsize(f6b),	1},
+
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
@@ -421,7 +409,7 @@ void  Gen11::initPlatformWorkarounds(void *that)
 		FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING;
 		
 		//ig boot flags
-		getMember<volatile uint32_t>(that, 0xc10)=/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
+		//getMember<volatile uint32_t>(that, 0xc10)=/*FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
 		
 	}
 	else
@@ -432,9 +420,91 @@ void  Gen11::initPlatformWorkarounds(void *that)
 		FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
 		
 		//ig boot flags
-		getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
+		//getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
 	}
 }
+
+uint64_t  Gen11::getOSInformation2(void *that)
+{
+	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
+	
+	//fPCIConfigRevisionID
+	getMember<int32_t>(that, 0xc9c)=1;
+	getMember<uint8_t>(that, 0x1b36)=1; //dither
+	
+	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
+	int p=0x5;
+	
+	pinfo[p].flags=
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
+	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
+	FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_AVOID_FAST_LINK_TRAINING;
+	
+	
+		pinfo[p].camelliaVersion=0;
+		//CamelliaTcon2=2 BanksiaTcon=3
+	
+		pinfo[p].fMobile=1;
+		pinfo[p].fPipeCount=3;
+		pinfo[p].fPortCount=3;
+		pinfo[p].fInfoFramebufferCount=2;
+
+		pinfo[p].fSliceCount=1;
+		pinfo[p].fEuCount=8;
+		pinfo[p].fSubSliceCount=8;
+	
+	//pinfo[p].fVideoTurboFreq=270000000;
+	
+	
+	for (int i = 0; i < 6; i++) {
+		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
+		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
+		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
+		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
+		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
+		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
+	}
+	
+	pinfo[p].currents[0].valu2=(uint64_t)&gDPVcc0_85V;
+	pinfo[p].currents[1].valu2=(uint64_t)&gDPVcc0_85V;
+	pinfo[p].currents[2].valu2=(uint64_t)&gDPVcc0_85V;
+
+	
+	OSArray *connectorArray = OSArray::withCapacity(6);
+	for (int i = 0; i < 6; i++) {
+		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
+		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[p].connectors[i].index, 32));
+		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[p].connectors[i].busId, 32));
+		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[p].connectors[i].pipe, 32));
+		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[p].connectors[i].pad, 32));
+		connectorDict->setObject("type", OSNumber::withNumber(pinfo[p].connectors[i].type, 32));
+		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[p].connectors[i].flags, 32));
+		connectorArray->setObject(connectorDict);
+		connectorDict->release();
+	}
+	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
+	connectorArray->release();
+	
+	/*pinfo[p].connectors[0].index=0;
+	pinfo[p].connectors[0].busId=0;
+	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].pad=0;
+	pinfo[p].connectors[0].type=ConnectorLVDS;
+	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
+	
+	pinfo[p].connectors[1].index=1;
+	pinfo[p].connectors[1].busId=0;
+	pinfo[p].connectors[1].pipe=0;
+	pinfo[p].connectors[1].pad=0;
+	pinfo[p].connectors[1].type=ConnectorDummy;
+	pinfo[p].connectors[1].flags=0;
+	
+*/
+	
+	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
+	return ret;
+}
+
 uint64_t  Gen11::getOSInformation(void *that)
 {
 	
@@ -449,7 +519,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	int p=1;
 	pinfo[p].fInfoFlags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ALLOW_CONNECTOR_RECOVER
-	|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|FB_FLAG_AVOID_FAST_LINK_TRAINING
+	|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED*/|FB_FLAG_AVOID_FAST_LINK_TRAINING
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
@@ -467,7 +537,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	pinfo[p].fInfoFBCompressionMemorySize=	0xB6D000;
 	//pinfo[p].fVideoTurboFreq=270000000;
-	//pinfo[p].VCLK=1000*0x438;
 	
 	
 	for (int i = 0; i < 6; i++) {
@@ -479,8 +548,8 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
 	
-	pinfo[p].connectors[0].pipe=1; // dp power
-	pinfo[p].connectors[0].flags=0x1+0x10;
+	//pinfo[p].connectors[0].pipe=1; // dp power
+	//pinfo[p].connectors[0].flags=0x1+0x8+0x10;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -583,89 +652,7 @@ unsigned long Gen11::AppleIntelScalerinit(void *that,uint param_1)
 }
 
 
-uint64_t  Gen11::getOSInformation2(void *that)
-{
-	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
-	
-	//fPCIConfigRevisionID
-	getMember<int32_t>(that, 0xc9c)=1;
-	getMember<uint8_t>(that, 0x1b36)=1; //dither
-	
-	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
-	int p=0x5;
-	
-	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
-	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
-	FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL;
-	
-	
-		pinfo[p].camelliaVersion=0;
-		//CamelliaTcon2=2 BanksiaTcon=3
-	
-		pinfo[p].fMobile=1;
-		pinfo[p].fPipeCount=3;
-		pinfo[p].fPortCount=3;
-		pinfo[p].fInfoFramebufferCount=2;
 
-		pinfo[p].fSliceCount=1;
-		pinfo[p].fEuCount=8;
-		pinfo[p].fSubSliceCount=8;
-	
-	//pinfo[p].fVideoTurboFreq=270000000;
-	
-	
-	for (int i = 0; i < 6; i++) {
-		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
-		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
-		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
-		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
-		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
-		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
-	}
-	
-	pinfo[p].currents[0].valu2=(uint64_t)&gDPVcc0_85V;
-	pinfo[p].currents[1].valu2=(uint64_t)&gDPVcc0_85V;
-	pinfo[p].currents[2].valu2=(uint64_t)&gDPVcc0_85V;
-	
-	pinfo[p].connectors[0].pipe=1; // dp power
-	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero icl
-	
-	
-	OSArray *connectorArray = OSArray::withCapacity(6);
-	for (int i = 0; i < 6; i++) {
-		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
-		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[p].connectors[i].index, 32));
-		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[p].connectors[i].busId, 32));
-		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[p].connectors[i].pipe, 32));
-		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[p].connectors[i].pad, 32));
-		connectorDict->setObject("type", OSNumber::withNumber(pinfo[p].connectors[i].type, 32));
-		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[p].connectors[i].flags, 32));
-		connectorArray->setObject(connectorDict);
-		connectorDict->release();
-	}
-	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
-	connectorArray->release();
-	
-	/*pinfo[p].connectors[0].index=0;
-	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].pad=0;
-	pinfo[p].connectors[0].type=ConnectorLVDS;
-	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
-	
-	pinfo[p].connectors[1].index=1;
-	pinfo[p].connectors[1].busId=0;
-	pinfo[p].connectors[1].pipe=0;
-	pinfo[p].connectors[1].pad=0;
-	pinfo[p].connectors[1].type=ConnectorDummy;
-	pinfo[p].connectors[1].flags=0;
-	
-*/
-	
-	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
-	return ret;
-}
 
 
 
