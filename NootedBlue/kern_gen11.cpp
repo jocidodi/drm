@@ -34,7 +34,7 @@ int bk=2;
 bool kexticl=false;
 bool kexttgld=false;
 bool kexttglp=false;
-
+IOFramebuffer *frame0;
 
 Gen11 *Gen11::callback = nullptr;
 
@@ -59,6 +59,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		SolveRequestPlus solveRequests[] = {
 			{"_gPlatformInformationList", this->gPlatformInformationList},
+			{"__ZN31AppleIntelFramebufferController14disableCDClockEv", this->orgDisableCDClock},
+			{"__ZN31AppleIntelFramebufferController19setCDClockFrequencyEy", this->orgSetCDClockFrequency},
 		};
 		PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		
@@ -76,11 +78,10 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 			{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 			{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
-			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
-			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",dovoid},
-			{"__ZN31AppleIntelFramebufferController13probeBootPipeEPbPN17AppleIntelPortHAL3DDIE",dozero},
-			
-			
+			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",setPanelPowerState, this->osetPanelPowerState},
+			//{"__ZN15AppleIntelPlane22setupPlanarSurfaceDBUFEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
+			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
@@ -89,7 +90,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
 		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 		
-		//clock
+		//TRANS_CLK_SE
 		static const uint8_t f6c[]= {0xc1, 0xe0, 0x1d, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
 		static const uint8_t r6c[]= {0xc1, 0xe0, 0x1c, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
 		
@@ -97,14 +98,16 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r6c2[]= {0xb8, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90};
 		
 		//force frame 0
-		static const uint8_t f6d[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
-		static const uint8_t r6d[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
+		static const uint8_t f7[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
+		static const uint8_t r7[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
+		
+
 		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
 			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
 			{&kextG11FB, f6c2, r6c2, arrsize(f6c2),    1},
-			{&kextG11FB, f6d, r6d, arrsize(f6d),    1},
+			{&kextG11FB, f7, r7, arrsize(f7),    1},
 			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
@@ -126,6 +129,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		if (isprod) {
 			SolveRequestPlus solveRequests[] = {
 				{"_gPlatformInformationList", this->gPlatformInformationList},
+				{"__ZN31AppleIntelFramebufferController14disableCDClockEv", this->orgDisableCDClock},
+				{"__ZN31AppleIntelFramebufferController19setCDClockFrequencyEy", this->orgSetCDClockFrequency},
 			};
 			PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		}
@@ -133,13 +138,14 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		{
 			SolveRequestPlus solveRequests[] = {
 				{"_gPlatformInformationList", this->gPlatformInformationList},
+				{"__ZN24AppleIntelBaseController14disableCDClockEv", this->orgDisableCDClock},
+				{"__ZN24AppleIntelBaseController19setCDClockFrequencyEy", this->orgSetCDClockFrequency},
 			};
 			PANIC_COND(!SolveRequestPlus::solveAll(patcher, index, solveRequests, address, size), "nblue",	"Failed to resolve symbols");
 		}
 
 		
 		RouteRequestPlus requests[] = {
-			
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
 			{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
@@ -154,7 +160,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
-				
+				{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 				{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 				{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 				{"__ZN31AppleIntelFramebufferController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
@@ -164,14 +170,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 				{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation, this->ogetOSInformation},
-
+				
+				
 			};
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route p symbols");
 			
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
-				
+				{"__ZN24AppleIntelBaseController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 				{"__ZN24AppleIntelBaseController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 				{"__ZN24AppleIntelBaseController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 				{"__ZN24AppleIntelBaseController9hwGetCRTCEP21AppleIntelFramebufferP21AppleIntelDisplayPath",hwGetCRTC, this->ohwGetCRTC},
@@ -188,7 +195,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		
 	
+		//TRANS_CLK_SE
+		static const uint8_t f6c[]= {0x83, 0x79, 0x08, 0x00, 0x74, 0x6c};
+		static const uint8_t r6c[]= {0x83, 0x79, 0x08, 0x00, 0x90, 0x90};
 
+		static const uint8_t f6cp[]= {0x41, 0x8b, 0x49, 0x08, 0x85, 0xc9, 0x74, 0x3f};
+		static const uint8_t r6cp[]= {0x41, 0x8b, 0x49, 0x08, 0x85, 0xc9, 0x90, 0x90};
 		
 		//ReadRegister64
 		static const uint8_t f7[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0xca, 0xf5, 0x0c, 0x00};
@@ -259,7 +271,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
-
+				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
@@ -276,7 +288,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
-
+				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
@@ -432,13 +444,13 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	getMember<int32_t>(that, 0xc9c)=1;
 	getMember<uint8_t>(that, 0x1b36)=1; //dither
 	
-	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
+		struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x5;
 	
 	pinfo[p].flags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_ALLOW_CONNECTOR_RECOVER|/*FB_FLAG_ENABLE_DITHERING|*/
 	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|
-	FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_AVOID_FAST_LINK_TRAINING;
+	/*FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_AVOID_FAST_LINK_TRAINING;
 	
 	
 		pinfo[p].camelliaVersion=0;
@@ -518,8 +530,8 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	int p=1;
 	pinfo[p].fInfoFlags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ALLOW_CONNECTOR_RECOVER
-	|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED*/|FB_FLAG_AVOID_FAST_LINK_TRAINING
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE/*|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/
+	/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED*/|FB_FLAG_AVOID_FAST_LINK_TRAINING|FB_FLAG_ALLOW_CONNECTOR_RECOVER
 	/*|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
 	
@@ -535,7 +547,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].fmaxEuCount=8;
 		pinfo[p].fsubslices=8;
 	
-	pinfo[p].fInfoFBCompressionMemorySize=	0xB6D000;
+	//pinfo[p].fInfoFBCompressionMemorySize=	0xB6D000;
 	//pinfo[p].fVideoTurboFreq=270000000;
 	
 	
@@ -547,9 +559,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
-	
-	//pinfo[p].connectors[0].pipe=1; // dp power
-	//pinfo[p].connectors[0].flags=0x1+0x8+0x10;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -630,10 +639,12 @@ void Gen11::FBMemMgr_Init(void *that)
 
 uint32_t Gen11::AppleIntelFramebufferinit(void *frame,void *cont,uint param_2)
 {
-	getMember<void *>(frame, 0x4a40) = ccont;
-	getMember<void *>(frame, 0xc40) = ccont;
+	if (!kexticl) {
+		getMember<void *>(frame, 0x4a40) = ccont;
+		getMember<void *>(frame, 0xc40) = ccont;
+	}
 	auto ret=FunctionCast(AppleIntelFramebufferinit, callback->oAppleIntelFramebufferinit)(frame,cont,param_2 );
-	
+	if (param_2==0) frame0=(IOFramebuffer *)frame;
 	return ret;
 }
 
@@ -891,10 +902,56 @@ void Gen11::setAsyncSliceCount2(void *that, uint32_t val)
 	FunctionCast(setAsyncSliceCount2, callback->osetAsyncSliceCount2)( that,requestedConfig.raw);
 }
 
-uint64_t Gen11::hwSetPanelPower(void *that,uint param_1)
+
+
+void  Gen11::setPanelPowerState(void *that ,bool param_1)
 {
-	auto ret=FunctionCast(hwSetPanelPower, callback->ohwSetPanelPower)( that,param_1);
-	IOFramebuffer *s = (IOFramebuffer*)getMember<void *>(that, 0xd18);
-	if (s) s->setProperty("AAPL,LCD-PowerState-ON", param_1==2 ? :true, false);
-	return ret;
+	frame0->setProperty("AAPL,LCD-PowerState-ON", param_1);
+}
+
+
+void Gen11::sanitizeCDClockFrequency(void *that) {
+
+	//auto referenceFrequency = callback->wrapReadRegister32(that, SKL_DSSM) & ICL_DSSM_CDCLK_PLL_REFCLK_MASK;
+	auto referenceFrequency =NBlue::callback->readReg32(ICL_REG_DSSM)>> 29;
+	//auto referenceFrequency = callback->wrapReadRegister32(that, ICL_REG_DSSM) >> 29;
+	uint32_t newCdclkFrequency = 0;
+	uint32_t newPLLFrequency = 0;
+	switch (referenceFrequency) {
+		case ICL_REF_CLOCK_FREQ_19_2:
+			newCdclkFrequency = ICL_CDCLK_FREQ_652_8;
+			newPLLFrequency = ICL_CDCLK_PLL_FREQ_REF_19_2;
+			break;
+			
+		case ICL_REF_CLOCK_FREQ_24_0:
+			newCdclkFrequency = ICL_CDCLK_FREQ_648_0;
+			newPLLFrequency = ICL_CDCLK_PLL_FREQ_REF_24_0;
+			break;
+			
+		case ICL_REF_CLOCK_FREQ_38_4:
+			newCdclkFrequency = ICL_CDCLK_FREQ_652_8;
+			newPLLFrequency = ICL_CDCLK_PLL_FREQ_REF_38_4;
+			break;
+			
+		default:
+			return;
+	}
+	
+	callback->orgDisableCDClock(that);
+	
+	callback->orgSetCDClockFrequency(that, newPLLFrequency);
+	NBlue::callback->readReg32( ICL_REG_CDCLK_CTL) & 0x7FF;
+}
+
+uint32_t Gen11::wrapProbeCDClockFrequency(void *that) {
+
+	//auto cdclk = NBlue::callback->readReg32(ICL_REG_CDCLK_CTL) & BXT_CDCLK_CD2X_DIV_SEL_MASK;
+	auto cdclk =NBlue::callback->readReg32(ICL_REG_CDCLK_CTL) & CDCLK_FREQ_DECIMAL_MASK;
+	
+	if (cdclk < ICL_CDCLK_DEC_FREQ_THRESHOLD) {
+		sanitizeCDClockFrequency(that);
+	}
+	
+	auto retVal = callback->orgProbeCDClockFrequency(that);
+	return retVal;
 }
