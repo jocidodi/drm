@@ -777,33 +777,6 @@ static HookCase *callback;
 #define EXPORT __attribute__((visibility("default")))
 
 
-class AppleInteeBaseController {
-    friend class HookCase;
-    friend class AppleInteePortHAL;
-    EXPORT uint32_t ReadRegister32(unsigned long regOffset);
-    EXPORT void WriteRegister32(unsigned long regOffset, uint32_t regValue);
-
-    EXPORT uint64_t ReadRegister64(volatile void *rmmio, unsigned long regOffset);
-    EXPORT void WriteRegister64(volatile void *rmmio, unsigned long regOffset,
-                                uint64_t regValue);
-
-    EXPORT uint64_t getPMTNow();
-
-    EXPORT IOReturn hwSetupDSBMemory();
-};
-
-class AppleInteePortHAL {
-    friend class HookCase;
-    friend class AppleInteeBaseController;
-    EXPORT uint32_t probePortMode();
-};
-
-
-class AppleInteeDisplayPath {
-    friend class HookCase;
-    EXPORT static uint32_t DSBEngineBusyStatus[DSB_MAX];
-};
-
 class AppleIntelBaseController {
     friend class HookCase;
     friend class AppleIntelPortHAL;

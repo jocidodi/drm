@@ -1291,7 +1291,7 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			u32 flags=0;
 			if (is_dp) flags=0x1+0x400;
-			if (is_edp) flags=0x0+0x8+0x10;
+			if (is_edp) flags=0x1+0x8+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
 			display->bconnectors[i].index=i;
