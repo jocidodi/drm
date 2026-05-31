@@ -111,6 +111,22 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0x80};
 		static const uint8_t r8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0xC0};
 		
+		//ver fix edp register adresses
+		static const uint8_t f24b[]= {0xbe, 0x40, 0xf8, 0x06, 0x00};
+		static const uint8_t r24b[]= {0xbe, 0x40, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f24c[]= {0x48, 0x81, 0xfb, 0x00, 0xf8, 0x06, 0x00};
+		static const uint8_t r24c[]= {0x48, 0x81, 0xfb, 0x00, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f24d[]= {0xbe, 0x60, 0xf8, 0x06, 0x00};
+		static const uint8_t r24d[]= {0xbe, 0x60, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f24e[]= {0xbe, 0x00, 0xf8, 0x06, 0x00};
+		static const uint8_t r24e[]= {0xbe, 0x00, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f24f[]= {0xba, 0x38, 0x48, 0x06, 0x00};
+		static const uint8_t r24f[]= {0xba, 0x18, 0x08, 0x06, 0x00};
+		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
 			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
@@ -119,6 +135,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
+			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
+			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
+			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
+			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
+			{&kextG11FB, f24f, r24f, arrsize(f24f),    1},
+			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
