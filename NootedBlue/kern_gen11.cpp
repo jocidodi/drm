@@ -79,7 +79,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 			{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
 			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",setPanelPowerState, this->osetPanelPowerState},
-			{"__ZN15AppleIntelPlane22setupPlanarSurfaceDBUFEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 			
@@ -111,21 +110,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0x80};
 		static const uint8_t r8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0xC0};
 		
-		//ver fix edp register adresses
-		static const uint8_t f24b[]= {0xbe, 0x40, 0xf8, 0x06, 0x00};
-		static const uint8_t r24b[]= {0xbe, 0x40, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f24c[]= {0x48, 0x81, 0xfb, 0x00, 0xf8, 0x06, 0x00};
-		static const uint8_t r24c[]= {0x48, 0x81, 0xfb, 0x00, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f24d[]= {0xbe, 0x60, 0xf8, 0x06, 0x00};
-		static const uint8_t r24d[]= {0xbe, 0x60, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f24e[]= {0xbe, 0x00, 0xf8, 0x06, 0x00};
-		static const uint8_t r24e[]= {0xbe, 0x00, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f24f[]= {0xba, 0x38, 0x48, 0x06, 0x00};
-		static const uint8_t r24f[]= {0xba, 0x18, 0x08, 0x06, 0x00};
+		//bootp
+		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
+		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
@@ -135,12 +122,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
-			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
-			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
-			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
-			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
-			{&kextG11FB, f24f, r24f, arrsize(f24f),    1},
-			
+			{&kextG11FB, f9, r9, arrsize(f9),    1},
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
@@ -226,7 +208,10 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 		}
 		
-	
+		//dbuff
+		static const uint8_t f5[]= {0x74, 0x5a, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+		static const uint8_t r5[]= {0x90, 0x90, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+		
 		//TRANS_CLK_SE
 		static const uint8_t f6c[]= {0x83, 0x79, 0x08, 0x00, 0x74, 0x6c};
 		static const uint8_t r6c[]= {0x83, 0x79, 0x08, 0x00, 0x90, 0x90};
@@ -310,6 +295,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
+				
+				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				//{&kextG11FBT, f8p, r8p, arrsize(f8p),	1},
@@ -328,6 +315,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
+				
+				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				//{&kextG11FBT, f8, r8, arrsize(f8),	1},
@@ -495,7 +484,6 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	
 		pinfo[p].camelliaVersion=0;
-		//CamelliaTcon2=2 BanksiaTcon=3
 	
 		pinfo[p].fMobile=1;
 		pinfo[p].fPipeCount=3;
@@ -521,6 +509,9 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	pinfo[p].currents[0].valu2=(uint64_t)&gDPVcc0_85V;
 	pinfo[p].currents[1].valu2=(uint64_t)&gDPVcc0_85V;
 	pinfo[p].currents[2].valu2=(uint64_t)&gDPVcc0_85V;
+	
+	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].flags=0x1+0x10;
 
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
