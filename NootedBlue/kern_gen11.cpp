@@ -99,9 +99,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//force frame 0
 		static const uint8_t f7[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
 		static const uint8_t r7[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
-		//cache
-		static const uint8_t f7b[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0x32, 0x01, 0x00, 0x00};
-		static const uint8_t r7b[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
 		
 		//TRANS_
 		static const uint8_t f8[]= {0xff, 0xc9, 0x83, 0xf9, 0x04, 0x77, 0x1c, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0xff, 0xe1, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x10};
@@ -110,7 +107,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0x80};
 		static const uint8_t r8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0xC0};
 		
-		//bootp
+		//builtin
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
@@ -119,7 +116,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
 			{&kextG11FB, f6c2, r6c2, arrsize(f6c2),    1},
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
-			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
@@ -234,6 +230,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f8p[]= {0x09, 0xca, 0xb9, 0xff, 0xff, 0xfc, 0x7f};
 		static const uint8_t r8p[]= {0x09, 0xca, 0xb9, 0xff, 0xfe, 0xfc, 0x7f};
 		
+		//builtin
+		static const uint8_t f9[]= {0xf6, 0x40, 0x14, 0x08, 0x75, 0x0d};
+		static const uint8_t r9[]= {0xf6, 0x40, 0x14, 0x08, 0xeb, 0x0d};
+		
+		static const uint8_t f9p[]= {0xf6, 0x40, 0x14, 0x08, 0x75, 0x0a};
+		static const uint8_t r9p[]= {0xf6, 0x40, 0x14, 0x08, 0xeb, 0x0a};
+		
 		//probeportmode hookcase fix
 		static const uint8_t f13[]= {0xff, 0x91, 0x90, 0x01, 0x00, 0x00, 0x83, 0xf8, 0x02, 0x0f, 0x84, 0xec, 0x00, 0x00, 0x00};
 		static const uint8_t r13[]= {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
@@ -266,26 +269,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r20p[]= {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x48, 0x85, 0xdb, 0x74, 0x17};
 
 		
-		//production ver fix register adresses if pipe=0
-		static const uint8_t f24bp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
-		static const uint8_t r24bp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
-		
-		static const uint8_t f24cp[]= {0x00, 0x4c, 0x89, 0xea, 0x75, 0x12};
-		static const uint8_t r24cp[]= {0x00, 0x4c, 0x89, 0xea, 0xeb, 0x12};
-		
-		static const uint8_t f24dp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
-		static const uint8_t r24dp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
-		
-		//debug ver fix register adresses if pipe=0
-		static const uint8_t f24b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
-		static const uint8_t r24b[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
-		
-		static const uint8_t f24c[]= {0x48, 0x8b, 0x55, 0xd0, 0x75, 0x13};
-		static const uint8_t r24c[]= {0x48, 0x8b, 0x55, 0xd0, 0xeb, 0x13};
-		
-		static const uint8_t f24d[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
-		static const uint8_t r24d[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
-		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
 		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
@@ -300,13 +283,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				//{&kextG11FBT, f8p, r8p, arrsize(f8p),	1},
+				{&kextG11FBT, f9p, r9p, arrsize(f9p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
 				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20p, r20p, arrsize(f20p),	1},
-				{&kextG11FBT, f24bp, r24bp, arrsize(f24bp),	14},
-				{&kextG11FBT, f24cp, r24cp, arrsize(f24cp),	1},
-				{&kextG11FBT, f24dp, r24dp, arrsize(f24dp),	4},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
 			};
@@ -320,14 +301,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				//{&kextG11FBT, f8, r8, arrsize(f8),	1},
+				{&kextG11FBT, f9, r9, arrsize(f9),	1},
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
 				{&kextG11FBT, f15, r15, arrsize(f15),	1},
 				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20, r20, arrsize(f20),	1},
-				{&kextG11FBT, f24b, r24b, arrsize(f24b),	11},
-				{&kextG11FBT, f24c, r24c, arrsize(f24c),	1},
-				{&kextG11FBT, f24d, r24d, arrsize(f24d),	6},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
 			};
@@ -591,6 +570,9 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
+	
+	pinfo[p].connectors[0].pipe=1;
+	pinfo[p].connectors[0].flags=0x1+0x10;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
