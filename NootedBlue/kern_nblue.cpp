@@ -67,7 +67,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
         this->iGPU = OSDynamicCast(IOPCIDevice, devInfo->videoBuiltin);
         PANIC_COND(!this->iGPU, "nblue", "videoBuiltin is not IOPCIDevice");
 		
-		//WIOKit::renameDevice(this->iGPU, "IGPU");
+		WIOKit::renameDevice(this->iGPU, "IGPU");
 		WIOKit::awaitPublishing(this->iGPU);
 		
 		//this->iGPU->enablePCIPowerManagement(kPCIPMCSPowerStateD0);
