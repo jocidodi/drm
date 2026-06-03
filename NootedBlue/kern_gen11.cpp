@@ -988,7 +988,7 @@ void Gen11::hwInitializeCState(void *that)
 	
 	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
 	
-	const uint8_t *fw_data = getFWByName("tgl_dmc_ver2_12_bin").data;
+	const uint8_t *fw_data = getFWByName("tgl_dmc_ver2_12.bin").data;
 	const struct intel_css_header *css_header = (const struct intel_css_header *)fw_data;
 	uint32_t css_header_size = css_header->header_len * 4;
 	uint32_t package_header_offset = css_header_size;
