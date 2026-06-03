@@ -7,6 +7,102 @@
 #include "kern_patcherplus.hpp"
 #include <Headers/kern_util.hpp>
 
+#define _PIPEDMC_CONTROL_A		0x45250
+#define _PIPEDMC_CONTROL_B		0x45254
+#define  PIPEDMC_ENABLE			REG_BIT(0)
+#define  DC_STATE_DEBUG                  (0x45520)
+#define  DC_STATE_DEBUG_MASK_CORES	(1 << 0)
+#define  DC_STATE_DEBUG_MASK_MEMORY_UP	(1 << 1)
+
+#define DMC_DEFAULT_FW_OFFSET		0xFFFFFFFF
+#define PACKAGE_MAX_FW_INFO_ENTRIES	20
+#define PACKAGE_V2_MAX_FW_INFO_ENTRIES	32
+#define DMC_V1_MAX_MMIO_COUNT		8
+#define DMC_V3_MAX_MMIO_COUNT		20
+#define DMC_V1_MMIO_START_RANGE		0x80000
+
+struct PACKED intel_css_header
+{
+	uint32_t module_type;
+	uint32_t header_len;
+	uint32_t header_ver;
+	uint32_t module_id;
+	uint32_t module_vendor;
+	uint32_t date;
+	uint32_t size;
+	uint32_t key_size;
+	uint32_t modulus_size;
+	uint32_t exponent_size;
+	uint32_t reserved1[0xc];
+	uint32_t version;
+	uint32_t reserved2[0x8];
+	uint32_t kernel_header_info;
+};
+
+struct PACKED intel_package_header
+{
+	uint8_t header_len;
+	uint8_t header_ver;
+	uint8_t reserved[0xa];
+	uint32_t num_entries;
+};
+
+struct PACKED intel_fw_info
+{
+	uint8_t reserved1;
+	uint8_t dmc_id;
+	char stepping;
+	char substepping;
+	uint32_t offset;
+	uint32_t reserved2;
+};
+
+
+struct PACKED intel_dmc_header_base {
+	uint32_t signature;
+
+	uint8_t header_len;
+
+	uint8_t header_ver;
+
+	uint16_t dmcc_ver;
+
+	uint32_t project;
+
+	uint32_t fw_size;
+
+	uint32_t fw_version;
+};
+
+struct PACKED intel_dmc_header_v1 {
+	struct intel_dmc_header_base base;
+
+	uint32_t mmio_count;
+
+	uint32_t mmioaddr[DMC_V1_MAX_MMIO_COUNT];
+
+	uint32_t mmiodata[DMC_V1_MAX_MMIO_COUNT];
+
+	char dfile[32];
+
+	uint32_t reserved1[2];
+};
+
+struct PACKED intel_dmc_header_v3 {
+	struct intel_dmc_header_base base;
+
+	uint32_t start_mmioaddr;
+
+	uint32_t reserved[9];
+
+	char dfile[32];
+
+	uint32_t mmio_count;
+
+	uint32_t mmioaddr[DMC_V3_MAX_MMIO_COUNT];
+
+	uint32_t mmiodata[DMC_V3_MAX_MMIO_COUNT];
+};
 
 static constexpr uint32_t ICL_REG_CDCLK_CTL = 0x46000;
 
@@ -543,6 +639,14 @@ private:
 	
 	static void sanitizeCDClockFrequency(void *that);
 	static uint32_t wrapProbeCDClockFrequency(void *that);
+	
+	static void hwInitializeCState(void *that);
+	mach_vm_address_t ohwInitializeCState {};
+	
+	static void hwConfigureCustomAUX(void *that,bool param_1);
+	mach_vm_address_t ohwConfigureCustomAUX {};
+	
+
 	
 public:
 

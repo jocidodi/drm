@@ -1,6 +1,7 @@
 
 #include "kern_gen11.hpp"
 #include <Headers/kern_api.hpp>
+#include "Firmware.hpp"
 
 static const char *pathG11FB = "/System/Library/Extensions/AppleIntelICLLPGraphicsFramebuffer.kext/Contents/MacOS/"
                                "AppleIntelICLLPGraphicsFramebuffer";
@@ -81,6 +82,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",setPanelPowerState, this->osetPanelPowerState},
 			{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
+			
+			{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
+			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
+			
+
+			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
@@ -180,7 +187,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 				{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation, this->ogetOSInformation},
-				
+				{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
+				{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 				
 			};
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route p symbols");
@@ -198,6 +206,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{"__ZN24AppleIntelBaseController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
 				{"__ZN24AppleIntelBaseController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 				{"__ZN24AppleIntelBaseController16getOSInformationEv",getOSInformation, this->ogetOSInformation},
+				{"__ZN24AppleIntelBaseController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
+				{"__ZN24AppleIntelBaseController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 				
 			};
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route d symbols");
@@ -969,3 +979,67 @@ uint32_t Gen11::wrapProbeCDClockFrequency(void *that) {
 	auto retVal = callback->orgProbeCDClockFrequency(that);
 	return retVal;
 }
+
+
+void Gen11::hwInitializeCState(void *that)
+{
+	//FunctionCast(hwInitializeCState, callback->ohwInitializeCState)(that);
+	//return;
+	
+	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
+	
+	const uint8_t *fw_data = getFWByName("tgl_dmc_ver2_12_bin").data;
+	const struct intel_css_header *css_header = (const struct intel_css_header *)fw_data;
+	uint32_t css_header_size = css_header->header_len * 4;
+	uint32_t package_header_offset = css_header_size;
+	const struct intel_package_header *package_header =
+			(const struct intel_package_header *)&fw_data[package_header_offset];
+	uint32_t package_header_size = package_header->header_len * 4;
+	const struct intel_fw_info *fw_info =
+			(const struct intel_fw_info *)((uint8_t *)package_header + sizeof(*package_header));
+	uint32_t num_entries = package_header->num_entries;
+	uint8_t target_dmc_id = 1; //DMC_FW_PIPEA
+	const struct intel_fw_info *selected_entry = NULL;
+
+	for (uint32_t i = 0; i < num_entries; i++) {
+			if (fw_info[i].dmc_id == target_dmc_id) {
+				selected_entry = &fw_info[i];
+				break;
+			}
+	}
+	if (!selected_entry) {
+			return;
+	}
+
+	uint32_t dmc_headers_base_offset = package_header_offset + package_header_size;
+	uint32_t dmc_header_offset = dmc_headers_base_offset + (selected_entry->offset * 4);
+	const struct intel_dmc_header_base *dmc_header=(const struct intel_dmc_header_base *)&fw_data[dmc_header_offset];
+	uint32_t header_len_bytes = dmc_header->header_len * 4;
+	const struct intel_dmc_header_v3 *v3 =(const struct intel_dmc_header_v3 *)dmc_header;
+	const uint8_t *payload = (const uint8_t *)dmc_header + header_len_bytes;
+	const uint32_t *payload_dwords = (const uint32_t *)payload;
+	uint32_t dmc_size_in_dwords = dmc_header->fw_size;
+	uint32_t register_addr = v3->start_mmioaddr;
+	
+	for (uint32_t i = 0; i < dmc_size_in_dwords; i++) {
+		NBlue::callback->writeReg32(register_addr,payload_dwords[i]);
+		register_addr += 4;
+	}
+
+	for (uint32_t i = 0; i < v3->mmio_count; i++) {
+			uint32_t addr = v3->mmioaddr[i];
+			uint32_t data = v3->mmiodata[i];
+			NBlue::callback->writeReg32(addr, data);
+	}
+
+	NBlue::callback->writeReg32(DC_STATE_DEBUG, DC_STATE_DEBUG_MASK_MEMORY_UP);
+	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
+	
+	hwConfigureCustomAUX(that,true);
+}
+
+void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
+{
+	FunctionCast(hwConfigureCustomAUX, callback->ohwConfigureCustomAUX)(that,param_1 );
+}
+
