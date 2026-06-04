@@ -107,6 +107,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f7[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
 		static const uint8_t r7[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
 		
+		static const uint8_t f7b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
+		static const uint8_t r7b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
+		
+		static const uint8_t f7c[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x46};
+		static const uint8_t r7c[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
+		
 		//TRANS_
 		static const uint8_t f8[]= {0xff, 0xc9, 0x83, 0xf9, 0x04, 0x77, 0x1c, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0xff, 0xe1, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x10};
 		static const uint8_t r8[]= {0x90, 0x90, 0x83, 0xf9, 0x04, 0x90, 0x90, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0x90, 0x90, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x08};
@@ -123,6 +129,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
 			{&kextG11FB, f6c2, r6c2, arrsize(f6c2),    1},
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
+			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
+			{&kextG11FB, f7c, r7c, arrsize(f7c),    1},
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
@@ -218,6 +226,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f5[]= {0x74, 0x5a, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 		static const uint8_t r5[]= {0x90, 0x90, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 		
+		//edp
+		static const uint8_t f6a[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
+		static const uint8_t r6a[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
+
+		static const uint8_t f6ap[]= {0x74, 0x2a, 0x83, 0xf8, 0x01, 0x74, 0x43, 0x85, 0xc0, 0x75, 0x60};
+		static const uint8_t r6ap[]= {0x90, 0x90, 0x83, 0xf8, 0x01, 0x90, 0x90, 0x85, 0xc0, 0x90, 0x90};
+		
 		//TRANS_CLK_SE
 		static const uint8_t f6c[]= {0x83, 0x79, 0x08, 0x00, 0x74, 0x6c};
 		static const uint8_t r6c[]= {0x83, 0x79, 0x08, 0x00, 0x90, 0x90};
@@ -233,6 +248,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f7p[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0x84, 0x40, 0x08, 0x00};
 		static const uint8_t r7p[]= {0x83, 0xc0, 0xf8, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0x84, 0x40, 0x08, 0x00};
 
+		
+		
 		//TRANS_
 		static const uint8_t f8[]= {0x81, 0xe1, 0x00, 0x00, 0x03, 0x00, 0xb8, 0xff, 0xff, 0xfc, 0x7f};
 		static const uint8_t r8[]= {0x81, 0xe1, 0x00, 0x00, 0x03, 0x00, 0xb8, 0xff, 0xfe, 0xfc, 0x7f};
@@ -290,6 +307,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			LookupPatchPlus const patchesp[] = {// tgl production kext
 				
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
+				{&kextG11FBT, f6ap, r6ap, arrsize(f6ap),    1},
 				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				//{&kextG11FBT, f8p, r8p, arrsize(f8p),	1},
@@ -308,6 +326,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			LookupPatchPlus const patches[] = {// tgl debug kext
 				
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
+				{&kextG11FBT, f6a, r6a, arrsize(f6a),    1},
 				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				//{&kextG11FBT, f8, r8, arrsize(f8),	1},
@@ -461,14 +480,14 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xc9c)=1;
-	getMember<uint8_t>(that, 0x1b36)=1; //dither
+	getMember<uint8_t>(that, 0x1b36)=1; //dither off
 	
 		struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x5;
 	
 	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|/*FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|*/
-	/*FB_FLAG_LIMIT_4K_SOURCE_SIZE|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|*/
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|/*FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	FB_FLAG_LIMIT_4K_SOURCE_SIZE|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|*/
 	/*FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_AVOID_FAST_LINK_TRAINING;
 	
 	
@@ -494,10 +513,6 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
-	
-	pinfo[p].currents[0].valu2=(uint64_t)&gDPVcc0_85V;
-	pinfo[p].currents[1].valu2=(uint64_t)&gDPVcc0_85V;
-	pinfo[p].currents[2].valu2=(uint64_t)&gDPVcc0_85V;
 	
 	pinfo[p].connectors[0].pipe=1;
 	pinfo[p].connectors[0].flags=0x1+0x10;
@@ -545,7 +560,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	//fPCIConfigRevisionID
 	getMember<int32_t>(that, 0xce4)=1; //PHYA
-	getMember<uint8_t>(that, 0x1b12)=1; //dither
+	getMember<uint8_t>(that, 0x1b12)=1; //dither off
 	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
