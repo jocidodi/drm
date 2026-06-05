@@ -36,6 +36,8 @@ bool kexticl=false;
 bool kexttgld=false;
 bool kexttglp=false;
 IOFramebuffer *frame0;
+int hwu=4;
+
 
 Gen11 *Gen11::callback = nullptr;
 
@@ -69,7 +71,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
-			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",dozero},// reg fix
+			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",getTranscoderOffset, this->ogetTranscoderOffset},
 			{"__ZN31AppleIntelFramebufferController14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
 			{"__ZN31AppleIntelFramebufferController15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
@@ -82,13 +84,16 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",setPanelPowerState, this->osetPanelPowerState},
 			{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
-			
 			{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
 			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
-			
+			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
+			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 
 			
+			{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			
+			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
@@ -113,6 +118,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f7c[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x46};
 		static const uint8_t r7c[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
 		
+		static const uint8_t f7d[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x37};
+		static const uint8_t r7d[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
+		
 		//TRANS_
 		static const uint8_t f8[]= {0xff, 0xc9, 0x83, 0xf9, 0x04, 0x77, 0x1c, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0xff, 0xe1, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x10};
 		static const uint8_t r8[]= {0x90, 0x90, 0x83, 0xf9, 0x04, 0x90, 0x90, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0x90, 0x90, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x08};
@@ -124,6 +132,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
+
+		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
 			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
@@ -131,9 +141,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
 			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
 			{&kextG11FB, f7c, r7c, arrsize(f7c),    1},
+			{&kextG11FB, f7d, r7d, arrsize(f7d),    1},
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
+			
+			
+			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
 
@@ -864,6 +878,8 @@ IOReturn Gen11::getAttributeForConnection(void* framebuffer, int32_t connectInde
 {
 	const auto ret = FunctionCast(getAttributeForConnection, callback->ogetAttributeForConnection)(
 																										   framebuffer, connectIndex, attribute, value);
+	
+	
 	if (attribute != 'bklt') { return ret; }
 	
 	unsigned long v=NBlue::callback->display_ctx.panel.backlight.level;
@@ -876,11 +892,33 @@ IOReturn Gen11::getAttributeForConnection(void* framebuffer, int32_t connectInde
 	return kIOReturnSuccess;
 };
 
+ 
+uint32_t Gen11::fsetAttribute(void *that,uint param_1,unsigned long param_2)
+{
+	if (param_1 == 'wsrv' && param_2!=0 && hwu==4)
+	{
+		fsetAttribute(that, 'powr',1);
+		IOSleep(2);
+		fsetAttribute(that, 'powr',2);
+	}
+	auto ret=FunctionCast(fsetAttribute,callback->ofsetAttribute)(that, param_1, param_2);
+	
+	if (param_1 == 'wsrv' && param_2!=0 && hwu==4)
+	{
+		hwu=3;
+	}
+	return ret;
+};
+
+
+
 IOReturn Gen11::wrapSetAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
 											  unsigned long value)
 {
 	const auto ret = FunctionCast(wrapSetAttributeForConnection, callback->owrapSetAttributeForConnection)(
 																										   framebuffer, connectIndex, attribute, value);
+	
+	
 	if (attribute != 'bklt') { return ret; }
 	
 	
@@ -1058,3 +1096,55 @@ void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
 	FunctionCast(hwConfigureCustomAUX, callback->ohwConfigureCustomAUX)(that,param_1 );
 }
 
+unsigned long Gen11::hwRegsNeedUpdate
+		  (void *that,void *param_1,
+		   void *param_2,void *param_3,void *param_4,
+		   void *param_5)
+{
+	
+	auto ret=FunctionCast(hwRegsNeedUpdate, callback->ohwRegsNeedUpdate)(that,param_1,param_2,param_3,param_4,param_5 );
+
+	/*if (hwu==1){
+		hwu=0;
+		return 1;
+	}*/
+	return ret;
+}
+
+int Gen11::getTranscoderOffset(void *that,void *param_1,uint param_2)
+{
+	FunctionCast(getTranscoderOffset, callback->ogetTranscoderOffset)(that,param_1,param_2 );
+	return 0;
+}
+
+unsigned long  Gen11::AppleIntelPortHALinit(void *that,void *param_1)
+{
+	auto ret=FunctionCast(AppleIntelPortHALinit, callback->oAppleIntelPortHALinit)(that,param_1 );
+	getMember<uint32_t>(that, 0x584)=0x60540;
+	getMember<uint32_t>(that, 0x588)=0x60544;
+	return ret;
+}
+
+unsigned long Gen11::hwSetMode(void *that,void *param_1,void *param_2,int param_3,void *param_4)
+{
+	auto ret=FunctionCast(hwSetMode, callback->ohwSetMode)(that,param_1,param_2,param_3,param_4 );
+	
+	if (hwu==2){
+		hwu=1;
+		return FunctionCast(hwSetMode, callback->ohwSetMode)(that,param_1,param_2,param_3,param_4 );
+	}
+	
+	return ret;
+}
+
+
+uint64_t Gen11::aframeBufferNotificationcallback(void *param_1,void *param_2,void *param_3,int param_4,void *param_5)
+{
+	auto ret=FunctionCast(aframeBufferNotificationcallback, callback->oaframeBufferNotificationcallback)(param_1,param_2,param_3,param_4,param_5 );
+
+	if (param_4 == 2)
+	{
+		if (hwu==3) hwu=2;
+	}
+	return ret;
+}

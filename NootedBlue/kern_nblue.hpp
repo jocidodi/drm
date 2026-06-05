@@ -81,8 +81,15 @@ class NBlue {
 };
 
 
-//! Neutralise access to AGDP configuration by board identifier.
-static const UInt8 kAGDPBoardIDKeyOriginal[] = "board-id";
-static const UInt8 kAGDPBoardIDKeyPatched[] =  "applehax";
+// Change frame-buffer count >= 2 check to >= 1.
+static const UInt8 kAGDPFBCountCheckOriginal[] = {0x02, 0x00, 0x00, 0x83, 0xF8, 0x02};
+static const UInt8 kAGDPFBCountCheckPatched[] = {0x02, 0x00, 0x00, 0x83, 0xF8, 0x01};
 
+// Ditto
+static const UInt8 kAGDPFBCountCheckOriginal13[] = {0x41, 0x83, 0xBE, 0x14, 0x02, 0x00, 0x00, 0x02};
+static const UInt8 kAGDPFBCountCheckPatched13[] = {0x41, 0x83, 0xBE, 0x14, 0x02, 0x00, 0x00, 0x01};
+
+// Neutralise access to AGDP configuration by board identifier.
+static const UInt8 kAGDPBoardIDKeyOriginal[] = "board-id";
+static const UInt8 kAGDPBoardIDKeyPatched[] = "applehax";
 

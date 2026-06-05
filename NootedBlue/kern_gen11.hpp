@@ -641,7 +641,26 @@ private:
 	static void hwConfigureCustomAUX(void *that,bool param_1);
 	mach_vm_address_t ohwConfigureCustomAUX {};
 	
+	static unsigned long hwRegsNeedUpdate
+			  (void *that,void *param_1,
+			   void *param_2,void *param_3,void *param_4,
+			   void *param_5);
+	mach_vm_address_t ohwRegsNeedUpdate {};
+	
+	static uint32_t fsetAttribute(void *that,uint param_1,unsigned long param_2);
+	mach_vm_address_t ofsetAttribute {};
+	
+	static int getTranscoderOffset(void *that,void *param_1,uint param_2);
+	mach_vm_address_t ogetTranscoderOffset {};
+	
+	static unsigned long  AppleIntelPortHALinit(void *that,void *param_1);
+	mach_vm_address_t oAppleIntelPortHALinit {};
 
+	static unsigned long hwSetMode(void *that,void *param_1,void *param_2,int param_3,void *param_4);
+	mach_vm_address_t ohwSetMode {};
+	
+	static uint64_t	aframeBufferNotificationcallback(void *param_1,void *param_2,void *param_3,int param_4,void *param_5);
+	mach_vm_address_t oaframeBufferNotificationcallback {};
 	
 public:
 

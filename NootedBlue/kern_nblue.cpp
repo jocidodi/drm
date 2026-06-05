@@ -275,8 +275,18 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 
 		return true;
 	}  else if (kextAGDP.loadIndex == index) {
-		const LookupPatchPlus patch {&kextAGDP, kAGDPBoardIDKeyOriginal, kAGDPBoardIDKeyPatched, 1};
-		SYSLOG_COND(!patch.apply(patcher, address, size), "NBlue", "Failed to apply AGDP board-id patch");
+		
+		const LookupPatchPlus boardIdPatch {&kextAGDP, kAGDPBoardIDKeyOriginal, kAGDPBoardIDKeyPatched, 1};
+		SYSLOG_COND(!boardIdPatch.apply(patcher, address, size), "AGDP", "Failed to apply AGDP board-id patch");
+
+		if (getKernelVersion() == KernelVersion::Ventura) {
+			const LookupPatchPlus patch {&kextAGDP, kAGDPFBCountCheckOriginal13, kAGDPFBCountCheckPatched13, 1};
+			SYSLOG_COND(!patch.apply(patcher, address, size), "AGDP", "Failed to apply AGDP FB count check patch");
+		} else {
+			const LookupPatchPlus patch {&kextAGDP, kAGDPFBCountCheckOriginal, kAGDPFBCountCheckPatched, 1};
+			SYSLOG_COND(!patch.apply(patcher, address, size), "AGDP", "Failed to apply AGDP FB count check patch");
+		}
+		
 		
 		return true;
 	}  else if (kextBacklight.loadIndex == index) {
