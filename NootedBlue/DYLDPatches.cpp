@@ -61,15 +61,6 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		vfs_context_rele(ctxt);
 		if (!err) { ok=1; sle=1;}
 		
-		if (!ok) {
-			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
-				const DYLDPatch patches[] = {
-					{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
-				};
-				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-			}
-		}
-		
 		if (ok) {
 			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
 				const DYLDPatch patches[] = {
@@ -79,19 +70,6 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
 			}
 		}
-		
-		/*if ((!strncmp(path, ICLGraphicsMTLDriver, arrsize(ICLGraphicsMTLDriver)) )) {
-			const DYLDPatch patches[] = {
-				{kICLGraphicsMTLDrivero, kICLGraphicsMTLDriverp, "kICLGraphicsMTLDriverp"},
-			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-		}
-		if ((!strncmp(path, ICLGraphicsGLDriver, arrsize(ICLGraphicsGLDriver)) )) {
-			const DYLDPatch patches[] = {
-				{kICLGraphicsMTLDrivero, kICLGraphicsMTLDriverp, "kICLGraphicsGLDriverp"},
-			};
-			DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
-		}*/
 		
 		return;
 	}
