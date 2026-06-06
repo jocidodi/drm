@@ -86,14 +86,14 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 			{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
 			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
+			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
+			
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
-			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
-
-			
 			{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
-			
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},
+			
+			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
@@ -191,7 +191,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
-			
+			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
 			
 		};
@@ -235,6 +235,18 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route d symbols");
 			
 		}
+		
+		//regs
+		static const uint8_t f4[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
+		static const uint8_t r4[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
+		
+		static const uint8_t f4a[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0xe9, 0x06, 0x00, 0x00};
+		static const uint8_t r4a[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x85, 0xe9, 0x06, 0x00, 0x00};
+		
+		static const uint8_t f4ap[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x50};
+		static const uint8_t r4ap[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
+		
+		
 		
 		//dbuff
 		static const uint8_t f5[]= {0x74, 0x5a, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -320,6 +332,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
 				
+				{&kextG11FBT, f4, r4, arrsize(f4),	1},
+				{&kextG11FBT, f4ap, r4ap, arrsize(f4ap),	1},
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6ap, r6ap, arrsize(f6ap),    1},
 				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
@@ -339,6 +353,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
 				
+				{&kextG11FBT, f4, r4, arrsize(f4),	1},
+				{&kextG11FBT, f4a, r4a, arrsize(f4a),	1},
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6a, r6a, arrsize(f6a),    1},
 				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
@@ -547,22 +563,6 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
 	connectorArray->release();
 	
-	/*pinfo[p].connectors[0].index=0;
-	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].pad=0;
-	pinfo[p].connectors[0].type=ConnectorLVDS;
-	pinfo[p].connectors[0].flags=0x1+0x10; //force display to frame zero
-	
-	pinfo[p].connectors[1].index=1;
-	pinfo[p].connectors[1].busId=0;
-	pinfo[p].connectors[1].pipe=0;
-	pinfo[p].connectors[1].pad=0;
-	pinfo[p].connectors[1].type=ConnectorDummy;
-	pinfo[p].connectors[1].flags=0;
-	
-*/
-	
 	auto ret=FunctionCast(getOSInformation2, callback->ogetOSInformation2)(that );
 	return ret;
 }
@@ -627,22 +627,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 	}
 	NBlue::callback->iGPU->setProperty("Driver_Connectors", connectorArray);
 	connectorArray->release();
-	
-	/*pinfo[p].connectors[0].index=0;//DDI0
-	pinfo[p].connectors[0].busId=0;
-	pinfo[p].connectors[0].pipe=0;//1 dp power 0 edp power
-	pinfo[p].connectors[0].pad=0;
-	pinfo[p].connectors[0].type=ConnectorLVDS;
-	pinfo[p].connectors[0].flags=0x1+0x8+0x10;
-	
-	pinfo[p].connectors[1].index=1;//DDI1
-	pinfo[p].connectors[1].busId=0;
-	pinfo[p].connectors[1].pipe=1;
-	pinfo[p].connectors[1].pad=0;
-	pinfo[p].connectors[1].type=ConnectorDummy;
-	pinfo[p].connectors[1].flags=0;
-	
-*/
 	
 	auto ret=FunctionCast(getOSInformation, callback->ogetOSInformation)(that );
 	return ret;
@@ -900,6 +884,7 @@ uint32_t Gen11::fsetAttribute(void *that,uint param_1,unsigned long param_2)
 		fsetAttribute(that, 'powr',1);
 		IOSleep(2);
 		fsetAttribute(that, 'powr',2);
+		IOSleep(2);
 	}
 	auto ret=FunctionCast(fsetAttribute,callback->ofsetAttribute)(that, param_1, param_2);
 	
@@ -1104,10 +1089,10 @@ unsigned long Gen11::hwRegsNeedUpdate
 	
 	auto ret=FunctionCast(hwRegsNeedUpdate, callback->ohwRegsNeedUpdate)(that,param_1,param_2,param_3,param_4,param_5 );
 
-	/*if (hwu==1){
+	if (hwu==1){
 		hwu=0;
 		return 1;
-	}*/
+	}
 	return ret;
 }
 
