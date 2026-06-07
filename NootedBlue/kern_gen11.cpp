@@ -1073,30 +1073,6 @@ uint64_t Gen11::aframeBufferNotificationcallback(void *param_1,void *param_2,voi
 }
 
 
-static bool fw_info_matches_stepping(const struct intel_fw_info *fw_info,
-									  const char current_stepping,
-									  const char current_substepping)
-{
-	if (current_stepping == fw_info->stepping &&
-		current_substepping == fw_info->substepping)
-		return true;
-
-	if (fw_info->substepping == '*' &&
-		current_stepping == fw_info->stepping)
-		return true;
-
-	if (current_stepping == '*' &&
-		current_substepping == fw_info->substepping)
-		return true;
-
-	if (fw_info->stepping == '*' &&
-		fw_info->substepping == '*')
-		return true;
-
-	return false;
-}
-
-
 static bool dmc_mmio_addr_sanity_check(const uint32_t *mmioaddr,
 										uint32_t mmio_count,
 										int header_ver,
@@ -1278,6 +1254,7 @@ static bool parse_dmc_fw_header(const uint8_t *dmc_fw_start,
 
 	info->mmio_count = mmio_count;
 	for (i = 0; i < mmio_count; i++) {
+		//fixup_dmc_evt()
 		info->mmioaddr[i] = mmioaddr[i];
 		info->mmiodata[i] = mmiodata[i];
 	}
@@ -1291,7 +1268,7 @@ static bool parse_dmc_fw_header(const uint8_t *dmc_fw_start,
 		return false;
 	}
 
-	if (payload_size > 0x20000) {  // DMC_MAX_FW_SIZE
+	if (payload_size > 0x20000) {  // DISPLAY_VER13_DMC_MAX_FW_SIZE
 		return false;
 	}
 
