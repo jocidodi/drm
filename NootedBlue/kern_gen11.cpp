@@ -1365,7 +1365,11 @@ void Gen11::hwInitializeCState(void *that)
 	
 	//panic("xxx");
 
-	NBlue::callback->writeReg32(DC_STATE_DEBUG, DC_STATE_DEBUG_MASK_MEMORY_UP);
+	NBlue::callback->intel_de_rmw( DC_STATE_DEBUG, 0,
+			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
+	NBlue::callback->readReg32(DC_STATE_DEBUG);
+	
+	//intel_dmc_enable_pipe
 	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
 	hwConfigureCustomAUX(that, true);
