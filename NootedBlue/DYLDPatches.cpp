@@ -61,11 +61,29 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		vfs_context_rele(ctxt);
 		if (!err) { ok=1; sle=1;}
 		
+		//icl
+		if (!ok) {
+			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
+				const DYLDPatch patches[] = {
+					{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
+					{klibMTLIGCCompilerPluginOriginal4, klibMTLIGCCompilerPluginPatched4, "klibMTLIGCCompilerPluginOriginal4"},
+					{klibMTLIGCCompilerPluginOriginal5, klibMTLIGCCompilerPluginPatched5, "klibMTLIGCCompilerPluginOriginal5"},
+					{klibMTLIGCCompilerPluginOriginal6b, klibMTLIGCCompilerPluginPatched6b, "klibMTLIGCCompilerPluginOriginal6b"},
+					{klibMTLIGCCompilerPluginOriginal7, klibMTLIGCCompilerPluginPatched7, "klibMTLIGCCompilerPluginOriginal7"},
+				};
+				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
+			}
+		}
+		
 		if (ok) {
 			if ((!strncmp(path, libMTLIGCCompilerPluginPath, arrsize(libMTLIGCCompilerPluginPath)) )) {
 				const DYLDPatch patches[] = {
 					{klibMTLIGCCompilerPluginOriginal, klibMTLIGCCompilerPluginPatched, "klibMTLIGCCompilerPluginOriginal"},
 					{klibMTLIGCCompilerPluginOriginal2, sle ? klibMTLIGCCompilerPluginPatched2:klibMTLIGCCompilerPluginPatched3, "klibMTLIGCCompilerPluginOriginal2"},
+					{klibMTLIGCCompilerPluginOriginal4, klibMTLIGCCompilerPluginPatched4, "klibMTLIGCCompilerPluginOriginal4"},
+					{klibMTLIGCCompilerPluginOriginal5, klibMTLIGCCompilerPluginPatched5, "klibMTLIGCCompilerPluginOriginal5"},
+					{klibMTLIGCCompilerPluginOriginal6, klibMTLIGCCompilerPluginPatched6, "klibMTLIGCCompilerPluginOriginal6"},
+					{klibMTLIGCCompilerPluginOriginal7, klibMTLIGCCompilerPluginPatched7, "klibMTLIGCCompilerPluginOriginal7"},
 				};
 				DYLDPatch::applyAll(patches, const_cast<void *>(data), PAGE_SIZE);
 			}
