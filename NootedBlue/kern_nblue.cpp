@@ -1301,7 +1301,7 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			u32 flags=0;
 			if (is_dp) flags=0x1+0x400;
-			if (is_edp) flags=0x1+0x8+0x10;
+			if (is_edp) flags=0x1+0x0+0x10;// not builtin
 			if (is_hdmi) flags=0x1+0x200;
 			
 			display->bconnectors[i].index=i;
@@ -1310,6 +1310,8 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			display->bconnectors[i].pad=0;
 			display->bconnectors[i].type=type;
 			display->bconnectors[i].flags=flags;
+			
+			if (i==0) display->bconnectors[i].pipe=1; //hack
 		}
 
 		NBlue::callback->iGPU->setProperty("Bios_Connectors", connectorArray);

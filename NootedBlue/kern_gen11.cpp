@@ -544,10 +544,6 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
 	
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].flags=0x1+0x10;
-
-	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
 		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
@@ -609,9 +605,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
 		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
 	}
-	
-	pinfo[p].connectors[0].pipe=1;
-	pinfo[p].connectors[0].flags=0x1+0x10;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
