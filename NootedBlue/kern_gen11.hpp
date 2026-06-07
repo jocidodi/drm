@@ -7,6 +7,7 @@
 #include "kern_patcherplus.hpp"
 #include <Headers/kern_util.hpp>
 
+
 #define _PIPEDMC_CONTROL_A		0x45250
 #define _PIPEDMC_CONTROL_B		0x45254
 #define  PIPEDMC_ENABLE			REG_BIT(0)
@@ -14,15 +15,27 @@
 #define  DC_STATE_DEBUG_MASK_CORES	(1 << 0)
 #define  DC_STATE_DEBUG_MASK_MEMORY_UP	(1 << 1)
 
-#define DMC_DEFAULT_FW_OFFSET		0xFFFFFFFF
-#define PACKAGE_MAX_FW_INFO_ENTRIES	20
-#define PACKAGE_V2_MAX_FW_INFO_ENTRIES	32
-#define DMC_V1_MAX_MMIO_COUNT		8
-#define DMC_V3_MAX_MMIO_COUNT		20
-#define DMC_V1_MMIO_START_RANGE		0x80000
+#define DMC_V1_MAX_MMIO_COUNT       8
+#define DMC_V3_MAX_MMIO_COUNT       20
+#define DMC_V1_MMIO_START_RANGE     0x80000
+#define DMC_MMIO_START_RANGE        0x80000
+#define DMC_MMIO_END_RANGE          0x8FFFF
 
-struct PACKED intel_css_header
-{
+#define TGL_MAIN_MMIO_START         0x80000
+#define TGL_MAIN_MMIO_END           0x8FFFF
+#define TGL_PIPE_MMIO_START(dmc_id) 0x80000
+#define TGL_PIPE_MMIO_END(dmc_id)   0x8FFFF
+#define ADLP_PIPE_MMIO_START        0x80000
+#define ADLP_PIPE_MMIO_END          0x8FFFF
+
+#define PACKAGE_MAX_FW_INFO_ENTRIES   20
+#define PACKAGE_V2_MAX_FW_INFO_ENTRIES 32
+
+// ============================================================================
+// STRUCTURES
+// ============================================================================
+
+struct intel_css_header {
 	uint32_t module_type;
 	uint32_t header_len;
 	uint32_t header_ver;
@@ -33,75 +46,65 @@ struct PACKED intel_css_header
 	uint32_t key_size;
 	uint32_t modulus_size;
 	uint32_t exponent_size;
-	uint32_t reserved1[0xc];
+	uint32_t reserved1[12];
 	uint32_t version;
-	uint32_t reserved2[0x8];
+	uint32_t reserved2[8];
 	uint32_t kernel_header_info;
-};
+} __attribute__((packed));
 
-struct PACKED intel_package_header
-{
-	uint8_t header_len;
-	uint8_t header_ver;
-	uint8_t reserved[0xa];
+struct intel_package_header {
+	uint8_t  header_len;
+	uint8_t  header_ver;
+	uint8_t  reserved[10];
 	uint32_t num_entries;
-};
+} __attribute__((packed));
 
-struct PACKED intel_fw_info
-{
-	uint8_t reserved1;
-	uint8_t dmc_id;
-	char stepping;
-	char substepping;
+struct intel_fw_info {
+	uint8_t  reserved1;
+	uint8_t  dmc_id;
+	char     stepping;
+	char     substepping;
 	uint32_t offset;
 	uint32_t reserved2;
-};
+} __attribute__((packed));
 
-
-struct PACKED intel_dmc_header_base {
+struct intel_dmc_header_base {
 	uint32_t signature;
-
-	uint8_t header_len;
-
-	uint8_t header_ver;
-
+	uint8_t  header_len;
+	uint8_t  header_ver;
 	uint16_t dmcc_ver;
-
 	uint32_t project;
-
 	uint32_t fw_size;
-
 	uint32_t fw_version;
-};
+} __attribute__((packed));
 
-struct PACKED intel_dmc_header_v1 {
+struct intel_dmc_header_v1 {
 	struct intel_dmc_header_base base;
-
 	uint32_t mmio_count;
-
 	uint32_t mmioaddr[DMC_V1_MAX_MMIO_COUNT];
-
 	uint32_t mmiodata[DMC_V1_MAX_MMIO_COUNT];
-
 	char dfile[32];
-
 	uint32_t reserved1[2];
-};
+} __attribute__((packed));
 
-struct PACKED intel_dmc_header_v3 {
+struct intel_dmc_header_v3 {
 	struct intel_dmc_header_base base;
-
 	uint32_t start_mmioaddr;
-
 	uint32_t reserved[9];
-
 	char dfile[32];
-
 	uint32_t mmio_count;
-
 	uint32_t mmioaddr[DMC_V3_MAX_MMIO_COUNT];
-
 	uint32_t mmiodata[DMC_V3_MAX_MMIO_COUNT];
+} __attribute__((packed));
+
+struct dmc_fw_info {
+	uint32_t mmio_count;
+	uint32_t mmioaddr[20];
+	uint32_t mmiodata[20];
+	uint32_t start_mmioaddr;
+	uint32_t dmc_fw_size;
+	const uint32_t *payload;
+	bool present;
 };
 
 static constexpr uint32_t ICL_REG_CDCLK_CTL = 0x46000;

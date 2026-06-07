@@ -1012,62 +1012,7 @@ uint32_t Gen11::wrapProbeCDClockFrequency(void *that) {
 }
 
 
-void Gen11::hwInitializeCState(void *that)
-{
-	//FunctionCast(hwInitializeCState, callback->ohwInitializeCState)(that);
-	//return;
-	
-	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
-	
-	const uint8_t *fw_data = getFWByName("tgl_dmc_ver2_12.bin").data;
-	const struct intel_css_header *css_header = (const struct intel_css_header *)fw_data;
-	uint32_t css_header_size = css_header->header_len * 4;
-	uint32_t package_header_offset = css_header_size;
-	const struct intel_package_header *package_header =
-			(const struct intel_package_header *)&fw_data[package_header_offset];
-	uint32_t package_header_size = package_header->header_len * 4;
-	const struct intel_fw_info *fw_info =
-			(const struct intel_fw_info *)((uint8_t *)package_header + sizeof(*package_header));
-	uint32_t num_entries = package_header->num_entries;
-	uint8_t target_dmc_id = 1; //DMC_FW_PIPEA
-	const struct intel_fw_info *selected_entry = NULL;
 
-	for (uint32_t i = 0; i < num_entries; i++) {
-			if (fw_info[i].dmc_id == target_dmc_id) {
-				selected_entry = &fw_info[i];
-				break;
-			}
-	}
-	if (!selected_entry) {
-			return;
-	}
-
-	uint32_t dmc_headers_base_offset = package_header_offset + package_header_size;
-	uint32_t dmc_header_offset = dmc_headers_base_offset + (selected_entry->offset * 4);
-	const struct intel_dmc_header_base *dmc_header=(const struct intel_dmc_header_base *)&fw_data[dmc_header_offset];
-	uint32_t header_len_bytes = dmc_header->header_len * 4;
-	const struct intel_dmc_header_v3 *v3 =(const struct intel_dmc_header_v3 *)dmc_header;
-	const uint8_t *payload = (const uint8_t *)dmc_header + header_len_bytes;
-	const uint32_t *payload_dwords = (const uint32_t *)payload;
-	uint32_t dmc_size_in_dwords = dmc_header->fw_size;
-	uint32_t register_addr = v3->start_mmioaddr;
-	
-	for (uint32_t i = 0; i < dmc_size_in_dwords; i++) {
-		NBlue::callback->writeReg32(register_addr,payload_dwords[i]);
-		register_addr += 4;
-	}
-
-	for (uint32_t i = 0; i < v3->mmio_count; i++) {
-			uint32_t addr = v3->mmioaddr[i];
-			uint32_t data = v3->mmiodata[i];
-			NBlue::callback->writeReg32(addr, data);
-	}
-
-	NBlue::callback->writeReg32(DC_STATE_DEBUG, DC_STATE_DEBUG_MASK_MEMORY_UP);
-	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
-	
-	hwConfigureCustomAUX(that,true);
-}
 
 void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
 {
@@ -1125,4 +1070,327 @@ uint64_t Gen11::aframeBufferNotificationcallback(void *param_1,void *param_2,voi
 		if (hwu==3) hwu=2;
 	}
 	return ret;
+}
+
+
+static bool fw_info_matches_stepping(const struct intel_fw_info *fw_info,
+									  const char current_stepping,
+									  const char current_substepping)
+{
+	if (current_stepping == fw_info->stepping &&
+		current_substepping == fw_info->substepping)
+		return true;
+
+	if (fw_info->substepping == '*' &&
+		current_stepping == fw_info->stepping)
+		return true;
+
+	if (current_stepping == '*' &&
+		current_substepping == fw_info->substepping)
+		return true;
+
+	if (fw_info->stepping == '*' &&
+		fw_info->substepping == '*')
+		return true;
+
+	return false;
+}
+
+
+static bool dmc_mmio_addr_sanity_check(const uint32_t *mmioaddr,
+										uint32_t mmio_count,
+										int header_ver,
+										uint8_t dmc_id)
+{
+	uint32_t start_range, end_range;
+	int i;
+
+	if (header_ver == 1) {
+		start_range = DMC_MMIO_START_RANGE;
+		end_range = DMC_MMIO_END_RANGE;
+	} else if (dmc_id == 0) { // DMC_FW_MAIN
+		start_range = TGL_MAIN_MMIO_START;
+		end_range = TGL_MAIN_MMIO_END;
+	} else if (DISPLAY_VER(&NBlue::callback->display_ctx) >= 13) {
+		start_range = ADLP_PIPE_MMIO_START;
+		end_range = ADLP_PIPE_MMIO_END;
+	} else if (DISPLAY_VER(&NBlue::callback->display_ctx) >= 12) {
+		start_range = TGL_PIPE_MMIO_START(dmc_id);
+		end_range = TGL_PIPE_MMIO_END(dmc_id);
+	}
+
+	for (i = 0; i < mmio_count; i++) {
+		if (mmioaddr[i] < start_range || mmioaddr[i] > end_range) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+static bool parse_dmc_fw_css(const uint8_t *fw_data,
+							  size_t fw_size,
+							  struct intel_css_header **css_header_out,
+							  size_t *remaining_out)
+{
+	struct intel_css_header *css_header;
+	size_t css_size;
+
+	if (fw_size < sizeof(struct intel_css_header)) {
+		return false;
+	}
+
+	css_header = (struct intel_css_header *)fw_data;
+	css_size = css_header->header_len * 4;
+
+	if (css_size != sizeof(struct intel_css_header)) {
+		return false;
+	}
+
+	if (fw_size < css_size) {
+		return false;
+	}
+
+	*css_header_out = css_header;
+	*remaining_out = fw_size - css_size;
+	return true;
+}
+
+
+static bool parse_dmc_fw_package(const uint8_t *fw_data,
+								  size_t fw_size,
+								  struct intel_package_header **pkg_header_out,
+								  struct intel_fw_info **fw_info_out,
+								  size_t *remaining_out)
+{
+	struct intel_package_header *pkg_header;
+	struct intel_fw_info *fw_info;
+	size_t pkg_size;
+	uint32_t max_entries;
+
+	if (fw_size < sizeof(struct intel_package_header)) {
+		return false;
+	}
+
+	pkg_header = (struct intel_package_header *)fw_data;
+
+	if (pkg_header->header_ver == 1) {
+		max_entries = PACKAGE_MAX_FW_INFO_ENTRIES;
+	} else if (pkg_header->header_ver == 2) {
+		max_entries = PACKAGE_V2_MAX_FW_INFO_ENTRIES;
+	} else {
+		return false;
+	}
+
+	pkg_size = pkg_header->header_len * 4;
+	if (fw_size < pkg_size) {
+		return false;
+	}
+
+	size_t expected_size = sizeof(struct intel_package_header) +
+						   (max_entries * sizeof(struct intel_fw_info));
+	if (pkg_header->header_len * 4 != expected_size) {
+		return false;
+	}
+
+	if (pkg_header->num_entries > max_entries) {
+		return false;
+	}
+
+	fw_info = (struct intel_fw_info *)
+		((uint8_t *)pkg_header + sizeof(*pkg_header));
+
+	*pkg_header_out = pkg_header;
+	*fw_info_out = fw_info;
+	*remaining_out = fw_size - pkg_size;
+	return true;
+}
+
+static bool parse_dmc_fw_header(const uint8_t *dmc_fw_start,
+								 size_t dmc_fw_size,
+								 struct dmc_fw_info *info)
+{
+	const struct intel_dmc_header_base *base;
+	size_t header_len_bytes;
+	size_t payload_size;
+	uint32_t mmio_count, mmio_count_max;
+	const uint32_t *mmioaddr, *mmiodata;
+	const uint8_t *payload;
+	int i;
+
+	if (dmc_fw_size < sizeof(struct intel_dmc_header_base)) {
+		return false;
+	}
+
+	base = (const struct intel_dmc_header_base *)dmc_fw_start;
+
+	if (base->header_ver == 3) {
+		const struct intel_dmc_header_v3 *v3 =
+			(const struct intel_dmc_header_v3 *)base;
+
+		if (dmc_fw_size < sizeof(*v3)) {
+			return false;
+		}
+
+		header_len_bytes = base->header_len * 4;
+		mmioaddr = v3->mmioaddr;
+		mmiodata = v3->mmiodata;
+		mmio_count = v3->mmio_count;
+		mmio_count_max = DMC_V3_MAX_MMIO_COUNT;
+		info->start_mmioaddr = v3->start_mmioaddr;
+
+	} else if (base->header_ver == 1) {
+		const struct intel_dmc_header_v1 *v1 =
+			(const struct intel_dmc_header_v1 *)base;
+
+		if (dmc_fw_size < sizeof(*v1)) {
+			return false;
+		}
+
+		header_len_bytes = base->header_len * 4;
+		mmioaddr = v1->mmioaddr;
+		mmiodata = v1->mmiodata;
+		mmio_count = v1->mmio_count;
+		mmio_count_max = DMC_V1_MAX_MMIO_COUNT;
+		info->start_mmioaddr = DMC_V1_MMIO_START_RANGE;
+
+	} else {
+		return false;
+	}
+
+	size_t expected_header_size = (base->header_ver == 3) ?
+		sizeof(struct intel_dmc_header_v3) :
+		sizeof(struct intel_dmc_header_v1);
+	
+	if (header_len_bytes != expected_header_size) {
+		return false;
+	}
+
+	if (mmio_count > mmio_count_max) {
+		return false;
+	}
+
+	if (!dmc_mmio_addr_sanity_check(mmioaddr, mmio_count,
+									 base->header_ver, 0)) {
+		return false;
+	}
+
+	info->mmio_count = mmio_count;
+	for (i = 0; i < mmio_count; i++) {
+		info->mmioaddr[i] = mmioaddr[i];
+		info->mmiodata[i] = mmiodata[i];
+	}
+
+	if (dmc_fw_size < header_len_bytes) {
+		return false;
+	}
+
+	payload_size = base->fw_size * 4;  // fw_size is in dwords
+	if (dmc_fw_size < header_len_bytes + payload_size) {
+		return false;
+	}
+
+	if (payload_size > 0x20000) {  // DMC_MAX_FW_SIZE
+		return false;
+	}
+
+	payload = dmc_fw_start + header_len_bytes;
+	info->dmc_fw_size = base->fw_size;
+	info->payload = (const uint32_t *)payload;
+
+	return true;
+}
+
+
+
+void Gen11::hwInitializeCState(void *that)
+{
+	
+	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
+	
+	struct intel_css_header *css_header;
+	struct intel_package_header *pkg_header;
+	struct intel_fw_info *fw_info;
+	struct dmc_fw_info dmc_info[5] = {};  // MAIN, PIPEA, PIPEB, PIPEC, PIPED
+	
+	auto fw = getFWByName("tgl_dmc_ver2_12.bin");
+	if (!fw.data || fw.size == 0) {
+		return;
+	}
+
+	const uint8_t *fw_data = fw.data;
+	size_t remaining = fw.size;
+
+
+	if (!parse_dmc_fw_css(fw_data, remaining, &css_header, &remaining)) {
+		return;
+	}
+
+	fw_data += (css_header->header_len * 4);
+
+	if (!parse_dmc_fw_package(fw_data, remaining, &pkg_header, &fw_info, &remaining)) {
+		return;
+	}
+
+	fw_data += (pkg_header->header_len * 4);
+
+	uint32_t readcount = (css_header->header_len * 4) +
+						 (pkg_header->header_len * 4);
+
+	for (uint32_t i = 0; i < pkg_header->num_entries; i++) {
+		uint8_t dmc_id = fw_info[i].dmc_id;
+		uint32_t offset = fw_info[i].offset * 4;
+
+		if (dmc_id >= 5) {
+			continue;
+		}
+
+		const uint8_t *dmc_start = fw.data + readcount + offset;
+		size_t dmc_fw_size = fw.size - (dmc_start - fw.data);
+
+		if ((readcount + offset) > fw.size) {
+			continue;
+		}
+
+		if (!parse_dmc_fw_header(dmc_start, dmc_fw_size, &dmc_info[dmc_id])) {
+			continue;
+		}
+
+		dmc_info[dmc_id].present = true;
+	}
+
+	if (!dmc_info[0].present) {
+		return;
+	}
+
+//pipe A
+	for (uint8_t dmc_id = 1; dmc_id < 2; dmc_id++) {
+		if (!dmc_info[dmc_id].present)
+			continue;
+
+		for (uint32_t i = 0; i < dmc_info[dmc_id].dmc_fw_size; i++) {
+			uint32_t addr = dmc_info[dmc_id].start_mmioaddr + (i * 4);
+			NBlue::callback->writeReg32(addr, dmc_info[dmc_id].payload[i]);
+		}
+	}
+	
+	for (uint8_t dmc_id = 1; dmc_id < 2; dmc_id++) {
+		if (!dmc_info[dmc_id].present)
+			continue;
+
+		for (uint32_t i = 0; i < dmc_info[dmc_id].mmio_count; i++) {
+			NBlue::callback->writeReg32(dmc_info[dmc_id].mmioaddr[i],
+									   dmc_info[dmc_id].mmiodata[i]);
+		}
+
+	}
+	
+	//panic("xxx");
+
+	NBlue::callback->writeReg32(DC_STATE_DEBUG, DC_STATE_DEBUG_MASK_MEMORY_UP);
+	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
+
+	hwConfigureCustomAUX(that, true);
+
 }
