@@ -126,8 +126,8 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 		
 		if (1)
 		{
-			static uint8_t builtin2[] = {0x00, 0x00, 0x5d, 0x8A};
-			static uint8_t builtin3[] = {0x5d, 0x8A, 0x00, 0x00};
+			static uint8_t builtin2[] = {0x00, 0x00, 0x52, 0x8A};
+			static uint8_t builtin3[] = {0x52, 0x8A, 0x00, 0x00};
 			int ok=0;
 			vnode_t vnode = NULLVP;
 			vfs_context_t ctxt = vfs_context_create(nullptr);

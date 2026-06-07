@@ -513,7 +513,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	getMember<uint8_t>(that, 0x1b36)=1; //dither off
 	
 		struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
-	int p=0x5;
+	int p=0x6;
 	
 	pinfo[p].flags=
 	FB_FLAG_DISABLE_PIPE_SCRAMBLE|/*FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
