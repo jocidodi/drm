@@ -124,8 +124,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 	if (ok) { //not running mac os installer
 		
 		
-		if (1)
-		{
+		int ok2=0;
 			static uint8_t builtin2[] = {0x00, 0x00, 0x52, 0x8A};
 			static uint8_t builtin3[] = {0x52, 0x8A, 0x00, 0x00};
 			ok=0;
@@ -135,7 +134,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			if (!err) vnode_put(vnode);
 			vfs_context_rele(ctxt);
 			if (!err) ok=1;
-			
+			if (ok) ok2=1;
 			//tgl
 			if (ok)
 			{
@@ -147,7 +146,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			
 			NBlue::callback->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
 			NBlue::callback->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
-		}
+		
 		
 	
 		int tcap=0;
@@ -224,7 +223,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
 			}
-			else
+			else if (!ok2)
 			{
 				const auto driversXML = getFWByName("Drivera1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
