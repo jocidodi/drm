@@ -128,10 +128,10 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 		{
 			static uint8_t builtin2[] = {0x00, 0x00, 0x52, 0x8A};
 			static uint8_t builtin3[] = {0x52, 0x8A, 0x00, 0x00};
-			int ok=0;
-			vnode_t vnode = NULLVP;
-			vfs_context_t ctxt = vfs_context_create(nullptr);
-			errno_t err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
+			ok=0;
+			vnode = NULLVP;
+			ctxt = vfs_context_create(nullptr);
+			err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
 			if (!err) vnode_put(vnode);
 			vfs_context_rele(ctxt);
 			if (!err) ok=1;
@@ -151,7 +151,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 		
 	
 		int tcap=0;
-		if (ok) {
+		if (1) {
 				ok=0;
 				vnode = NULLVP;
 				ctxt = vfs_context_create(nullptr);
@@ -160,7 +160,6 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			   vfs_context_rele(ctxt);
 			   if (!err) ok=1;
 
-			//if (ok) { // remove this to load icl if tgl not installed
 				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
 				memcpy(dataNull, driversXML.data, driversXML.size);
@@ -181,9 +180,8 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				} else ok=0;
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
-			//}
 		}
-		if (1/*ok*/) {
+		if (1) {
 				ok=0;
 				int sle=-1;
 				vnode = NULLVP;
