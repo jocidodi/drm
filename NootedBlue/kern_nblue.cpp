@@ -151,13 +151,6 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 	
 		int tcap=0;
 		if (1) {
-				ok=0;
-				vnode = NULLVP;
-				ctxt = vfs_context_create(nullptr);
-				err = vnode_lookup("/Library/Extensions/AppleIntelTGLGraphicsFramebuffer.kext/Contents/MacOS/AppleIntelTGLGraphicsFramebuffer", 0, &vnode, ctxt);
-			   if (!err) vnode_put(vnode);
-			   vfs_context_rele(ctxt);
-			   if (!err) ok=1;
 
 				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
