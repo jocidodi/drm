@@ -77,6 +77,21 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		
         static uint8_t builtin[] = {0x00};
 		
+		/*static uint8_t builtin2[] = {0x00, 0x00, 0x52, 0x8A};
+		static uint8_t builtin3[] = {0x52, 0x8A, 0x00, 0x00};
+		int ok=0;
+		//tgl
+		if (ok)
+		{
+			builtin2[2]=0x49;
+			builtin2[3]=0x9A;
+			builtin3[0]=0x49;
+			builtin3[1]=0x9A;
+		}
+		
+		this->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
+		this->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
+		*/
 		this->iGPU->setProperty("built-in", builtin, arrsize(builtin));
 		this->iGPU->setProperty("AAPL,slot-name", const_cast<char *>("built-in"), 9);
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
@@ -125,8 +140,6 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 		
 		
 		int ok2=0;
-			static uint8_t builtin2[] = {0x00, 0x00, 0x52, 0x8A};
-			static uint8_t builtin3[] = {0x52, 0x8A, 0x00, 0x00};
 			ok=0;
 			vnode = NULLVP;
 			ctxt = vfs_context_create(nullptr);
@@ -135,18 +148,6 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			vfs_context_rele(ctxt);
 			if (!err) ok=1;
 			if (ok) ok2=1;
-			//tgl
-			if (ok)
-			{
-				builtin2[2]=0x49;
-				builtin2[3]=0x9A;
-				builtin3[0]=0x49;
-				builtin3[1]=0x9A;
-			}
-			
-			NBlue::callback->iGPU->setProperty("AAPL,ig-platform-id", builtin2, arrsize(builtin2));
-			NBlue::callback->iGPU->setProperty("device-id", builtin3, arrsize(builtin3));
-		
 		
 	
 		int tcap=0;
