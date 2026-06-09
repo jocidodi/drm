@@ -7,6 +7,7 @@
 2) nblue setup
 
 boot args: debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware
+
 add -allow3d to load graphics
    
 use opencore device injection for icl
