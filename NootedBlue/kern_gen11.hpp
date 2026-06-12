@@ -115,13 +115,36 @@ struct intel_dmc_header_v3 {
 } __attribute__((packed));
 
 struct dmc_fw_info {
-	uint32_t mmio_count;
-	uint32_t mmioaddr[20];
-	uint32_t mmiodata[20];
-	uint32_t start_mmioaddr;
-	uint32_t dmc_fw_size;
-	const uint32_t *payload;
+	u32 mmio_count;
+	u32 mmioaddr[20];
+	u32 mmiodata[20];
+	u32 dmc_offset;
+	u32 start_mmioaddr;
+	u32 dmc_fw_size; /*dwords */
+	u32 *payload;
 	bool present;
+};
+
+enum intel_dmc_id {
+	DMC_FW_MAIN = 0,
+	DMC_FW_PIPEA,
+	DMC_FW_PIPEB,
+	DMC_FW_PIPEC,
+	DMC_FW_PIPED,
+	DMC_FW_MAX
+};
+
+struct intel_dmc {
+	struct intel_display *display;
+	//struct work_struct work;
+	const char *fw_path;
+	u32 max_fw_size; /* bytes */
+	u32 version;
+	struct {
+		u32 dc5_start;
+		u32 count;
+	} dc6_allowed;
+	struct dmc_fw_info dmc_info[DMC_FW_MAX];
 };
 
 static constexpr uint32_t ICL_REG_CDCLK_CTL = 0x46000;

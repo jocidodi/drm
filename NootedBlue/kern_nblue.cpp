@@ -1249,7 +1249,7 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
 				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
-				else if (child->dvo_port == DVO_PORT_MIPIC) port = (display->version >= 11) ? PORT_B : PORT_C;
+				else if (child->dvo_port == DVO_PORT_MIPIC) port = (DISPLAY_VER(display) >= 11) ? PORT_B : PORT_C;
 			}
 
 			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
@@ -1280,8 +1280,8 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(display, port,buf2, sizeof(buf2))));
 			connectorDict->setObject("PHY", OSString::withCString(phy_to_string(phy)));
 			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(display, buf, sizeof(buf), aux_ch)));
-			connectorDict->setObject("GMBUS", OSNumber::withNumber((unsigned long long)child->ddc_pin, 32));
-
+			connectorDict->setObject("GMBUS", OSNumber::withNumber(child->ddc_pin, 32));
+			
 			connectorArray->setObject(connectorDict);
 			connectorDict->release();
 			
@@ -1324,11 +1324,161 @@ void init_bdb_blocks(struct intel_display *display)
 	}
 }
 
+static const struct platform_desc *find_platform_desc()
+{
+	int i;
 
+	for (i = 0; i < ARRAY_SIZE(intel_display_ids); i++) {
+		if (intel_display_ids[i].devid == NBlue::callback->deviceId)
+			return intel_display_ids[i].desc;
+	}
+
+	return NULL;
+}
+
+static const struct subplatform_desc *
+find_subplatform_desc( const struct platform_desc *desc)
+{
+	const struct subplatform_desc *sp;
+	const u16 *id;
+
+	for (sp = desc->subplatforms; sp && sp->pciidlist; sp++)
+		for (id = sp->pciidlist; *id; id++)
+			if (*id == NBlue::callback->deviceId)
+				return sp;
+
+	return NULL;
+}
+
+
+#define __STEP_NAME(name) [STEP_##name] = #name,
+
+static void initialize_step(struct intel_display *display, enum intel_step step)
+{
+	static const char step_names[][3] = {
+		STEP_NAME_LIST(__STEP_NAME)
+	};
+
+	DISPLAY_RUNTIME_INFO(display)->step = step;
+
+	/* Step name will remain an empty string if not applicable */
+	if (step >= 0 && step < ARRAY_SIZE(step_names))
+		strcpy(DISPLAY_RUNTIME_INFO(display)->step_name, step_names[step],strlen(DISPLAY_RUNTIME_INFO(display)->step_name));
+}
+
+#undef __STEP_NAME
+
+static enum intel_step get_pre_gmdid_step(struct intel_display *display,
+					  const struct stepping_desc *main,
+					  const struct stepping_desc *sub)
+{
+	const enum intel_step *map = main->map;
+	int size = main->size;
+	int revision = NBlue::callback->pciRevision;
+	enum intel_step step;
+
+	if (sub && sub->map && sub->size) {
+		map = sub->map;
+		size = sub->size;
+	}
+
+	if (!map || !size)
+		return STEP_NONE;
+
+	if (revision < size && map[revision] != STEP_NONE) {
+		step = map[revision];
+	} else {
+
+		while (revision < size && map[revision] == STEP_NONE)
+			revision++;
+
+		if (revision < size) {
+			step = map[revision];
+		} else {
+			step = STEP_FUTURE;
+		}
+	}
+
+	return step;
+}
+
+
+
+void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
+		 const unsigned long *bitmap2, int bits)
+{
+	int k;
+	int nr = BITS_TO_LONGS(bits);
+
+	for (k = 0; k < nr; k++)
+		dst[k] = bitmap1[k] | bitmap2[k];
+}
+
+#define small_const_nbits(nbits) \
+	(__builtin_constant_p(nbits) && (nbits) <= BITS_PER_LONG && (nbits) > 0)
+static void bitmap_or(unsigned long *dst, const unsigned long *src1,
+		   const unsigned long *src2, unsigned int nbits)
+{
+	if (small_const_nbits(nbits))
+		*dst = *src1 | *src2;
+	else
+		__bitmap_or(dst, src1, src2, nbits);
+}
+static unsigned int display_platforms_num_bits(void)
+{
+	return sizeof(((struct intel_display_platforms *)0)->bitmap) * BITS_PER_BYTE;
+}
+static void display_platforms_or(struct intel_display_platforms *dst,
+				 const struct intel_display_platforms *src)
+{
+	bitmap_or(dst->bitmap, dst->bitmap, src->bitmap, display_platforms_num_bits());
+}
+
+struct intel_display *intel_display_device_probe(struct intel_display *display)
+{
+	const struct intel_display_device_info *info;
+	struct intel_display_ip_ver ip_ver = {};
+	const struct platform_desc *desc;
+	const struct subplatform_desc *subdesc;
+	enum intel_step step;
+
+
+	desc = find_platform_desc();
+
+	info = desc->info;
+
+	DISPLAY_INFO(display) = info;
+
+	memcpy(DISPLAY_RUNTIME_INFO(display),
+		   &DISPLAY_INFO(display)->__runtime_defaults,
+		   sizeof(*DISPLAY_RUNTIME_INFO(display)));
+
+
+	display->platform = desc->platforms;
+
+	subdesc = find_subplatform_desc( desc);
+	if (subdesc) {
+
+		display_platforms_or(&display->platform, &subdesc->platforms);
+	}
+
+	step = get_pre_gmdid_step(display, &desc->step_info,
+					  subdesc ? &subdesc->step_info : NULL);
+	
+
+	initialize_step(display, step);
+
+
+	return display;
+
+no_display:
+
+	return nullptr;
+}
 
 int NBlue::intel_opregion_setup()
 {
-	intel_display *display=&display_ctx;
+	struct intel_display *display=&display_ctx;
 	struct intel_opregion *opregion = &display->opregion;
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
@@ -1436,7 +1586,7 @@ int NBlue::intel_opregion_setup()
 			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
 
 			if (bdb) {
-				uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+				/*uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
 				asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
 				uint32_t family = (eax >> 8) & 0xF;
 				uint32_t model = (eax >> 4) & 0xF;
@@ -1459,11 +1609,15 @@ int NBlue::intel_opregion_setup()
 					display->version = 12;
 				} else {
 					display->version = 12;
-				}
-
-				display->platform.alderlake_s = false; // needs detection
+				}*/
+				
+				
+				intel_display_device_probe(display);
+				
+				
+				/*display->platform.alderlake_s = false; // needs detection
 				display->platform.rocketlake = display->isRKL;
-				display->platform.dg1 = false;
+				display->platform.dg1 = false;*/
 				display->pps.mmio_base = PCH_PPS_BASE;
 				display->panel.pps.mmio_base = PCH_PPS_BASE;
 				display->vbt.version = bdb->version;

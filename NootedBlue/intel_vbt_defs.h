@@ -2033,33 +2033,1007 @@ struct intel_vbt_data {
 	} sdvo_mappings[2];
 };
 
-struct intel_display {
-	int version; // For DISPLAY_VER macro
-	struct {
-		bool alderlake_s;
-		bool dg1;
-		bool rocketlake;
-	} platform;
-	struct {
-		u32 mmio_base;
-	} pps;
-	struct intel_panel panel;
-	ConnectorInfo bconnectors[6];
-	bool isRealTGL = false;
-	bool isRKL  = false;
-	bool isADL =  false;
-	bool isRPL = false;
-	bool isMTL= false;
-	const struct bdb_header *bdb;
-	struct intel_vbt_data vbt;
-	struct intel_opregion opregion;
-};
+
 
 struct bdb_block_entry {
 	struct list_head node;
 	enum bdb_block_id section_id;
 	u8 data[];
 };
+
+
+enum pipe {
+	INVALID_PIPE = -1,
+
+	PIPE_A = 0,
+	PIPE_B,
+	PIPE_C,
+	PIPE_D,
+	_PIPE_EDP,
+
+	I915_MAX_PIPES = _PIPE_EDP
+};
+
+enum transcoder {
+	INVALID_TRANSCODER = -1,
+	/*
+	 * The following transcoders have a 1:1 transcoder -> pipe mapping,
+	 * keep their values fixed: the code assumes that TRANSCODER_A=0, the
+	 * rest have consecutive values and match the enum values of the pipes
+	 * they map to.
+	 */
+	TRANSCODER_A = PIPE_A,
+	TRANSCODER_B = PIPE_B,
+	TRANSCODER_C = PIPE_C,
+	TRANSCODER_D = PIPE_D,
+
+	/*
+	 * The following transcoders can map to any pipe, their enum value
+	 * doesn't need to stay fixed.
+	 */
+	TRANSCODER_EDP,
+	TRANSCODER_DSI_0,
+	TRANSCODER_DSI_1,
+	TRANSCODER_DSI_A = TRANSCODER_DSI_0,	/* legacy DSI */
+	TRANSCODER_DSI_C = TRANSCODER_DSI_1,	/* legacy DSI */
+
+	I915_MAX_TRANSCODERS
+};
+
+struct intel_display_ip_ver {
+	u16 ver;
+	u16 rel;
+	u16 step; /* hardware */
+};
+
+struct intel_display_runtime_info {
+	struct intel_display_ip_ver ip;
+	int step; /* symbolic */
+	char step_name[3]; /* empty string if not applicable */
+
+	u32 rawclk_freq;
+
+	u8 pipe_mask;
+	u8 cpu_transcoder_mask;
+	u16 port_mask;
+
+	u8 num_sprites[I915_MAX_PIPES];
+	u8 num_scalers[I915_MAX_PIPES];
+
+	u8 fbc_mask;
+
+	bool has_hdcp;
+	bool has_dmc;
+	bool has_dsc;
+	bool edp_typec_support;
+	bool has_dbuf_overlap_detection;
+};
+#define DEV_INFO_DISPLAY_FOR_EACH_FLAG(func) \
+/* Keep in alphabetical order */ \
+func(cursor_needs_physical); \
+func(has_cdclk_crawl); \
+func(has_cdclk_squash); \
+func(has_ddi); \
+func(has_dp_mst); \
+func(has_dsb); \
+func(has_fpga_dbg); \
+func(has_gmch); \
+func(has_hotplug); \
+func(has_hti); \
+func(has_ipc); \
+func(has_overlay); \
+func(has_psr); \
+func(has_psr_hw_tracking); \
+func(overlay_needs_physical); \
+func(supports_tv);
+struct intel_display_device_info {
+	/* Initial runtime info. */
+	const struct intel_display_runtime_info __runtime_defaults;
+
+	u8 abox_mask;
+
+	struct {
+		u16 size; /* in blocks */
+		u8 slice_mask;
+	} dbuf;
+
+#define DEFINE_FLAG(name) u8 name:1
+	DEV_INFO_DISPLAY_FOR_EACH_FLAG(DEFINE_FLAG);
+#undef DEFINE_FLAG
+
+	/* Global register offset for the display engine */
+	u32 mmio_offset;
+
+	/* Register offsets for the various display pipes and transcoders */
+	u32 pipe_offsets[I915_MAX_TRANSCODERS];
+	u32 trans_offsets[I915_MAX_TRANSCODERS];
+	u32 cursor_offsets[I915_MAX_PIPES];
+
+	struct {
+		u32 degamma_lut_size;
+		u32 gamma_lut_size;
+		u32 degamma_lut_tests;
+		u32 gamma_lut_tests;
+	} color;
+};
+enum dbuf_slice {
+	DBUF_S1,
+	DBUF_S2,
+	DBUF_S3,
+	DBUF_S4,
+	I915_MAX_DBUF_SLICES
+};
+enum drm_color_lut_tests {
+
+	DRM_COLOR_LUT_EQUAL_CHANNELS = BIT(0),
+
+	DRM_COLOR_LUT_NON_DECREASING = BIT(1),
+};
+enum intel_fbc_id {
+	INTEL_FBC_A,
+	INTEL_FBC_B,
+	INTEL_FBC_C,
+	INTEL_FBC_D,
+
+	I915_MAX_FBCS,
+};
+#define PIPE_A_OFFSET		0x70000
+#define PIPE_B_OFFSET		0x71000
+#define PIPE_C_OFFSET		0x72000
+#define PIPE_D_OFFSET		0x73000
+#define CHV_PIPE_C_OFFSET	0x74000
+/*
+* There's actually no pipe EDP. Some pipe registers have
+* simply shifted from the pipe to the transcoder, while
+* keeping their original offset. Thus we need PIPE_EDP_OFFSET
+* to access such registers in transcoder EDP.
+*/
+#define PIPE_EDP_OFFSET	0x7f000
+
+/* ICL DSI 0 and 1 */
+#define PIPE_DSI0_OFFSET	0x7b000
+#define PIPE_DSI1_OFFSET	0x7b800
+
+#define TRANSCODER_A_OFFSET 0x60000
+#define TRANSCODER_B_OFFSET 0x61000
+#define TRANSCODER_C_OFFSET 0x62000
+#define CHV_TRANSCODER_C_OFFSET 0x63000
+#define TRANSCODER_D_OFFSET 0x63000
+#define TRANSCODER_EDP_OFFSET 0x6f000
+#define TRANSCODER_DSI0_OFFSET	0x6b000
+#define TRANSCODER_DSI1_OFFSET	0x6b800
+
+#define CURSOR_A_OFFSET 0x70080
+#define CURSOR_B_OFFSET 0x700c0
+#define CHV_CURSOR_C_OFFSET 0x700e0
+#define IVB_CURSOR_B_OFFSET 0x71080
+#define IVB_CURSOR_C_OFFSET 0x72080
+#define TGL_CURSOR_D_OFFSET 0x73080
+
+#define IVB_CURSOR_OFFSETS \
+.cursor_offsets = { \
+[PIPE_A] = CURSOR_A_OFFSET, \
+[PIPE_B] = IVB_CURSOR_B_OFFSET, \
+[PIPE_C] = IVB_CURSOR_C_OFFSET, \
+}
+
+#define TGL_CURSOR_OFFSETS \
+.cursor_offsets = { \
+[PIPE_A] = CURSOR_A_OFFSET, \
+[PIPE_B] = IVB_CURSOR_B_OFFSET, \
+[PIPE_C] = IVB_CURSOR_C_OFFSET, \
+[PIPE_D] = TGL_CURSOR_D_OFFSET, \
+}
+
+#define XE_LPDP_FEATURES							\
+.abox_mask = GENMASK(1, 0),						\
+.color = {								\
+.degamma_lut_size = 129, .gamma_lut_size = 1024,		\
+.degamma_lut_tests = DRM_COLOR_LUT_NON_DECREASING |		\
+DRM_COLOR_LUT_EQUAL_CHANNELS,					\
+},									\
+.dbuf.size = 4096,							\
+.dbuf.slice_mask = BIT(DBUF_S1) | BIT(DBUF_S2) | BIT(DBUF_S3) |		\
+BIT(DBUF_S4),							\
+.has_cdclk_crawl = 1,							\
+.has_cdclk_squash = 1,							\
+.has_ddi = 1,								\
+.has_dp_mst = 1,							\
+.has_dsb = 1,								\
+.has_fpga_dbg = 1,							\
+.has_hotplug = 1,							\
+.has_ipc = 1,								\
+.has_psr = 1,								\
+.pipe_offsets = {							\
+[TRANSCODER_A] = PIPE_A_OFFSET,					\
+[TRANSCODER_B] = PIPE_B_OFFSET,					\
+[TRANSCODER_C] = PIPE_C_OFFSET,					\
+[TRANSCODER_D] = PIPE_D_OFFSET,					\
+},									\
+.trans_offsets = {							\
+[TRANSCODER_A] = TRANSCODER_A_OFFSET,				\
+[TRANSCODER_B] = TRANSCODER_B_OFFSET,				\
+[TRANSCODER_C] = TRANSCODER_C_OFFSET,				\
+[TRANSCODER_D] = TRANSCODER_D_OFFSET,				\
+},									\
+TGL_CURSOR_OFFSETS,							\
+						\
+.__runtime_defaults.cpu_transcoder_mask =				\
+BIT(TRANSCODER_A) | BIT(TRANSCODER_B) |				\
+BIT(TRANSCODER_C) | BIT(TRANSCODER_D),				\
+.__runtime_defaults.fbc_mask = BIT(INTEL_FBC_A) | BIT(INTEL_FBC_B),	\
+.__runtime_defaults.has_dmc = 1,					\
+.__runtime_defaults.has_dsc = 1,					\
+.__runtime_defaults.has_hdcp = 1,					\
+.__runtime_defaults.pipe_mask =						\
+BIT(PIPE_A) | BIT(PIPE_B) | BIT(PIPE_C) | BIT(PIPE_D),		\
+.__runtime_defaults.port_mask = BIT(PORT_A) | BIT(PORT_B) |		\
+BIT(PORT_TC1) | BIT(PORT_TC2) | BIT(PORT_TC3) | BIT(PORT_TC4)
+
+static const struct intel_display_device_info xe_lpdp_display = {
+	XE_LPDP_FEATURES,
+};
+static const struct intel_display_device_info xe2_hpd_display = {
+	XE_LPDP_FEATURES,
+	.__runtime_defaults.port_mask = BIT(PORT_A) |
+		BIT(PORT_TC1) | BIT(PORT_TC2) | BIT(PORT_TC3) | BIT(PORT_TC4),
+};
+static const struct intel_display_device_info xe2_lpd_display = {
+	XE_LPDP_FEATURES,
+
+	.__runtime_defaults.fbc_mask =
+		BIT(INTEL_FBC_A) | BIT(INTEL_FBC_B) |
+		BIT(INTEL_FBC_C) | BIT(INTEL_FBC_D),
+	.__runtime_defaults.has_dbuf_overlap_detection = true,
+};
+static const struct intel_display_device_info wcl_display = {
+	XE_LPDP_FEATURES,
+
+	.__runtime_defaults.cpu_transcoder_mask =
+		BIT(TRANSCODER_A) | BIT(TRANSCODER_B) | BIT(TRANSCODER_C),
+	.__runtime_defaults.pipe_mask =
+		BIT(PIPE_A) | BIT(PIPE_B) | BIT(PIPE_C),
+	.__runtime_defaults.fbc_mask =
+		BIT(INTEL_FBC_A) | BIT(INTEL_FBC_B) | BIT(INTEL_FBC_C),
+	.__runtime_defaults.port_mask =
+		BIT(PORT_A) | BIT(PORT_B) | BIT(PORT_TC1) | BIT(PORT_TC2),
+};
+
+static const struct {
+	u16 ver;
+	u16 rel;
+	const struct intel_display_device_info *display;
+} gmdid_display_map[] = {
+	{ 14,  0, &xe_lpdp_display },
+	{ 14,  1, &xe2_hpd_display },
+	{ 20,  0, &xe2_lpd_display },
+	{ 30,  0, &xe2_lpd_display },
+	{ 30,  2, &wcl_display },
+	{ 35,  0, &xe2_lpd_display },
+};
+
+#define INTEL_DISPLAY_DEVICE(_id, _desc) { .devid = (_id), .desc = (_desc) }
+#define __NUM_PLATFORMS (INTEL_DISPLAY_PLATFORMS(__COUNT) 0)
+#define DECLARE_BITMAP(name,bits) \
+unsigned long name[BITS_TO_LONGS(bits)]
+#define INTEL_DISPLAY_PLATFORMS(func) \
+/* Platform group aliases */ \
+func(g4x) /* g45 and gm45 */ \
+func(mobile) /* mobile platforms */ \
+func(dgfx) /* discrete graphics */ \
+/* Display ver 2 */ \
+func(i830) \
+func(i845g) \
+func(i85x) \
+func(i865g) \
+/* Display ver 3 */ \
+func(i915g) \
+func(i915gm) \
+func(i945g) \
+func(i945gm) \
+func(g33) \
+func(pineview) \
+/* Display ver 4 */ \
+func(i965g) \
+func(i965gm) \
+func(g45) \
+func(gm45) \
+/* Display ver 5 */ \
+func(ironlake) \
+/* Display ver 6 */ \
+func(sandybridge) \
+/* Display ver 7 */ \
+func(ivybridge) \
+func(valleyview) \
+func(haswell) \
+func(haswell_ult) \
+func(haswell_ulx) \
+/* Display ver 8 */ \
+func(broadwell) \
+func(broadwell_ult) \
+func(broadwell_ulx) \
+func(cherryview) \
+/* Display ver 9 */ \
+func(skylake) \
+func(skylake_ult) \
+func(skylake_ulx) \
+func(broxton) \
+func(kabylake) \
+func(kabylake_ult) \
+func(kabylake_ulx) \
+func(geminilake) \
+func(coffeelake) \
+func(coffeelake_ult) \
+func(coffeelake_ulx) \
+func(cometlake) \
+func(cometlake_ult) \
+func(cometlake_ulx) \
+/* Display ver 11 */ \
+func(icelake) \
+func(icelake_port_f) \
+func(jasperlake) \
+func(elkhartlake) \
+/* Display ver 12 */ \
+func(tigerlake) \
+func(tigerlake_uy) \
+func(rocketlake) \
+func(dg1) \
+func(alderlake_s) \
+func(alderlake_s_raptorlake_s) \
+/* Display ver 13 */ \
+func(alderlake_p) \
+func(alderlake_p_alderlake_n) \
+func(alderlake_p_raptorlake_p) \
+func(alderlake_p_raptorlake_u) \
+func(dg2) \
+func(dg2_g10) \
+func(dg2_g11) \
+func(dg2_g12) \
+/* Display ver 14 (based on GMD ID) */ \
+func(meteorlake) \
+func(meteorlake_u) \
+/* Display ver 20 (based on GMD ID) */ \
+func(lunarlake) \
+/* Display ver 14.1 (based on GMD ID) */ \
+func(battlemage) \
+/* Display ver 30 (based on GMD ID) */ \
+func(pantherlake) \
+func(pantherlake_wildcatlake) \
+/* Display ver 35 (based on GMD ID) */ \
+func(novalake)
+
+#define __MEMBER(name) unsigned long name:1;
+#define __COUNT(x) 1 +
+
+#define __NUM_PLATFORMS (INTEL_DISPLAY_PLATFORMS(__COUNT) 0)
+#define BITS_PER_LONG_LONG 64
+#define BITS_PER_LONG 64
+#define BIT_MASK(nr)		(UL(1) << ((nr) % BITS_PER_LONG))
+#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+#define BIT_ULL_MASK(nr)	(ULL(1) << ((nr) % BITS_PER_LONG_LONG))
+#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+#define BITS_PER_BYTE		8
+#define BITS_PER_TYPE(type)	(sizeof(type) * BITS_PER_BYTE)
+#define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define BITS_TO_LONGS(nr)	__KERNEL_DIV_ROUND_UP(nr, BITS_PER_TYPE(long))
+struct intel_display_platforms {
+union {
+struct {
+INTEL_DISPLAY_PLATFORMS(__MEMBER);
+};
+DECLARE_BITMAP(bitmap, __NUM_PLATFORMS);
+};
+};
+#define STEP_ENUM_VAL(name)  STEP_##name,
+
+#define STEP_NAME_LIST(func)		\
+func(A0)			\
+func(A1)			\
+func(A2)			\
+func(A3)			\
+func(B0)			\
+func(B1)			\
+func(B2)			\
+func(B3)			\
+func(C0)			\
+func(C1)			\
+func(C2)			\
+func(C3)			\
+func(D0)			\
+func(D1)			\
+func(D2)			\
+func(D3)			\
+func(E0)			\
+func(E1)			\
+func(E2)			\
+func(E3)			\
+func(F0)			\
+func(F1)			\
+func(F2)			\
+func(F3)			\
+func(G0)			\
+func(G1)			\
+func(G2)			\
+func(G3)			\
+func(H0)			\
+func(H1)			\
+func(H2)			\
+func(H3)			\
+func(I0)			\
+func(I1)			\
+func(I2)			\
+func(I3)			\
+func(J0)			\
+func(J1)			\
+func(J2)			\
+func(J3)
+
+/*
+* Symbolic steppings that do not match the hardware. These are valid both as gt
+* and display steppings as symbolic names.
+*/
+enum intel_step {
+STEP_NONE = 0,
+STEP_NAME_LIST(STEP_ENUM_VAL)
+STEP_FUTURE,
+STEP_FOREVER,
+};
+
+struct stepping_desc {
+	const enum intel_step *map; /* revid to step map */
+	size_t size; /* map size */
+};
+struct subplatform_desc {
+	struct intel_display_platforms platforms;
+	const char *name;
+	const u16 *pciidlist;
+	struct stepping_desc step_info;
+};
+
+
+
+struct platform_desc {
+	struct intel_display_platforms platforms;
+	const char *name;
+	const struct subplatform_desc *subplatforms;
+	const struct intel_display_device_info *info; /* NULL for GMD ID */
+	struct stepping_desc step_info;
+};
+
+
+
+#define PLATFORM(_platform)			 \
+.platforms._platform = 1,		 \
+.name = #_platform
+
+#define SUBPLATFORM(_platform, _subplatform)				\
+.platforms._platform##_##_subplatform = 1,			\
+.name = #_subplatform
+
+
+
+#define STEP_INFO(_map)				\
+	.step_info.map = _map,			\
+	.step_info.size = ARRAY_SIZE(_map)
+
+#define ID(x, ...) x
+
+#define INTEL_TGL_GT1_IDS(MACRO__, ...) \
+MACRO__(0x9A60, ## __VA_ARGS__), \
+MACRO__(0x9A68, ## __VA_ARGS__), \
+MACRO__(0x9A70, ## __VA_ARGS__)
+
+#define INTEL_TGL_GT2_IDS(MACRO__, ...) \
+MACRO__(0x9A40, ## __VA_ARGS__), \
+MACRO__(0x9A49, ## __VA_ARGS__), \
+MACRO__(0x9A59, ## __VA_ARGS__), \
+MACRO__(0x9A78, ## __VA_ARGS__), \
+MACRO__(0x9AC0, ## __VA_ARGS__), \
+MACRO__(0x9AC9, ## __VA_ARGS__), \
+MACRO__(0x9AD9, ## __VA_ARGS__), \
+MACRO__(0x9AF8, ## __VA_ARGS__)
+
+/* RKL */
+#define INTEL_RKL_IDS(MACRO__, ...) \
+	MACRO__(0x4C80, ## __VA_ARGS__), \
+	MACRO__(0x4C8A, ## __VA_ARGS__), \
+	MACRO__(0x4C8B, ## __VA_ARGS__), \
+	MACRO__(0x4C8C, ## __VA_ARGS__), \
+	MACRO__(0x4C90, ## __VA_ARGS__), \
+	MACRO__(0x4C9A, ## __VA_ARGS__)
+
+/* DG1 */
+#define INTEL_DG1_IDS(MACRO__, ...) \
+	MACRO__(0x4905, ## __VA_ARGS__), \
+	MACRO__(0x4906, ## __VA_ARGS__), \
+	MACRO__(0x4907, ## __VA_ARGS__), \
+	MACRO__(0x4908, ## __VA_ARGS__), \
+	MACRO__(0x4909, ## __VA_ARGS__)
+
+/* ADL-S */
+#define INTEL_ADLS_IDS(MACRO__, ...) \
+	MACRO__(0x4680, ## __VA_ARGS__), \
+	MACRO__(0x4682, ## __VA_ARGS__), \
+	MACRO__(0x4688, ## __VA_ARGS__), \
+	MACRO__(0x468A, ## __VA_ARGS__), \
+	MACRO__(0x468B, ## __VA_ARGS__), \
+	MACRO__(0x4690, ## __VA_ARGS__), \
+	MACRO__(0x4692, ## __VA_ARGS__), \
+	MACRO__(0x4693, ## __VA_ARGS__)
+
+/* ADL-P */
+#define INTEL_ADLP_IDS(MACRO__, ...) \
+	MACRO__(0x46A0, ## __VA_ARGS__), \
+	MACRO__(0x46A1, ## __VA_ARGS__), \
+	MACRO__(0x46A2, ## __VA_ARGS__), \
+	MACRO__(0x46A3, ## __VA_ARGS__), \
+	MACRO__(0x46A6, ## __VA_ARGS__), \
+	MACRO__(0x46A8, ## __VA_ARGS__), \
+	MACRO__(0x46AA, ## __VA_ARGS__), \
+	MACRO__(0x462A, ## __VA_ARGS__), \
+	MACRO__(0x4626, ## __VA_ARGS__), \
+	MACRO__(0x4628, ## __VA_ARGS__), \
+	MACRO__(0x46B0, ## __VA_ARGS__), \
+	MACRO__(0x46B1, ## __VA_ARGS__), \
+	MACRO__(0x46B2, ## __VA_ARGS__), \
+	MACRO__(0x46B3, ## __VA_ARGS__), \
+	MACRO__(0x46C0, ## __VA_ARGS__), \
+	MACRO__(0x46C1, ## __VA_ARGS__), \
+	MACRO__(0x46C2, ## __VA_ARGS__), \
+	MACRO__(0x46C3, ## __VA_ARGS__)
+
+/* ADL-N */
+#define INTEL_ADLN_IDS(MACRO__, ...) \
+	MACRO__(0x46D0, ## __VA_ARGS__), \
+	MACRO__(0x46D1, ## __VA_ARGS__), \
+	MACRO__(0x46D2, ## __VA_ARGS__), \
+	MACRO__(0x46D3, ## __VA_ARGS__), \
+	MACRO__(0x46D4, ## __VA_ARGS__)
+
+/* RPL-S */
+#define INTEL_RPLS_IDS(MACRO__, ...) \
+	MACRO__(0xA780, ## __VA_ARGS__), \
+	MACRO__(0xA781, ## __VA_ARGS__), \
+	MACRO__(0xA782, ## __VA_ARGS__), \
+	MACRO__(0xA783, ## __VA_ARGS__), \
+	MACRO__(0xA788, ## __VA_ARGS__), \
+	MACRO__(0xA789, ## __VA_ARGS__), \
+	MACRO__(0xA78A, ## __VA_ARGS__), \
+	MACRO__(0xA78B, ## __VA_ARGS__)
+
+/* RPL-U */
+#define INTEL_RPLU_IDS(MACRO__, ...) \
+	MACRO__(0xA721, ## __VA_ARGS__), \
+	MACRO__(0xA7A1, ## __VA_ARGS__), \
+	MACRO__(0xA7A9, ## __VA_ARGS__), \
+	MACRO__(0xA7AC, ## __VA_ARGS__), \
+	MACRO__(0xA7AD, ## __VA_ARGS__)
+
+/* RPL-P */
+#define INTEL_RPLP_IDS(MACRO__, ...) \
+	MACRO__(0xA720, ## __VA_ARGS__), \
+	MACRO__(0xA7A0, ## __VA_ARGS__), \
+	MACRO__(0xA7A8, ## __VA_ARGS__), \
+	MACRO__(0xA7AA, ## __VA_ARGS__), \
+	MACRO__(0xA7AB, ## __VA_ARGS__)
+
+#define INTEL_TGL_IDS(MACRO__, ...) \
+INTEL_TGL_GT1_IDS(MACRO__, ## __VA_ARGS__), \
+INTEL_TGL_GT2_IDS(MACRO__, ## __VA_ARGS__)
+
+
+#define XE_D_DISPLAY \
+.abox_mask = GENMASK(2, 1), \
+.dbuf.size = 2048, \
+.dbuf.slice_mask = BIT(DBUF_S1) | BIT(DBUF_S2), \
+.has_ddi = 1, \
+.has_dp_mst = 1, \
+.has_dsb = 1, \
+.has_fpga_dbg = 1, \
+.has_hotplug = 1, \
+.has_ipc = 1, \
+.has_psr = 1, \
+.has_psr_hw_tracking = 1, \
+.pipe_offsets = { \
+[TRANSCODER_A] = PIPE_A_OFFSET, \
+[TRANSCODER_B] = PIPE_B_OFFSET, \
+[TRANSCODER_C] = PIPE_C_OFFSET, \
+[TRANSCODER_D] = PIPE_D_OFFSET, \
+[TRANSCODER_DSI_0] = PIPE_DSI0_OFFSET, \
+[TRANSCODER_DSI_1] = PIPE_DSI1_OFFSET, \
+}, \
+.trans_offsets = { \
+[TRANSCODER_A] = TRANSCODER_A_OFFSET, \
+[TRANSCODER_B] = TRANSCODER_B_OFFSET, \
+[TRANSCODER_C] = TRANSCODER_C_OFFSET, \
+[TRANSCODER_D] = TRANSCODER_D_OFFSET, \
+[TRANSCODER_DSI_0] = TRANSCODER_DSI0_OFFSET, \
+[TRANSCODER_DSI_1] = TRANSCODER_DSI1_OFFSET, \
+}, \
+TGL_CURSOR_OFFSETS, \
+ICL_COLORS, \
+\
+.__runtime_defaults.ip.ver = 12, \
+.__runtime_defaults.has_dmc = 1, \
+.__runtime_defaults.has_dsc = 1, \
+.__runtime_defaults.has_hdcp = 1, \
+.__runtime_defaults.pipe_mask = \
+BIT(PIPE_A) | BIT(PIPE_B) | BIT(PIPE_C) | BIT(PIPE_D), \
+.__runtime_defaults.cpu_transcoder_mask = \
+BIT(TRANSCODER_A) | BIT(TRANSCODER_B) | \
+BIT(TRANSCODER_C) | BIT(TRANSCODER_D) | \
+BIT(TRANSCODER_DSI_0) | BIT(TRANSCODER_DSI_1), \
+.__runtime_defaults.fbc_mask = BIT(INTEL_FBC_A)
+
+static const u16 tgl_uy_ids[] = {
+INTEL_TGL_GT2_IDS(ID),
+0
+};
+
+static const enum intel_step tgl_steppings[] = {
+[0] = STEP_B0,
+[1] = STEP_D0,
+};
+
+static const enum intel_step tgl_uy_steppings[] = {
+[0] = STEP_A0,
+[1] = STEP_C0,
+[2] = STEP_C0,
+[3] = STEP_D0,
+};
+
+#define ICL_COLORS \
+.color = { \
+.degamma_lut_size = 33, .gamma_lut_size = 262145, \
+.degamma_lut_tests = DRM_COLOR_LUT_NON_DECREASING | \
+	 DRM_COLOR_LUT_EQUAL_CHANNELS, \
+.gamma_lut_tests = DRM_COLOR_LUT_NON_DECREASING, \
+}
+
+static const struct intel_display_device_info tgli=
+{
+	XE_D_DISPLAY,
+	.__runtime_defaults.port_mask = BIT(PORT_A) | BIT(PORT_B) |
+	BIT(PORT_TC1) | BIT(PORT_TC2) | BIT(PORT_TC3) | BIT(PORT_TC4) | BIT(PORT_TC5) | BIT(PORT_TC6)
+};
+
+static const struct subplatform_desc tgl_s[] = {
+	{
+		SUBPLATFORM(tigerlake, uy),
+		.pciidlist = tgl_uy_ids,
+		STEP_INFO(tgl_uy_steppings),
+	},
+};
+
+static const struct platform_desc tgl_desc = {
+PLATFORM(tigerlake),
+.info = &tgli,
+.subplatforms=tgl_s,
+STEP_INFO(tgl_steppings),
+};
+
+static const enum intel_step rkl_steppings[] = {
+	[0] = STEP_A0,
+	[1] = STEP_B0,
+	[4] = STEP_C0,
+};
+static const struct intel_display_device_info rkli={
+	XE_D_DISPLAY,
+	.abox_mask = BIT(0),
+	.has_hti = 1,
+	.has_psr_hw_tracking = 0,
+
+	.__runtime_defaults.pipe_mask = BIT(PIPE_A) | BIT(PIPE_B) | BIT(PIPE_C),
+	.__runtime_defaults.cpu_transcoder_mask =
+	BIT(TRANSCODER_A) | BIT(TRANSCODER_B) | BIT(TRANSCODER_C),
+	.__runtime_defaults.port_mask = BIT(PORT_A) | BIT(PORT_B) |
+	BIT(PORT_TC1) | BIT(PORT_TC2),
+};
+
+static const struct platform_desc rkl_desc = {
+	PLATFORM(rocketlake),
+	.info = &rkli,
+	STEP_INFO(rkl_steppings),
+};
+
+static const u16 adls_rpls_ids[] = {
+	INTEL_RPLS_IDS(ID),
+	0
+};
+
+static const enum intel_step adl_s_steppings[] = {
+	[0x0] = STEP_A0,
+	[0x1] = STEP_A2,
+	[0x4] = STEP_B0,
+	[0x8] = STEP_B0,
+	[0xC] = STEP_C0,
+};
+
+static const enum intel_step adl_s_rpl_s_steppings[] = {
+	[0x4] = STEP_D0,
+	[0xC] = STEP_C0,
+};
+
+static const struct subplatform_desc adl_s_s[] = {
+	{
+		SUBPLATFORM(alderlake_s, raptorlake_s),
+		.pciidlist = adls_rpls_ids,
+		STEP_INFO(adl_s_rpl_s_steppings),
+	},
+};
+
+static const struct intel_display_device_info adl_s_descs={
+	XE_D_DISPLAY,
+	   .has_hti = 1,
+	   .has_psr_hw_tracking = 0,
+
+	   .__runtime_defaults.port_mask = BIT(PORT_A) |
+	   BIT(PORT_TC1) | BIT(PORT_TC2) | BIT(PORT_TC3) | BIT(PORT_TC4),
+};
+
+static const struct platform_desc adl_s_desc = {
+	PLATFORM(alderlake_s),
+	.subplatforms = adl_s_s,
+	.info = &adl_s_descs,
+	STEP_INFO(adl_s_steppings),
+};
+
+#define XE_LPD_FEATURES \
+.abox_mask = GENMASK(1, 0),						\
+.color = {								\
+.degamma_lut_size = 129, .gamma_lut_size = 1024,		\
+.degamma_lut_tests = DRM_COLOR_LUT_NON_DECREASING |		\
+DRM_COLOR_LUT_EQUAL_CHANNELS,					\
+},									\
+.dbuf.size = 4096,							\
+.dbuf.slice_mask = BIT(DBUF_S1) | BIT(DBUF_S2) | BIT(DBUF_S3) |		\
+BIT(DBUF_S4),							\
+.has_ddi = 1,								\
+.has_dp_mst = 1,							\
+.has_dsb = 1,								\
+.has_fpga_dbg = 1,							\
+.has_hotplug = 1,							\
+.has_ipc = 1,								\
+.has_psr = 1,								\
+.pipe_offsets = {							\
+[TRANSCODER_A] = PIPE_A_OFFSET,					\
+[TRANSCODER_B] = PIPE_B_OFFSET,					\
+[TRANSCODER_C] = PIPE_C_OFFSET,					\
+[TRANSCODER_D] = PIPE_D_OFFSET,					\
+[TRANSCODER_DSI_0] = PIPE_DSI0_OFFSET,				\
+[TRANSCODER_DSI_1] = PIPE_DSI1_OFFSET,				\
+},									\
+.trans_offsets = {							\
+[TRANSCODER_A] = TRANSCODER_A_OFFSET,				\
+[TRANSCODER_B] = TRANSCODER_B_OFFSET,				\
+[TRANSCODER_C] = TRANSCODER_C_OFFSET,				\
+[TRANSCODER_D] = TRANSCODER_D_OFFSET,				\
+[TRANSCODER_DSI_0] = TRANSCODER_DSI0_OFFSET,			\
+[TRANSCODER_DSI_1] = TRANSCODER_DSI1_OFFSET,			\
+},									\
+TGL_CURSOR_OFFSETS,							\
+						\
+.__runtime_defaults.ip.ver = 13,					\
+.__runtime_defaults.has_dmc = 1,					\
+.__runtime_defaults.has_dsc = 1,					\
+.__runtime_defaults.fbc_mask = BIT(INTEL_FBC_A),			\
+.__runtime_defaults.has_hdcp = 1,					\
+.__runtime_defaults.pipe_mask =						\
+BIT(PIPE_A) | BIT(PIPE_B) | BIT(PIPE_C) | BIT(PIPE_D)
+
+static const struct intel_display_device_info xe_lpd_display = {
+XE_LPD_FEATURES,
+.has_cdclk_crawl = 1,
+.has_psr_hw_tracking = 0,
+
+.__runtime_defaults.cpu_transcoder_mask =
+BIT(TRANSCODER_A) | BIT(TRANSCODER_B) |
+BIT(TRANSCODER_C) | BIT(TRANSCODER_D) |
+BIT(TRANSCODER_DSI_0) | BIT(TRANSCODER_DSI_1),
+.__runtime_defaults.port_mask = BIT(PORT_A) | BIT(PORT_B) |
+BIT(PORT_TC1) | BIT(PORT_TC2) | BIT(PORT_TC3) | BIT(PORT_TC4),
+};
+
+
+static const u16 adlp_adln_ids[] = {
+	INTEL_ADLN_IDS(ID),
+	0
+};
+
+static const u16 adlp_rplu_ids[] = {
+	INTEL_RPLU_IDS(ID),
+	0
+};
+
+static const u16 adlp_rplp_ids[] = {
+	INTEL_RPLP_IDS(ID),
+	0
+};
+
+static const enum intel_step adl_p_steppings[] = {
+	[0x0] = STEP_A0,
+	[0x4] = STEP_B0,
+	[0x8] = STEP_C0,
+	[0xC] = STEP_D0,
+};
+
+static const enum intel_step adl_p_adl_n_steppings[] = {
+	[0x0] = STEP_D0,
+};
+
+static const enum intel_step adl_p_rpl_pu_steppings[] = {
+	[0x4] = STEP_E0,
+};
+
+static const struct subplatform_desc adl_p_descs[]={
+	{
+		SUBPLATFORM(alderlake_p, alderlake_n),
+		.pciidlist = adlp_adln_ids,
+		STEP_INFO(adl_p_adl_n_steppings),
+	},
+	{
+		SUBPLATFORM(alderlake_p, raptorlake_p),
+		.pciidlist = adlp_rplp_ids,
+		STEP_INFO(adl_p_rpl_pu_steppings),
+	},
+	{
+		SUBPLATFORM(alderlake_p, raptorlake_u),
+		.pciidlist = adlp_rplu_ids,
+		STEP_INFO(adl_p_rpl_pu_steppings),
+	},
+};
+
+static const struct platform_desc adl_p_desc = {
+	PLATFORM(alderlake_p),
+	.subplatforms = adl_p_descs,
+	.info = &xe_lpd_display,
+	STEP_INFO(adl_p_steppings),
+};
+
+
+
+static const struct {
+u32 devid;
+const struct platform_desc *desc;
+} intel_display_ids[] = {
+INTEL_TGL_IDS(INTEL_DISPLAY_DEVICE, &tgl_desc),
+INTEL_RKL_IDS(INTEL_DISPLAY_DEVICE, &rkl_desc),
+INTEL_ADLS_IDS(INTEL_DISPLAY_DEVICE, &adl_s_desc),
+INTEL_RPLS_IDS(INTEL_DISPLAY_DEVICE, &adl_s_desc),
+INTEL_ADLP_IDS(INTEL_DISPLAY_DEVICE, &adl_p_desc),
+INTEL_ADLN_IDS(INTEL_DISPLAY_DEVICE, &adl_p_desc),
+INTEL_RPLU_IDS(INTEL_DISPLAY_DEVICE, &adl_p_desc),
+INTEL_RPLP_IDS(INTEL_DISPLAY_DEVICE, &adl_p_desc),
+};
+
+struct stepping_info {
+	char stepping;
+	char substepping;
+};
+
+#define _PIPEDMC_FPQ_TS_A		0x5f134
+#define _PIPEDMC_FPQ_TS_B		0x5f534
+#define PIPEDMC_FPQ_TS(pipe)		_MMIO_PIPE((pipe), _PIPEDMC_FPQ_TS_A, _PIPEDMC_FPQ_TS_B)
+
+#define _PIPEDMC_SCANLINE_RO_A		0x5f144
+#define _PIPEDMC_SCANLINE_RO_B		0x5f544
+#define PIPEDMC_SCANLINE_RO(pipe)	_MMIO_PIPE((pipe), _PIPEDMC_SCANLINE_RO_A, _PIPEDMC_SCANLINE_RO_B)
+
+#define _PIPEDMC_FPQ_CTL1_A		0x5f160
+#define _PIPEDMC_FPQ_CTL1_B		0x5f560
+#define PIPEDMC_FPQ_CTL1(pipe)		_MMIO_PIPE((pipe), _PIPEDMC_FPQ_CTL1_A, _PIPEDMC_FPQ_CTL1_B)
+#define   PIPEDMC_SW_DMC_WAKE		REG_BIT(0)
+
+#define _PIPEDMC_FPQ_CTL2_A		0x5f164
+#define _PIPEDMC_FPQ_CTL2_B		0x5f564
+#define PIPEDMC_FPQ_CTL2(pipe)		_MMIO_PIPE((pipe), _PIPEDMC_FPQ_CTL2_A, _PIPEDMC_FPQ_CTL2_B)
+#define   PIPEDMC_DMC_INT_AT_DELAYED_VBLANK	REG_BIT(1)
+#define   PIPEDMC_W1_DMC_WAKE			REG_BIT(0)
+
+#define _PIPEDMC_INTERRUPT_A		0x5f190 /* lnl+ */
+#define _PIPEDMC_INTERRUPT_B		0x5f590 /* lnl+ */
+#define PIPEDMC_INTERRUPT(pipe)		_MMIO_PIPE((pipe), _PIPEDMC_INTERRUPT_A, _PIPEDMC_INTERRUPT_B)
+#define _PIPEDMC_INTERRUPT_MASK_A	0x5f194 /* lnl+ */
+#define _PIPEDMC_INTERRUPT_MASK_B	0x5f594 /* lnl+ */
+#define PIPEDMC_INTERRUPT_MASK(pipe)	_MMIO_PIPE((pipe), _PIPEDMC_INTERRUPT_MASK_A, _PIPEDMC_INTERRUPT_MASK_B)
+#define   PIPEDMC_FLIPQ_PROG_DONE	REG_BIT(3)
+#define   PIPEDMC_ERROR			REG_BIT(2)
+#define   PIPEDMC_GTT_FAULT		REG_BIT(1)
+#define   PIPEDMC_ATS_FAULT		REG_BIT(0)
+
+#define PIPEDMC_BLOCK_PKGC_SW_A	0x5f1d0
+#define PIPEDMC_BLOCK_PKGC_SW_B	0x5F5d0
+#define PIPEDMC_BLOCK_PKGC_SW(pipe)				_MMIO_PIPE(pipe, \
+									   PIPEDMC_BLOCK_PKGC_SW_A, \
+									   PIPEDMC_BLOCK_PKGC_SW_B)
+#define PIPEDMC_BLOCK_PKGC_SW_BLOCK_PKGC_ALWAYS			BIT(31)
+#define PIPEDMC_BLOCK_PKGC_SW_BLOCK_PKGC_UNTIL_NEXT_FRAMESTART	BIT(15)
+
+#define _ADLP_PIPEDMC_REG_MMIO_BASE_A	0x5f000
+#define _TGL_PIPEDMC_REG_MMIO_BASE_A	0x92000
+
+#define __PIPEDMC_REG_MMIO_BASE(i915, dmc_id) \
+	((DISPLAY_VER(i915) >= 13 ? _ADLP_PIPEDMC_REG_MMIO_BASE_A : \
+					_TGL_PIPEDMC_REG_MMIO_BASE_A) + \
+	 0x400 * ((dmc_id) - 1))
+
+#define __DMC_REG_MMIO_BASE		0x8f000
+
+#define _DMC_REG_MMIO_BASE(i915, dmc_id) \
+	((dmc_id) == DMC_FW_MAIN ? __DMC_REG_MMIO_BASE : \
+				   __PIPEDMC_REG_MMIO_BASE(i915, dmc_id))
+
+#define _DMC_REG(i915, dmc_id, reg) \
+	((reg) - __DMC_REG_MMIO_BASE + _DMC_REG_MMIO_BASE(i915, dmc_id))
+
+#define DMC_EVENT_HANDLER_COUNT_GEN12	8
+
+#define _DMC_EVT_HTP_0			0x8f004
+
+#define DMC_EVT_HTP(i915, dmc_id, handler) \
+	_MMIO(_DMC_REG(i915, dmc_id, _DMC_EVT_HTP_0) + 4 * (handler))
+
+#define _DMC_EVT_CTL_0			0x8f034
+
+#define DMC_EVT_CTL(i915, dmc_id, handler) \
+	_MMIO(_DMC_REG(i915, dmc_id, _DMC_EVT_CTL_0) + 4 * (handler))
+
+#define DMC_EVT_CTL_ENABLE		REG_BIT(31)
+#define DMC_EVT_CTL_RECURRING		REG_BIT(30)
+#define DMC_EVT_CTL_TYPE_MASK		REG_GENMASK(17, 16)
+#define DMC_EVT_CTL_TYPE_LEVEL_0	0
+#define DMC_EVT_CTL_TYPE_LEVEL_1	1
+#define DMC_EVT_CTL_TYPE_EDGE_1_0	2
+#define DMC_EVT_CTL_TYPE_EDGE_0_1	3
+#define DMC_EVT_CTL_EVENT_ID_MASK	REG_GENMASK(15, 8)
+
+#define DMC_HTP_ADDR_SKL	0x00500034
+#define DMC_SSP_BASE		_MMIO(0x8F074)
+#define DMC_HTP_SKL		_MMIO(0x8F004)
+#define DMC_LAST_WRITE		_MMIO(0x8F034)
+#define DMC_LAST_WRITE_VALUE	0xc003b400
+#define DMC_MMIO_START_RANGE	0x80000
+#define DMC_MMIO_END_RANGE     0x8FFFF
+#define DMC_V1_MMIO_START_RANGE		0x80000
+#define TGL_MAIN_MMIO_START		0x8F000
+#define TGL_MAIN_MMIO_END		0x8FFFF
+#define _TGL_PIPEA_MMIO_START		0x92000
+#define _TGL_PIPEA_MMIO_END		0x93FFF
+#define _TGL_PIPEB_MMIO_START		0x96000
+#define _TGL_PIPEB_MMIO_END		0x97FFF
+#define ADLP_PIPE_MMIO_START		0x5F000
+#define ADLP_PIPE_MMIO_END		0x5FFFF
+
+
+struct intel_display {
+	
+	struct intel_display_platforms platform;
+	
+	struct {
+		const struct intel_display_device_info *__device_info;
+
+		struct intel_display_runtime_info __runtime_info;
+	} info;
+
+	struct {
+		u32 mmio_base;
+	} pps;
+	
+	struct intel_panel panel;
+	ConnectorInfo bconnectors[6];
+	const struct bdb_header *bdb;
+	struct intel_vbt_data vbt;
+	struct intel_opregion opregion;
+};
+
+#define DISPLAY_INFO(__display)		((__display)->info.__device_info)
+#define DISPLAY_RUNTIME_INFO(__display)	(&(__display)->info.__runtime_info)
+
+#define DISPLAY_VER(__display)		(DISPLAY_RUNTIME_INFO(__display)->ip.ver)
+#define DISPLAY_VERx100(__display)	(DISPLAY_RUNTIME_INFO(__display)->ip.ver * 100 + \
+					 DISPLAY_RUNTIME_INFO(__display)->ip.rel)
+
+
 
 
 #ifdef __cplusplus

@@ -196,7 +196,6 @@ enum intel_backlight_type {
 # define DP_TRAIN_VOLTAGE_SWING_LEVEL_3 (3 << 0)
 
 #define port_name(p) ((p) + '0')
-#define DISPLAY_VER(d) ((d)->version)
 #define AUX_CH_NAME_BUFSIZE	6
 
 #define  _MMIO(x) (x)
