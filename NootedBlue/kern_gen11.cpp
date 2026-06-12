@@ -508,8 +508,6 @@ uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 	
-	//fPCIConfigRevisionID
-	getMember<int32_t>(that, 0xc9c)=1;
 	getMember<uint8_t>(that, 0x1b36)=1; //dither off
 	
 		struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
@@ -568,8 +566,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 	
-	//fPCIConfigRevisionID
-	getMember<int32_t>(that, 0xce4)=1; //PHYA
 	getMember<uint8_t>(that, 0x1b12)=1; //dither off
 	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
