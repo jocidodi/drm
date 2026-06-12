@@ -1050,7 +1050,6 @@ unsigned long Gen11::hwSetMode(void *that,void *param_1,void *param_2,int param_
 	
 	if (hwu==2){
 		hwu=1;
-		return FunctionCast(hwSetMode, callback->ohwSetMode)(that,param_1,param_2,param_3,param_4 );
 	}
 	
 	return ret;
