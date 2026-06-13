@@ -1510,8 +1510,9 @@ static void dmc_load_program(struct intel_display *display, enum intel_dmc_id dm
 	IOSimpleLockUnlock(myLock);
 	IOSimpleLockFree(myLock);
 	
-	dmc_load_mmio(display, dmc_id);
+	//dmc_load_mmio(display, dmc_id);
 }
+
 
 
 void Gen11::hwInitializeCState(void *that)
@@ -1581,8 +1582,8 @@ void Gen11::hwInitializeCState(void *that)
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
 	NBlue::callback->readReg32(DC_STATE_DEBUG);
 	
-	
-	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
+	//need_pipedmc_load_mmio
+	//NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
 	//hwConfigureCustomAUX(that, true);
 
