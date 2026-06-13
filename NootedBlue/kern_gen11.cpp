@@ -534,12 +534,12 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	
 	for (int i = 0; i < 6; i++) {
-		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
-		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
-		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
-		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
-		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
-		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
+		pinfo[p].connectors[i].index=NBlue::callback->display_base.bconnectors[i].index;
+		pinfo[p].connectors[i].busId=NBlue::callback->display_base.bconnectors[i].busId;
+		pinfo[p].connectors[i].pipe=NBlue::callback->display_base.bconnectors[i].pipe;
+		pinfo[p].connectors[i].pad=NBlue::callback->display_base.bconnectors[i].pad;
+		pinfo[p].connectors[i].type=NBlue::callback->display_base.bconnectors[i].type;
+		pinfo[p].connectors[i].flags=NBlue::callback->display_base.bconnectors[i].flags;
 	}
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -594,12 +594,12 @@ uint64_t  Gen11::getOSInformation(void *that)
 	
 	
 	for (int i = 0; i < 6; i++) {
-		pinfo[p].connectors[i].index=NBlue::callback->display_ctx.bconnectors[i].index;
-		pinfo[p].connectors[i].busId=NBlue::callback->display_ctx.bconnectors[i].busId;
-		pinfo[p].connectors[i].pipe=NBlue::callback->display_ctx.bconnectors[i].pipe;
-		pinfo[p].connectors[i].pad=NBlue::callback->display_ctx.bconnectors[i].pad;
-		pinfo[p].connectors[i].type=NBlue::callback->display_ctx.bconnectors[i].type;
-		pinfo[p].connectors[i].flags=NBlue::callback->display_ctx.bconnectors[i].flags;
+		pinfo[p].connectors[i].index=NBlue::callback->display_base.bconnectors[i].index;
+		pinfo[p].connectors[i].busId=NBlue::callback->display_base.bconnectors[i].busId;
+		pinfo[p].connectors[i].pipe=NBlue::callback->display_base.bconnectors[i].pipe;
+		pinfo[p].connectors[i].pad=NBlue::callback->display_base.bconnectors[i].pad;
+		pinfo[p].connectors[i].type=NBlue::callback->display_base.bconnectors[i].type;
+		pinfo[p].connectors[i].flags=NBlue::callback->display_base.bconnectors[i].flags;
 	}
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -705,41 +705,41 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 	if (bk==1){
 		
 		//bklfrequency
-		getMember<uint32_t>(that, kexticl ? 0xe54 : kexttgld ? 0xe6c : 0x60)=NBlue::callback->display_ctx.panel.backlight.pwm_level_max;
+		getMember<uint32_t>(that, kexticl ? 0xe54 : kexttgld ? 0xe6c : 0x60)=NBlue::callback->display_base.panel.backlight.pwm_level_max;
 		
 		//bkllvl
-		if (getMember<uint32_t>(that, kexticl ? 0xe4c : kexttgld ? 0xe64 : 0xe58)<NBlue::callback->display_ctx.panel.backlight.level)
-		getMember<uint32_t>(that, kexticl ? 0xe4c : kexttgld ? 0xe64 : 0xe58)=NBlue::callback->display_ctx.panel.backlight.level;
+		if (getMember<uint32_t>(that, kexticl ? 0xe4c : kexttgld ? 0xe64 : 0xe58)<NBlue::callback->display_base.panel.backlight.level)
+		getMember<uint32_t>(that, kexticl ? 0xe4c : kexttgld ? 0xe64 : 0xe58)=NBlue::callback->display_base.panel.backlight.level;
 		
-		if (getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)>NBlue::callback->display_ctx.panel.backlight.level)
+		if (getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)>NBlue::callback->display_base.panel.backlight.level)
 			getMember<uint32_t>(that, kexticl ? 0xe4c : kexttgld ? 0xe64 : 0xe58)=getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c);
 		
 		//bkllvl_saved
-		if (getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)<NBlue::callback->display_ctx.panel.backlight.level)
-		getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)=NBlue::callback->display_ctx.panel.backlight.level;
+		if (getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)<NBlue::callback->display_base.panel.backlight.level)
+		getMember<uint32_t>(that, kexticl ? 0xe50 : kexttgld ? 0xe68 : 0xe5c)=NBlue::callback->display_base.panel.backlight.level;
 		
 		
 		u32 pwm_ctl;
 
-		pwm_ctl = NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller));
+		pwm_ctl = NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_base.panel.backlight.controller));
 		if (pwm_ctl & BXT_BLC_PWM_ENABLE) {
 			pwm_ctl &= ~BXT_BLC_PWM_ENABLE;
-			NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller),
+			NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_base.panel.backlight.controller),
 					   pwm_ctl);
 		}
 
-		NBlue::callback->writeReg32( BXT_BLC_PWM_FREQ(NBlue::callback->display_ctx.panel.backlight.controller),
-									NBlue::callback->display_ctx.panel.backlight.pwm_level_max);
+		NBlue::callback->writeReg32( BXT_BLC_PWM_FREQ(NBlue::callback->display_base.panel.backlight.controller),
+									NBlue::callback->display_base.panel.backlight.pwm_level_max);
 
-		NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), NBlue::callback->display_ctx.panel.backlight.level);
+		NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_base.panel.backlight.controller), NBlue::callback->display_base.panel.backlight.level);
 
 		pwm_ctl = 0;
-		if (NBlue::callback->display_ctx.panel.backlight.active_low_pwm)
+		if (NBlue::callback->display_base.panel.backlight.active_low_pwm)
 			pwm_ctl |= BXT_BLC_PWM_POLARITY;
 
-		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller), pwm_ctl);
-		NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller));
-		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_ctx.panel.backlight.controller),
+		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_base.panel.backlight.controller), pwm_ctl);
+		NBlue::callback->readReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_base.panel.backlight.controller));
+		NBlue::callback->writeReg32( BXT_BLC_PWM_CTL(NBlue::callback->display_base.panel.backlight.controller),
 				   pwm_ctl | BXT_BLC_PWM_ENABLE);
 
 	}
@@ -758,7 +758,7 @@ void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 	if (kexticl) getMember<uint32_t>(that, 0xd00)= param_1;
 	else getMember<uint32_t>(that, 0xd48)= param_1;
 	
-	struct intel_pps_delays p = NBlue::callback->display_ctx.panel.pps.pps_delays;
+	struct intel_pps_delays p = NBlue::callback->display_base.panel.pps.pps_delays;
 
 
 	if (kexttgld)
@@ -778,7 +778,7 @@ void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 		getMember<uint32_t>(that, 0x1558)= p.power_cycle;
 	}
 	
-	struct pps_registers regs=NBlue::callback->display_ctx.panel.regs;
+	struct pps_registers regs=NBlue::callback->display_base.panel.regs;
 	
 	
 	uint32_t PCH_PP_ON_DELAYS = REG_FIELD_PREP(PANEL_POWER_UP_DELAY_MASK, p.power_up) |
@@ -789,7 +789,7 @@ void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 	NBlue::callback->writeReg32(regs.pp_on, PCH_PP_ON_DELAYS);
 	NBlue::callback->writeReg32(regs.pp_off, PCH_PP_OFF_DELAYS);
 
-	int div = NBlue::callback->display_ctx.panel.rawclk_freq / 1000;
+	int div = NBlue::callback->display_base.panel.rawclk_freq / 1000;
 	
 	if (NBlue::callback->readReg32(regs.pp_div)!=-1)
 		NBlue::callback->writeReg32( regs.pp_div,
@@ -855,7 +855,7 @@ IOReturn Gen11::getAttributeForConnection(void* framebuffer, int32_t connectInde
 	
 	if (attribute != 'bklt') { return ret; }
 	
-	unsigned long v=NBlue::callback->display_ctx.panel.backlight.level;
+	unsigned long v=NBlue::callback->display_base.panel.backlight.level;
 	if (getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58)<v)  getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58)=v;
 	
 	*value=getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58);
@@ -896,9 +896,9 @@ IOReturn Gen11::wrapSetAttributeForConnection(void* framebuffer, int32_t connect
 	if (attribute != 'bklt') { return ret; }
 	
 	
-	if (value<NBlue::callback->display_ctx.panel.backlight.level)  value=NBlue::callback->display_ctx.panel.backlight.level;
+	if (value<NBlue::callback->display_base.panel.backlight.level)  value=NBlue::callback->display_base.panel.backlight.level;
 	
-	NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_ctx.panel.backlight.controller), value);
+	NBlue::callback->writeReg32( BXT_BLC_PWM_DUTY(NBlue::callback->display_base.panel.backlight.controller), value);
 	getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58)=value;
 	return kIOReturnSuccess;
 };
@@ -1068,37 +1068,6 @@ uint64_t Gen11::aframeBufferNotificationcallback(void *param_1,void *param_2,voi
 }
 
 
-static bool dmc_mmio_addr_sanity_check(const uint32_t *mmioaddr,
-										uint32_t mmio_count,
-										int header_ver,
-										uint8_t dmc_id)
-{
-	uint32_t start_range, end_range;
-	int i;
-
-	if (header_ver == 1) {
-		start_range = DMC_MMIO_START_RANGE;
-		end_range = DMC_MMIO_END_RANGE;
-	} else if (dmc_id == 0) { // DMC_FW_MAIN
-		start_range = TGL_MAIN_MMIO_START;
-		end_range = TGL_MAIN_MMIO_END;
-	} else if (DISPLAY_VER(&NBlue::callback->display_ctx) >= 13) {
-		start_range = ADLP_PIPE_MMIO_START;
-		end_range = ADLP_PIPE_MMIO_END;
-	} else if (DISPLAY_VER(&NBlue::callback->display_ctx) >= 12) {
-		start_range = TGL_PIPE_MMIO_START(dmc_id);
-		end_range = TGL_PIPE_MMIO_END(dmc_id);
-	}
-
-	for (i = 0; i < mmio_count; i++) {
-		if (mmioaddr[i] < start_range || mmioaddr[i] > end_range) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
 static bool is_valid_dmc_id(enum intel_dmc_id dmc_id)
 {
 	return dmc_id >= DMC_FW_MAIN && dmc_id < DMC_FW_MAX;
@@ -1121,7 +1090,6 @@ static void dmc_set_fw_offset(struct intel_dmc *dmc,
 				  const struct stepping_info *si,
 				  u8 package_ver)
 {
-	struct intel_display *display = dmc->display;
 	enum intel_dmc_id dmc_id;
 	unsigned int i;
 
@@ -1136,6 +1104,7 @@ static void dmc_set_fw_offset(struct intel_dmc *dmc,
 		if (dmc->dmc_info[dmc_id].present)
 			continue;
 
+		
 		if (fw_info_matches_stepping(&fw_info[i], si)) {
 			dmc->dmc_info[dmc_id].present = true;
 			dmc->dmc_info[dmc_id].dmc_offset = fw_info[i].offset;
@@ -1149,7 +1118,6 @@ parse_dmc_fw_package(struct intel_dmc *dmc,
 			 const struct stepping_info *si,
 			 size_t rem_size)
 {
-	struct intel_display *display = dmc->display;
 	u32 package_size = sizeof(struct intel_package_header);
 	u32 num_entries, max_entries;
 	const struct intel_fw_info *fw_info;
@@ -1177,6 +1145,7 @@ parse_dmc_fw_package(struct intel_dmc *dmc,
 	num_entries = package_header->num_entries;
 	if ((num_entries > max_entries))
 		num_entries = max_entries;
+	
 
 	fw_info = (const struct intel_fw_info *)
 		((u8 *)package_header + sizeof(*package_header));
@@ -1195,7 +1164,7 @@ static bool dmc_mmio_addr_sanity_check(struct intel_dmc *dmc,
 {
 	struct intel_display *display = dmc->display;
 	u32 start_range, end_range;
-	int i;
+	u32 i;
 
 	if (header_ver == 1) {
 		start_range = DMC_MMIO_START_RANGE;
@@ -1354,10 +1323,6 @@ static u32 parse_dmc_fw_header(struct intel_dmc *dmc,
 	}
 
 	for (i = 0; i < mmio_count - 1; i++) {
-		u32 orig_mmiodata[2] = {
-			dmc_info->mmiodata[i],
-			dmc_info->mmiodata[i+1],
-		};
 
 		if (!fixup_dmc_evt(display, dmc_id,
 				   dmc_info->mmioaddr[i], &dmc_info->mmiodata[i],
@@ -1380,9 +1345,10 @@ static u32 parse_dmc_fw_header(struct intel_dmc *dmc,
 	}
 	dmc_info->dmc_fw_size = dmc_header->fw_size;
 
-	dmc_info->payload = (u32*)IOMalloc(payload_size);
+	dmc_info->payload = static_cast<UInt32 *>(IOMallocZero(payload_size));
 	if (!dmc_info->payload)
 		return 0;
+	
 
 	payload = (u8 *)(dmc_header) + header_len_bytes;
 	memcpy(dmc_info->payload, payload, payload_size);
@@ -1407,7 +1373,6 @@ static u32 parse_dmc_fw_css(struct intel_dmc *dmc,
 				struct intel_css_header *css_header,
 				size_t rem_size)
 {
-	struct intel_display *display = dmc->display;
 
 	if (rem_size < sizeof(struct intel_css_header)) {
 		return 0;
@@ -1422,7 +1387,124 @@ static u32 parse_dmc_fw_css(struct intel_dmc *dmc,
 
 	return sizeof(struct intel_css_header);
 }
+static struct intel_dmc *display_to_dmc(struct intel_display *display)
+{
+	return display->dmc.dmc;
+}
+static void disable_event_handler(struct intel_display *display,
+				  u32 ctl_reg, u32 htp_reg)
+{
+	NBlue::callback->writeReg32(  ctl_reg,
+			   REG_FIELD_PREP(DMC_EVT_CTL_TYPE_MASK,
+					  DMC_EVT_CTL_TYPE_EDGE_0_1) |
+			   REG_FIELD_PREP(DMC_EVT_CTL_EVENT_ID_MASK,
+					  DMC_EVENT_FALSE));
+	NBlue::callback->writeReg32( htp_reg, 0);
+}
+static bool has_dmc_id_fw(struct intel_display *display, enum intel_dmc_id dmc_id)
+{
+	struct intel_dmc *dmc = display_to_dmc(display);
 
+	return dmc && dmc->dmc_info[dmc_id].payload;
+}
+
+bool intel_dmc_has_payload(struct intel_display *display)
+{
+	return has_dmc_id_fw(display, DMC_FW_MAIN);
+}
+static void disable_all_event_handlers(struct intel_display *display,
+					   enum intel_dmc_id dmc_id)
+{
+	int handler;
+
+	if (DISPLAY_VER(display) < 12)
+		return;
+
+	if (!has_dmc_id_fw(display, dmc_id))
+		return;
+
+	for (handler = 0; handler < DMC_EVENT_HANDLER_COUNT_GEN12; handler++)
+		disable_event_handler(display,
+					  DMC_EVT_CTL(display, dmc_id, handler),
+					  DMC_EVT_HTP(display, dmc_id, handler));
+}
+static u32 dmc_evt_ctl_disable(u32 dmc_evt_ctl)
+{
+
+	return (dmc_evt_ctl & DMC_EVT_CTL_ENABLE) |
+		REG_FIELD_PREP(DMC_EVT_CTL_TYPE_MASK,
+				   DMC_EVT_CTL_TYPE_EDGE_0_1) |
+		REG_FIELD_PREP(DMC_EVT_CTL_EVENT_ID_MASK,
+				   DMC_EVENT_FALSE);
+}
+static bool disable_dmc_evt(struct intel_display *display,
+				enum intel_dmc_id dmc_id,
+							u32 reg, u32 data)
+{
+	if (!is_dmc_evt_ctl_reg(display, dmc_id, reg))
+		return false;
+
+	if (dmc_id != DMC_FW_MAIN)
+		return true;
+
+	if (display->platform.tigerlake &&
+		is_event_handler(display, dmc_id, 0xbf, reg, data))
+		return true;
+
+	if ((display->platform.tigerlake || display->platform.alderlake_s) &&
+		is_event_handler(display, dmc_id, 0x2e, reg, data))
+		return true;
+
+	return false;
+}
+static u32 dmc_mmiodata(struct intel_display *display,
+			struct intel_dmc *dmc,
+			enum intel_dmc_id dmc_id, int i)
+{
+	if (disable_dmc_evt(display, dmc_id,
+				dmc->dmc_info[dmc_id].mmioaddr[i],
+				dmc->dmc_info[dmc_id].mmiodata[i]))
+		return dmc_evt_ctl_disable(dmc->dmc_info[dmc_id].mmiodata[i]);
+	else
+		return dmc->dmc_info[dmc_id].mmiodata[i];
+}
+
+static void dmc_load_mmio(struct intel_display *display, enum intel_dmc_id dmc_id)
+{
+	struct intel_dmc *dmc = display_to_dmc(display);
+	u32 i;
+
+	for (i = 0; i < dmc->dmc_info[dmc_id].mmio_count; i++) {
+		NBlue::callback->writeReg32( dmc->dmc_info[dmc_id].mmioaddr[i],
+				   dmc_mmiodata(display, dmc, dmc_id, i));
+	}
+}
+static void dmc_load_program(struct intel_display *display, enum intel_dmc_id dmc_id)
+{
+	struct intel_dmc *dmc = display_to_dmc(display);
+	u32 i;
+
+	disable_all_event_handlers(display, dmc_id);
+
+	IOSimpleLock *myLock;
+	myLock = IOSimpleLockAlloc();
+	IOSimpleLockLock(myLock);
+
+	//preempt_disable();
+
+	for (i = 0; i < dmc->dmc_info[dmc_id].dmc_fw_size; i++) {
+		NBlue::callback->writeReg32(
+				  DMC_PROGRAM(dmc->dmc_info[dmc_id].start_mmioaddr, i),
+				  dmc->dmc_info[dmc_id].payload[i]);
+	}
+
+	//preempt_enable();
+	
+	IOSimpleLockUnlock(myLock);
+	IOSimpleLockFree(myLock);
+	
+	dmc_load_mmio(display, dmc_id);
+}
 
 
 void Gen11::hwInitializeCState(void *that)
@@ -1431,9 +1513,7 @@ void Gen11::hwInitializeCState(void *that)
 	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
 	
 	
-	struct intel_dmc dmc0;
-	struct intel_dmc *dmc=&dmc0;
-	dmc->display=&NBlue::callback->display_ctx;
+	struct intel_dmc *dmc=NBlue::callback->display_base.dmc.dmc;
 	
 	struct intel_css_header *css_header;
 	struct intel_package_header *package_header;
@@ -1447,6 +1527,7 @@ void Gen11::hwInitializeCState(void *that)
 		return;
 	}
 	
+	initialize_stepping_info(&NBlue::callback->display_base, &si);
 	
 	css_header = (struct intel_css_header *)fw.data;
 	r = parse_dmc_fw_css(dmc, css_header, fw.size);
@@ -1474,26 +1555,15 @@ void Gen11::hwInitializeCState(void *that)
 		parse_dmc_fw_header(dmc, dmc_header, fw.size - offset, static_cast<intel_dmc_id>(i));
 	}
 
-
-
-	for (uint8_t dmc_id = 0; dmc_id < DMC_FW_MAX; dmc_id++) {
-		if (!dmc->dmc_info[dmc_id].present)
-			continue;
-		for (uint32_t i = 0; i < dmc->dmc_info[dmc_id].dmc_fw_size; i++) {
-			uint32_t addr = dmc->dmc_info[dmc_id].start_mmioaddr + (i * 4);
-			NBlue::callback->writeReg32(addr, dmc->dmc_info[dmc_id].payload[i]);
-		}
+	if (!intel_dmc_has_payload(&NBlue::callback->display_base)) {
+		return ;
 	}
 	
-	for (uint8_t dmc_id = 0; dmc_id < DMC_FW_MAX; dmc_id++) {
-		if (!dmc->dmc_info[dmc_id].present)
+	
+	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
+		if (!dmc->dmc_info[i].present)
 			continue;
-
-		for (uint32_t i = 0; i < dmc->dmc_info[dmc_id].mmio_count; i++) {
-			NBlue::callback->writeReg32(dmc->dmc_info[dmc_id].mmioaddr[i],
-										dmc->dmc_info[dmc_id].mmiodata[i]);
-		}
-
+		dmc_load_program(&NBlue::callback->display_base, static_cast<intel_dmc_id>(i));
 	}
 	
 
@@ -1501,9 +1571,9 @@ void Gen11::hwInitializeCState(void *that)
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
 	NBlue::callback->readReg32(DC_STATE_DEBUG);
 	
-	//intel_dmc_enable_pipe
+	
 	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
-	hwConfigureCustomAUX(that, true);
+	//hwConfigureCustomAUX(that, true);
 
 }

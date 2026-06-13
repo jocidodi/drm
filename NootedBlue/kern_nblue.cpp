@@ -1156,7 +1156,9 @@ parse_lfp_backlight(struct intel_display *display,
 	OSArray *connectorArray = OSArray::withCapacity(1);
 	OSDictionary *connectorDict = OSDictionary::withCapacity(40);
 	
-
+	connectorDict->setObject("step_name", OSString::withCString( DISPLAY_RUNTIME_INFO(display)->step_name ));
+	connectorDict->setObject("display_ver", OSNumber::withNumber(DISPLAY_VER(display), 32));
+	
 	connectorDict->setObject("panel_type", OSNumber::withNumber(panel_type, 32));
 	connectorDict->setObject("pp_ctl", OSNumber::withNumber(pp_ctl, 32));
 	connectorDict->setObject("pp_status", OSNumber::withNumber(pp_sta, 32));
@@ -1326,7 +1328,7 @@ void init_bdb_blocks(struct intel_display *display)
 
 static const struct platform_desc *find_platform_desc()
 {
-	int i;
+	u32 i;
 
 	for (i = 0; i < ARRAY_SIZE(intel_display_ids); i++) {
 		if (intel_display_ids[i].devid == NBlue::callback->deviceId)
@@ -1361,25 +1363,24 @@ static void initialize_step(struct intel_display *display, enum intel_step step)
 
 	DISPLAY_RUNTIME_INFO(display)->step = step;
 
-	/* Step name will remain an empty string if not applicable */
 	if (step >= 0 && step < ARRAY_SIZE(step_names))
-		strcpy(DISPLAY_RUNTIME_INFO(display)->step_name, step_names[step],strlen(DISPLAY_RUNTIME_INFO(display)->step_name));
+		strcpy(DISPLAY_RUNTIME_INFO(display)->step_name, step_names[step],sizeof(DISPLAY_RUNTIME_INFO(display)->step_name));
 }
 
 #undef __STEP_NAME
 
-static enum intel_step get_pre_gmdid_step(struct intel_display *display,
+static enum intel_step get_pre_gmdid_step(
 					  const struct stepping_desc *main,
 					  const struct stepping_desc *sub)
 {
 	const enum intel_step *map = main->map;
-	int size = main->size;
+	int size = (int)main->size;
 	int revision = NBlue::callback->pciRevision;
 	enum intel_step step;
 
 	if (sub && sub->map && sub->size) {
 		map = sub->map;
-		size = sub->size;
+		size = (int)sub->size;
 	}
 
 	if (!map || !size)
@@ -1437,7 +1438,6 @@ static void display_platforms_or(struct intel_display_platforms *dst,
 struct intel_display *intel_display_device_probe(struct intel_display *display)
 {
 	const struct intel_display_device_info *info;
-	struct intel_display_ip_ver ip_ver = {};
 	const struct platform_desc *desc;
 	const struct subplatform_desc *subdesc;
 	enum intel_step step;
@@ -1462,7 +1462,7 @@ struct intel_display *intel_display_device_probe(struct intel_display *display)
 		display_platforms_or(&display->platform, &subdesc->platforms);
 	}
 
-	step = get_pre_gmdid_step(display, &desc->step_info,
+	step = get_pre_gmdid_step( &desc->step_info,
 					  subdesc ? &subdesc->step_info : NULL);
 	
 
@@ -1471,49 +1471,33 @@ struct intel_display *intel_display_device_probe(struct intel_display *display)
 
 	return display;
 
-no_display:
-
-	return nullptr;
 }
 
 int NBlue::intel_opregion_setup()
 {
-	struct intel_display *display=&display_ctx;
+	struct intel_display *display=&display_base;
 	struct intel_opregion *opregion = &display->opregion;
+	display->dmc.dmc=&dmc0;
+	display->dmc.dmc->display=display;
+	display->dmc.dmc->max_fw_size=0x20000;
+	
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
 	int err = 0;
-	void *base = nullptr;
 	const void *vbt = nullptr;
 	u32 vbt_size = 0;
-
-	asls = NBlue::callback->iGPU->configRead32(0xFC);
+	
+	asls = iGPU->configRead32(0xFC);
 	
 	if (asls == 0) {
 		return -ENOMEM;
 	}
 
 	IOPhysicalAddress physAddr = asls;
-	base = IOMallocPageable(OPREGION_SIZE, PAGE_SIZE);
-	if (!base) {
-		return -ENOMEM;
-	}
-
 	IOMemoryDescriptor *memDesc = IOMemoryDescriptor::withPhysicalAddress(
 		physAddr, OPREGION_SIZE, kIODirectionInOut);
 	
-	if (!memDesc) {
-		IOFreePageable(base, OPREGION_SIZE);
-		return -ENOMEM;
-	}
-
 	IOMemoryMap *memMap = memDesc->map();
-	if (!memMap) {
-		memDesc->release();
-		IOFreePageable(base, OPREGION_SIZE);
-		return -ENOMEM;
-	}
-
 	mach_vm_address_t virtAddr = memMap->getVirtualAddress();
 	
 	memcpy(buf, (void *)virtAddr, sizeof(buf));
@@ -1523,15 +1507,13 @@ int NBlue::intel_opregion_setup()
 	}
 
 	opregion->header = reinterpret_cast<struct opregion_header *>(virtAddr);
-
-
 	mboxes = opregion->header->mboxes;
 	
 	if (mboxes & MBOX_ACPI) {
 			opregion->acpi = (struct opregion_acpi *)((uint8_t *)virtAddr + OPREGION_ACPI_OFFSET);
 			opregion->acpi->chpd = 1;
 		}
-
+	
 		if (mboxes & MBOX_ASLE) {
 			opregion->asle = (struct opregion_asle *)((uint8_t *)virtAddr + OPREGION_ASLE_OFFSET);
 			opregion->asle->ardy = ASLE_ARDY_NOT_READY;
@@ -1586,38 +1568,9 @@ int NBlue::intel_opregion_setup()
 			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
 
 			if (bdb) {
-				/*uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
-				asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(1));
-				uint32_t family = (eax >> 8) & 0xF;
-				uint32_t model = (eax >> 4) & 0xF;
-				uint32_t extModel = (eax >> 16) & 0xF;
-				uint32_t stepping = eax & 0xF;
-				if (family == 0x6) {
-					model |= (extModel << 4);
-				}
-				uint32_t cpuModel = model;
-				display->isRealTGL = (model == 0x8C || model == 0x8D);
-				display->isRKL = (model == 0xA7);
-				display->isADL = (model == 0x97 || model == 0x9A || model == 0xBE);
-				display->isRPL = (model == 0xB7 || model == 0xBA || model == 0xBF ||
-							   model == 0xA6 || model == 0xAA);
-				display->isMTL = (model == 0xAC || model == 0xAD);
 
-				if (display->isMTL || display->isADL || display->isRPL) {
-					display->version = 13;
-				} else if (display->isRealTGL|| display->isRKL) {
-					display->version = 12;
-				} else {
-					display->version = 12;
-				}*/
-				
-				
 				intel_display_device_probe(display);
-				
-				
-				/*display->platform.alderlake_s = false; // needs detection
-				display->platform.rocketlake = display->isRKL;
-				display->platform.dg1 = false;*/
+
 				display->pps.mmio_base = PCH_PPS_BASE;
 				display->panel.pps.mmio_base = PCH_PPS_BASE;
 				display->vbt.version = bdb->version;
@@ -1630,22 +1583,19 @@ int NBlue::intel_opregion_setup()
 err_out:
 	if (memMap) memMap->release();
 	if (memDesc) memDesc->release();
-	if (base) IOFreePageable(base, OPREGION_SIZE);
 	
 	return err;
 }
 
 void NBlue::parse_backlight()
 {
-	parse_lfp_backlight(&display_ctx,&display_ctx.panel);
+	parse_lfp_backlight(&display_base,&display_base.panel);
 }
 
 UInt32 NBlue::readReg32(unsigned long reg) {
 	if (Gen11::callback)
 	return Gen11::callback->raReadRegister32(nullptr,reg);
 	
-	//panic("X");
-
 	if (reg < rmmioLen-4) {
 		return this->rmmioPtr[reg];
 	} else {
@@ -1656,9 +1606,6 @@ UInt32 NBlue::readReg32(unsigned long reg) {
 void NBlue::writeReg32(unsigned long reg, UInt32 val) {
 	if (Gen11::callback)
 	return Gen11::callback->raWriteRegister32(nullptr,reg,val);
-	
-	//panic("X");
-	
 	
 	if (reg < rmmioLen-4) {
 		this->rmmioPtr[reg] = val;

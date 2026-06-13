@@ -21,8 +21,8 @@ extern const struct FWDescriptor firmware[];
 extern const size_t firmwareCount;
 
 struct Firmware {
-    UInt8 *data;
-    UInt32 size;
+	UInt8 *data;
+	size_t size;
 };
 
 inline const Firmware getFWByName(const char *name) {

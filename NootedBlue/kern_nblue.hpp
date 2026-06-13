@@ -37,7 +37,8 @@ class NBlue {
     public:
 	
     static NBlue *callback;
-	intel_display display_ctx;
+	struct intel_display display_base;
+	struct intel_dmc dmc0;
 	IOPCIDevice *iGPU {nullptr};
 	
 	uint32_t deviceId {0};

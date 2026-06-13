@@ -3004,6 +3004,13 @@ struct stepping_info {
 #define ADLP_PIPE_MMIO_START		0x5F000
 #define ADLP_PIPE_MMIO_END		0x5FFFF
 
+#define DMC_PROGRAM(addr, i)	_MMIO((addr) + (i) * 4)
+enum dmc_event_id {
+	DMC_EVENT_TRUE = 0x0,
+	DMC_EVENT_FALSE = 0x1,
+};
+
+
 
 struct intel_display {
 	
@@ -3019,6 +3026,11 @@ struct intel_display {
 		u32 mmio_base;
 	} pps;
 	
+	struct {
+		struct intel_dmc *dmc;
+		//struct ref_tracker *wakeref;
+	} dmc;
+	
 	struct intel_panel panel;
 	ConnectorInfo bconnectors[6];
 	const struct bdb_header *bdb;
@@ -3033,7 +3045,144 @@ struct intel_display {
 #define DISPLAY_VERx100(__display)	(DISPLAY_RUNTIME_INFO(__display)->ip.ver * 100 + \
 					 DISPLAY_RUNTIME_INFO(__display)->ip.rel)
 
+#define DMC_DEFAULT_FW_OFFSET		0xFFFFFFFF
+#define PACKAGE_MAX_FW_INFO_ENTRIES	20
+#define PACKAGE_V2_MAX_FW_INFO_ENTRIES	32
+#define DMC_V1_MAX_MMIO_COUNT		8
+#define DMC_V3_MAX_MMIO_COUNT		20
+#define DMC_V1_MMIO_START_RANGE		0x80000
 
+#define _PIPEDMC_CONTROL_A		0x45250
+#define _PIPEDMC_CONTROL_B		0x45254
+#define  PIPEDMC_ENABLE			REG_BIT(0)
+#define  DC_STATE_DEBUG                  (0x45520)
+#define  DC_STATE_DEBUG_MASK_CORES	(1 << 0)
+#define  DC_STATE_DEBUG_MASK_MEMORY_UP	(1 << 1)
+
+#define DMC_HTP_ADDR_SKL	0x00500034
+#define DMC_SSP_BASE		_MMIO(0x8F074)
+#define DMC_HTP_SKL		_MMIO(0x8F004)
+#define DMC_LAST_WRITE		_MMIO(0x8F034)
+#define DMC_LAST_WRITE_VALUE	0xc003b400
+#define DMC_MMIO_START_RANGE	0x80000
+#define DMC_MMIO_END_RANGE     0x8FFFF
+#define DMC_V1_MMIO_START_RANGE		0x80000
+#define TGL_MAIN_MMIO_START		0x8F000
+#define TGL_MAIN_MMIO_END		0x8FFFF
+#define _TGL_PIPEA_MMIO_START		0x92000
+#define _TGL_PIPEA_MMIO_END		0x93FFF
+#define _TGL_PIPEB_MMIO_START		0x96000
+#define _TGL_PIPEB_MMIO_END		0x97FFF
+#define ADLP_PIPE_MMIO_START		0x5F000
+#define ADLP_PIPE_MMIO_END		0x5FFFF
+
+#define TGL_PIPE_MMIO_START(dmc_id)	_PICK_EVEN(((dmc_id) - 1), _TGL_PIPEA_MMIO_START,\
+						  _TGL_PIPEB_MMIO_START)
+
+#define TGL_PIPE_MMIO_END(dmc_id)	_PICK_EVEN(((dmc_id) - 1), _TGL_PIPEA_MMIO_END,\
+						  _TGL_PIPEB_MMIO_END)
+
+#define PACKAGE_MAX_FW_INFO_ENTRIES   20
+#define PACKAGE_V2_MAX_FW_INFO_ENTRIES 32
+
+// ============================================================================
+// STRUCTURES
+// ============================================================================
+
+struct intel_css_header {
+	uint32_t module_type;
+	uint32_t header_len;
+	uint32_t header_ver;
+	uint32_t module_id;
+	uint32_t module_vendor;
+	uint32_t date;
+	uint32_t size;
+	uint32_t key_size;
+	uint32_t modulus_size;
+	uint32_t exponent_size;
+	uint32_t reserved1[12];
+	uint32_t version;
+	uint32_t reserved2[8];
+	uint32_t kernel_header_info;
+} __attribute__((packed));
+
+struct intel_package_header {
+	uint8_t  header_len;
+	uint8_t  header_ver;
+	uint8_t  reserved[10];
+	uint32_t num_entries;
+} __attribute__((packed));
+
+struct intel_fw_info {
+	uint8_t  reserved1;
+	uint8_t  dmc_id;
+	char     stepping;
+	char     substepping;
+	uint32_t offset;
+	uint32_t reserved2;
+} __attribute__((packed));
+
+struct intel_dmc_header_base {
+	uint32_t signature;
+	uint8_t  header_len;
+	uint8_t  header_ver;
+	uint16_t dmcc_ver;
+	uint32_t project;
+	uint32_t fw_size;
+	uint32_t fw_version;
+} __attribute__((packed));
+
+struct intel_dmc_header_v1 {
+	struct intel_dmc_header_base base;
+	uint32_t mmio_count;
+	uint32_t mmioaddr[DMC_V1_MAX_MMIO_COUNT];
+	uint32_t mmiodata[DMC_V1_MAX_MMIO_COUNT];
+	char dfile[32];
+	uint32_t reserved1[2];
+} __attribute__((packed));
+
+struct intel_dmc_header_v3 {
+	struct intel_dmc_header_base base;
+	uint32_t start_mmioaddr;
+	uint32_t reserved[9];
+	char dfile[32];
+	uint32_t mmio_count;
+	uint32_t mmioaddr[DMC_V3_MAX_MMIO_COUNT];
+	uint32_t mmiodata[DMC_V3_MAX_MMIO_COUNT];
+} __attribute__((packed));
+
+struct dmc_fw_info {
+	u32 mmio_count;
+	u32 mmioaddr[20];
+	u32 mmiodata[20];
+	u32 dmc_offset;
+	u32 start_mmioaddr;
+	u32 dmc_fw_size; /*dwords */
+	u32 *payload;
+	bool present;
+};
+
+enum intel_dmc_id {
+	DMC_FW_MAIN = 0,
+	DMC_FW_PIPEA,
+	DMC_FW_PIPEB,
+	DMC_FW_PIPEC,
+	DMC_FW_PIPED,
+	DMC_FW_MAX
+};
+
+struct intel_dmc {
+	struct intel_display *display;
+	//struct work_struct work;
+	const char *fw_path;
+	u32 max_fw_size; /* bytes */
+	u32 version;
+	struct {
+		u32 dc5_start;
+		u32 count;
+	} dc6_allowed;
+	struct dmc_fw_info dmc_info[DMC_FW_MAX];
+};
 
 
 #ifdef __cplusplus
