@@ -3184,6 +3184,12 @@ struct intel_dmc {
 	struct dmc_fw_info dmc_info[DMC_FW_MAX];
 };
 
+#define GEN9_CLKGATE_DIS_0		_MMIO(0x46530)
+#define   DARBF_GATING_DIS		REG_BIT(27)
+#define CLKREQ_POLICY			_MMIO(0x101038)
+#define  CLKREQ_POLICY_MEM_UP_OVRD	REG_BIT(1)
+
+
 
 #ifdef __cplusplus
 //}

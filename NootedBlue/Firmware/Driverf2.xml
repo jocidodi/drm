@@ -129,8 +129,6 @@
 		<integer>0</integer>
 		<key>DisableInternalPanel</key>
 		<integer>0</integer>
-		<key>DitherDisable</key>
-		<integer>1</integer>
 		<key>DynamicRingTables</key>
 		<integer>0</integer>
 		<key>EDPDownSpreadDisable</key>
