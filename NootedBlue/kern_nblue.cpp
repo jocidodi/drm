@@ -1158,6 +1158,8 @@ parse_lfp_backlight(struct intel_display *display,
 	
 	connectorDict->setObject("step_name", OSString::withCString( DISPLAY_RUNTIME_INFO(display)->step_name ));
 	connectorDict->setObject("display_ver", OSNumber::withNumber(DISPLAY_VER(display), 32));
+	connectorDict->setObject("devid", OSNumber::withNumber(NBlue::callback->deviceId, 32));
+	connectorDict->setObject("revid", OSNumber::withNumber(NBlue::callback->pciRevision, 32));
 	
 	connectorDict->setObject("panel_type", OSNumber::withNumber(panel_type, 32));
 	connectorDict->setObject("pp_ctl", OSNumber::withNumber(pp_ctl, 32));

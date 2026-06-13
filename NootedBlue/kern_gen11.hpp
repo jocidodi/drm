@@ -568,6 +568,11 @@ private:
 	static uint64_t	aframeBufferNotificationcallback(void *param_1,void *param_2,void *param_3,int param_4,void *param_5);
 	mach_vm_address_t oaframeBufferNotificationcallback {};
 	
+	static void setDCState(void *that,bool param_1);
+	mach_vm_address_t osetDCState {};
+	
+	
+	
 public:
 
 	void init();
