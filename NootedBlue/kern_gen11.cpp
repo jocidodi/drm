@@ -88,9 +88,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 			
-			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
+			/*{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
-			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},
+			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},*/
 			
 			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
@@ -133,6 +133,20 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
+		//regs
+		static const uint8_t f10[]= {0x40, 0xf8, 0x06, 0x00};
+		static const uint8_t r10[]= {0x40, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f10a[]= {0x70, 0xfa, 0x06, 0x00};
+		static const uint8_t r10a[]= {0x70, 0x0a, 0x06, 0x00};
+		
+		static const uint8_t f10b[]= {0x00, 0xf8, 0x06, 0x00};
+		static const uint8_t r10b[]= {0x00, 0x08, 0x06, 0x00};
+		
+		static const uint8_t f10c[]= {0x60, 0xf8, 0x06, 0x00};
+		static const uint8_t r10c[]= {0x60, 0x08, 0x06, 0x00};
+		
+		
 
 		//getHPDState register
 		static const uint8_t f19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
@@ -150,7 +164,10 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			{&kextG11FB, f19, r19, arrsize(f19),    5},
-			
+			{&kextG11FB, f10, r10, arrsize(f10),    12},
+			{&kextG11FB, f10a, r10a, arrsize(f10a),    1},
+			{&kextG11FB, f10b, r10b, arrsize(f10b),    32},
+			{&kextG11FB, f10c, r10c, arrsize(f10c),    11},
 			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
