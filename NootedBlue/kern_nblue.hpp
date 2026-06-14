@@ -38,6 +38,7 @@ class NBlue {
 	
     static NBlue *callback;
 	struct intel_display display_base;
+	const struct intel_device_info *info_base;
 	struct intel_dmc dmc0;
 	IOPCIDevice *iGPU {nullptr};
 	

@@ -1475,6 +1475,118 @@ struct intel_display *intel_display_device_probe(struct intel_display *display)
 
 }
 
+static enum intel_pch
+intel_pch_type(const struct intel_display *display, unsigned short id)
+{
+	switch (id) {
+	case INTEL_PCH_IBX_DEVICE_ID_TYPE:
+		return PCH_IBX;
+	case INTEL_PCH_CPT_DEVICE_ID_TYPE:
+		return PCH_CPT;
+	case INTEL_PCH_PPT_DEVICE_ID_TYPE:
+		return PCH_CPT;
+	case INTEL_PCH_LPT_DEVICE_ID_TYPE:
+		return PCH_LPT_H;
+	case INTEL_PCH_LPT_LP_DEVICE_ID_TYPE:
+		return PCH_LPT_LP;
+	case INTEL_PCH_WPT_DEVICE_ID_TYPE:
+		return PCH_LPT_H;
+	case INTEL_PCH_WPT_LP_DEVICE_ID_TYPE:
+		return PCH_LPT_LP;
+	case INTEL_PCH_SPT_DEVICE_ID_TYPE:
+		return PCH_SPT;
+	case INTEL_PCH_SPT_LP_DEVICE_ID_TYPE:
+		return PCH_SPT;
+	case INTEL_PCH_KBP_DEVICE_ID_TYPE:
+		return PCH_SPT;
+	case INTEL_PCH_CNP_DEVICE_ID_TYPE:
+		return PCH_CNP;
+	case INTEL_PCH_CNP_LP_DEVICE_ID_TYPE:
+		return PCH_CNP;
+	case INTEL_PCH_CMP_DEVICE_ID_TYPE:
+	case INTEL_PCH_CMP2_DEVICE_ID_TYPE:
+		return PCH_CNP;
+	case INTEL_PCH_CMP_V_DEVICE_ID_TYPE:
+		return PCH_SPT;
+	case INTEL_PCH_ICP_DEVICE_ID_TYPE:
+	case INTEL_PCH_ICP2_DEVICE_ID_TYPE:
+		return PCH_ICP;
+	case INTEL_PCH_MCC_DEVICE_ID_TYPE:
+		return PCH_TGP;
+	case INTEL_PCH_TGP_DEVICE_ID_TYPE:
+	case INTEL_PCH_TGP2_DEVICE_ID_TYPE:
+		return PCH_TGP;
+	case INTEL_PCH_JSP_DEVICE_ID_TYPE:
+		return PCH_ICP;
+	case INTEL_PCH_ADP_DEVICE_ID_TYPE:
+	case INTEL_PCH_ADP2_DEVICE_ID_TYPE:
+	case INTEL_PCH_ADP3_DEVICE_ID_TYPE:
+	case INTEL_PCH_ADP4_DEVICE_ID_TYPE:
+		return PCH_ADP;
+	default:
+		return PCH_NONE;
+	}
+}
+
+static u32 get_allowed_dc_mask(struct intel_display *display, int enable_dc)
+{
+	u32 mask;
+	int requested_dc;
+	int max_dc;
+
+
+	if (DISPLAY_VER(display) >= 20)
+		max_dc = 2;
+	else if (display->platform.dg2)
+		max_dc = 1;
+	else if (display->platform.dg1)
+		max_dc = 3;
+	else if (DISPLAY_VER(display) >= 12)
+		max_dc = 4;
+	else if (display->platform.geminilake || display->platform.broxton)
+		max_dc = 1;
+	else if (DISPLAY_VER(display) >= 9)
+		max_dc = 2;
+	else
+		max_dc = 0;
+
+
+	mask = display->platform.geminilake || display->platform.broxton ||
+		DISPLAY_VER(display) >= 11 ? DC_STATE_EN_DC9 : 0;
+
+	//if (!display->params.disable_power_well)
+		max_dc = 0;
+
+	if (enable_dc >= 0 && enable_dc <= max_dc) {
+		requested_dc = enable_dc;
+	} else if (enable_dc == -1) {
+		requested_dc = max_dc;
+	} else if (enable_dc > max_dc && enable_dc <= 4) {
+		requested_dc = max_dc;
+	} else {
+		requested_dc = max_dc;
+	}
+
+	switch (requested_dc) {
+	case 4:
+		mask |= DC_STATE_EN_DC3CO | DC_STATE_EN_UPTO_DC6;
+		break;
+	case 3:
+		mask |= DC_STATE_EN_DC3CO | DC_STATE_EN_UPTO_DC5;
+		break;
+	case 2:
+		mask |= DC_STATE_EN_UPTO_DC6;
+		break;
+	case 1:
+		mask |= DC_STATE_EN_UPTO_DC5;
+		break;
+	}
+
+
+	return mask;
+}
+
+
 int NBlue::intel_opregion_setup()
 {
 	struct intel_display *display=&display_base;
@@ -1482,6 +1594,12 @@ int NBlue::intel_opregion_setup()
 	display->dmc.dmc=&dmc0;
 	display->dmc.dmc->display=display;
 	display->dmc.dmc->max_fw_size=0x20000;
+	
+	unsigned short id = deviceId & INTEL_PCH_DEVICE_ID_MASK;
+	display->pch_type = intel_pch_type(display, id);
+	
+	display->power.domains.allowed_dc_mask = get_allowed_dc_mask(display, true);
+	
 	
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
@@ -1570,6 +1688,15 @@ int NBlue::intel_opregion_setup()
 			const struct bdb_header *bdb = reinterpret_cast<const struct bdb_header *>(base + vbth->bdb_offset);
 
 			if (bdb) {
+				
+				u32 i;
+				for (i = 0; i < ARRAY_SIZE(intel_platform_ids); i++) {
+					if (intel_platform_ids[i].devid == deviceId)
+					{
+						info_base= intel_platform_ids[i].desc;
+						break;
+					}
+				}
 
 				intel_display_device_probe(display);
 

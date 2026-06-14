@@ -94,7 +94,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			*/
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
-			{"__ZN31AppleIntelFramebufferController10setDCStateEb",setDCState, this->osetDCState},
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
@@ -135,6 +134,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
 
+		//getHPDState register
+		static const uint8_t f19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
+		static const uint8_t r19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
 		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
@@ -147,7 +149,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f8, r8, arrsize(f8),    1},
 			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
-			
+			{&kextG11FB, f19, r19, arrsize(f19),    5},
 			
 			
 		};
@@ -201,7 +203,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
-				{"__ZN31AppleIntelFramebufferController10setDCStateEb",setDCState, this->osetDCState},
 				{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 				{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 				{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
@@ -221,7 +222,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		} else //debug version
 		{
 			RouteRequestPlus requests[] = {
-				{"__ZN24AppleIntelBaseController10setDCStateEb",setDCState, this->osetDCState},
 				{"__ZN24AppleIntelBaseController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 				{"__ZN24AppleIntelBaseController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 				{"__ZN24AppleIntelBaseController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
@@ -314,9 +314,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t r15[]= {0xeb, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		
 
-		//getHPDState register
-		static const uint8_t f19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
-		static const uint8_t r19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
+		
 		
 		//savenvram
 		static const uint8_t f20[]= {0xff, 0x90, 0xf8, 0x09, 0x00, 0x00, 0x41, 0x89, 0xc6, 0x48, 0x85, 0xdb, 0x74, 0x17};
@@ -346,7 +344,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f9p, r9p, arrsize(f9p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
-				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20p, r20p, arrsize(f20p),	1},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
@@ -368,7 +365,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
 				{&kextG11FBT, f15, r15, arrsize(f15),	1},
-				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20, r20, arrsize(f20),	1},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
@@ -1012,14 +1008,11 @@ uint32_t Gen11::wrapProbeCDClockFrequency(void *that) {
 }
 
 
-void Gen11::setDCState(void *that,bool param_1)
-{
-	FunctionCast(setDCState, callback->osetDCState)(that,param_1 );
-}
+
 
 void Gen11::hwConfigureCustomAUX(void *that,bool param_1)
 {
-	FunctionCast(hwConfigureCustomAUX, callback->ohwConfigureCustomAUX)(that,param_1 );
+	//FunctionCast(hwConfigureCustomAUX, callback->ohwConfigureCustomAUX)(that,param_1 );
 }
 
 unsigned long Gen11::hwRegsNeedUpdate
@@ -1514,15 +1507,126 @@ static void dmc_load_program(struct intel_display *display, enum intel_dmc_id dm
 }
 
 
+static u32 gen9_dc_mask(struct intel_display *display)
+{
+	u32 mask;
+
+	mask = DC_STATE_EN_UPTO_DC5;
+
+	if (DISPLAY_VER(display) >= 12)
+		mask |= DC_STATE_EN_DC3CO | DC_STATE_EN_UPTO_DC6
+					  | DC_STATE_EN_DC9;
+	else if (DISPLAY_VER(display) == 11)
+		mask |= DC_STATE_EN_UPTO_DC6 | DC_STATE_EN_DC9;
+	else if (display->platform.geminilake || display->platform.broxton)
+		mask |= DC_STATE_EN_DC9;
+	else
+		mask |= DC_STATE_EN_UPTO_DC6;
+
+	return mask;
+}
+void intel_dmc_update_dc6_allowed_count(struct intel_display *display,
+					bool start_tracking)
+{
+	struct intel_dmc *dmc = display_to_dmc(display);
+	u32 dc5_cur_count;
+
+	if (DISPLAY_VER(dmc->display) < 14)
+		return;
+
+	dc5_cur_count = NBlue::callback->readReg32( DG1_DMC_DEBUG_DC5_COUNT);
+
+	if (!start_tracking)
+		dmc->dc6_allowed.count += dc5_cur_count - dmc->dc6_allowed.dc5_start;
+
+	dmc->dc6_allowed.dc5_start = dc5_cur_count;
+}
+
+static void gen9_write_dc_state(struct intel_display *display,
+				u32 state)
+{
+	int rewrites = 0;
+	int rereads = 0;
+	u32 v;
+
+	NBlue::callback->writeReg32( DC_STATE_EN, state);
+
+	do  {
+		v = NBlue::callback->readReg32( DC_STATE_EN);
+
+		if (v != state) {
+			NBlue::callback->writeReg32( DC_STATE_EN, state);
+			rewrites++;
+			rereads = 0;
+		} else if (rereads++ > 5) {
+			break;
+		}
+
+	} while (rewrites < 100);
+
+	/*if (v != state)
+		drm_err(display->drm,
+			"Writing dc state to 0x%x failed, now 0x%x\n",
+			state, v);*/
+
+	/* Most of the times we need one retry, avoid spam */
+	/*if (rewrites > 1)
+		drm_dbg_kms(display->drm,
+				"Rewrote dc state to 0x%x %d times\n",
+				state, rewrites);*/
+}
+
+void gen9_set_dc_state(struct intel_display *display, u32 state)
+{
+	struct i915_power_domains *power_domains = &display->power.domains;
+	bool dc6_was_enabled, enable_dc6;
+	u32 mask;
+	u32 val;
+
+
+	if ((state & ~power_domains->allowed_dc_mask))
+		state &= power_domains->allowed_dc_mask;
+
+	//if (!power_domains->initializing)
+	//	intel_psr_notify_dc5_dc6(display);
+
+	val = NBlue::callback->readReg32( DC_STATE_EN);
+	mask = gen9_dc_mask(display);
+	//drm_dbg_kms(display->drm, "Setting DC state from %02x to %02x\n",
+		//	val & mask, state);
+
+	/* Check if DMC is ignoring our DC state requests */
+	//if ((val & mask) != power_domains->dc_state)
+	//	drm_err(display->drm, "DC state mismatch (0x%x -> 0x%x)\n",
+		//	power_domains->dc_state, val & mask);
+
+	enable_dc6 = state & DC_STATE_EN_UPTO_DC6;
+	dc6_was_enabled = power_domains->dc_state & DC_STATE_EN_UPTO_DC6;
+	if (!dc6_was_enabled && enable_dc6)
+		intel_dmc_update_dc6_allowed_count(display, true);
+
+	val &= ~mask;
+	val |= state;
+
+	gen9_write_dc_state(display, val);
+
+	if (!enable_dc6 && dc6_was_enabled)
+		intel_dmc_update_dc6_allowed_count(display, false);
+
+	power_domains->dc_state = val & mask;
+}
 
 void Gen11::hwInitializeCState(void *that)
 {
 	
 	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
 	
+	gen9_set_dc_state(&NBlue::callback->display_base,DC_STATE_DISABLE);
+	
+	NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D, 0,PCH_DPMGUNIT_CLOCK_GATE_DISABLE);
+	
 	if (DISPLAY_VER(&NBlue::callback->display_base)== 12){
 		NBlue::callback->intel_de_rmw( CLKREQ_POLICY, CLKREQ_POLICY_MEM_UP_OVRD, 0);
-		NBlue::callback->intel_de_rmw( GEN9_CLKGATE_DIS_0, 0, DARBF_GATING_DIS);
 	}
 	
 	struct intel_dmc *dmc=NBlue::callback->display_base.dmc.dmc;
@@ -1538,8 +1642,6 @@ void Gen11::hwInitializeCState(void *that)
 	if (!fw.data || fw.size == 0) {
 		return;
 	}
-	
-	
 	
 	initialize_stepping_info(&NBlue::callback->display_base, &si);
 	
@@ -1580,14 +1682,24 @@ void Gen11::hwInitializeCState(void *that)
 		dmc_load_program(&NBlue::callback->display_base, static_cast<intel_dmc_id>(i));
 	}
 	
-	setDCState(that,false);
+	
+	NBlue::callback->intel_de_rmw( GEN11_CHICKEN_DCPR_2, 0,
+			 DCPR_CLEAR_MEMSTAT_DIS | DCPR_SEND_RESP_IMM |
+			 DCPR_MASK_LPMODE | DCPR_MASK_MAXLATENCY_MEMUP_CLR);
+	
 	
 	NBlue::callback->intel_de_rmw( DC_STATE_DEBUG, 0,
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
 	NBlue::callback->readReg32(DC_STATE_DEBUG);
 	
-	NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
+	if (DISPLAY_VER(&NBlue::callback->display_base) == 12 && NBlue::callback->display_base.info.__device_info->has_psr)
+	{
+		NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, PIPEDMC_ENABLE, 0);
+	}
+	else
+		NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
-	hwConfigureCustomAUX(that, true);
-
+	//hwConfigureCustomAUX(that, true);
+	
+	
 }

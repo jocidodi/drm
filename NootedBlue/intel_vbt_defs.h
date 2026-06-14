@@ -2314,8 +2314,10 @@ static const struct {
 
 #define INTEL_DISPLAY_DEVICE(_id, _desc) { .devid = (_id), .desc = (_desc) }
 #define __NUM_PLATFORMS (INTEL_DISPLAY_PLATFORMS(__COUNT) 0)
+
 #define DECLARE_BITMAP(name,bits) \
 unsigned long name[BITS_TO_LONGS(bits)]
+
 #define INTEL_DISPLAY_PLATFORMS(func) \
 /* Platform group aliases */ \
 func(g4x) /* g45 and gm45 */ \
@@ -2518,20 +2520,6 @@ struct platform_desc {
 
 #define ID(x, ...) x
 
-#define INTEL_TGL_GT1_IDS(MACRO__, ...) \
-MACRO__(0x9A60, ## __VA_ARGS__), \
-MACRO__(0x9A68, ## __VA_ARGS__), \
-MACRO__(0x9A70, ## __VA_ARGS__)
-
-#define INTEL_TGL_GT2_IDS(MACRO__, ...) \
-MACRO__(0x9A40, ## __VA_ARGS__), \
-MACRO__(0x9A49, ## __VA_ARGS__), \
-MACRO__(0x9A59, ## __VA_ARGS__), \
-MACRO__(0x9A78, ## __VA_ARGS__), \
-MACRO__(0x9AC0, ## __VA_ARGS__), \
-MACRO__(0x9AC9, ## __VA_ARGS__), \
-MACRO__(0x9AD9, ## __VA_ARGS__), \
-MACRO__(0x9AF8, ## __VA_ARGS__)
 
 /* RKL */
 #define INTEL_RKL_IDS(MACRO__, ...) \
@@ -2616,6 +2604,21 @@ MACRO__(0x9AF8, ## __VA_ARGS__)
 	MACRO__(0xA7A8, ## __VA_ARGS__), \
 	MACRO__(0xA7AA, ## __VA_ARGS__), \
 	MACRO__(0xA7AB, ## __VA_ARGS__)
+
+#define INTEL_TGL_GT1_IDS(MACRO__, ...) \
+	MACRO__(0x9A60, ## __VA_ARGS__), \
+	MACRO__(0x9A68, ## __VA_ARGS__), \
+	MACRO__(0x9A70, ## __VA_ARGS__)
+
+#define INTEL_TGL_GT2_IDS(MACRO__, ...) \
+	MACRO__(0x9A40, ## __VA_ARGS__), \
+	MACRO__(0x9A49, ## __VA_ARGS__), \
+	MACRO__(0x9A59, ## __VA_ARGS__), \
+	MACRO__(0x9A78, ## __VA_ARGS__), \
+	MACRO__(0x9AC0, ## __VA_ARGS__), \
+	MACRO__(0x9AC9, ## __VA_ARGS__), \
+	MACRO__(0x9AD9, ## __VA_ARGS__), \
+	MACRO__(0x9AF8, ## __VA_ARGS__)
 
 #define INTEL_TGL_IDS(MACRO__, ...) \
 INTEL_TGL_GT1_IDS(MACRO__, ## __VA_ARGS__), \
@@ -3010,33 +3013,57 @@ enum dmc_event_id {
 	DMC_EVENT_FALSE = 0x1,
 };
 
+enum intel_pch {
+	PCH_NOP = -1,	/* PCH without south display */
+	PCH_NONE = 0,	/* No PCH present */
+	PCH_IBX,	/* Ibexpeak PCH */
+	PCH_CPT,	/* Cougarpoint/Pantherpoint PCH */
+	PCH_LPT_H,	/* Lynxpoint/Wildcatpoint H PCH */
+	PCH_LPT_LP,	/* Lynxpoint/Wildcatpoint LP PCH */
+	PCH_SPT,        /* Sunrisepoint/Kaby Lake PCH */
+	PCH_CNP,        /* Cannon/Comet Lake PCH */
+	PCH_ICP,	/* Ice Lake/Jasper Lake PCH */
+	PCH_TGP,	/* Tiger Lake/Mule Creek Canyon PCH */
+	PCH_ADP,	/* Alder Lake PCH */
 
-
-struct intel_display {
-	
-	struct intel_display_platforms platform;
-	
-	struct {
-		const struct intel_display_device_info *__device_info;
-
-		struct intel_display_runtime_info __runtime_info;
-	} info;
-
-	struct {
-		u32 mmio_base;
-	} pps;
-	
-	struct {
-		struct intel_dmc *dmc;
-		//struct ref_tracker *wakeref;
-	} dmc;
-	
-	struct intel_panel panel;
-	ConnectorInfo bconnectors[6];
-	const struct bdb_header *bdb;
-	struct intel_vbt_data vbt;
-	struct intel_opregion opregion;
+	/* Fake PCHs, functionality handled on the same PCI dev */
+	PCH_DG1 = 1024,
+	PCH_DG2,
+	PCH_MTL,
+	PCH_LNL,
 };
+
+#define INTEL_PCH_DEVICE_ID_MASK		0xff80
+#define INTEL_PCH_IBX_DEVICE_ID_TYPE		0x3b00
+#define INTEL_PCH_CPT_DEVICE_ID_TYPE		0x1c00
+#define INTEL_PCH_PPT_DEVICE_ID_TYPE		0x1e00
+#define INTEL_PCH_LPT_DEVICE_ID_TYPE		0x8c00
+#define INTEL_PCH_LPT_LP_DEVICE_ID_TYPE		0x9c00
+#define INTEL_PCH_WPT_DEVICE_ID_TYPE		0x8c80
+#define INTEL_PCH_WPT_LP_DEVICE_ID_TYPE		0x9c80
+#define INTEL_PCH_SPT_DEVICE_ID_TYPE		0xA100
+#define INTEL_PCH_SPT_LP_DEVICE_ID_TYPE		0x9D00
+#define INTEL_PCH_KBP_DEVICE_ID_TYPE		0xA280
+#define INTEL_PCH_CNP_DEVICE_ID_TYPE		0xA300
+#define INTEL_PCH_CNP_LP_DEVICE_ID_TYPE		0x9D80
+#define INTEL_PCH_CMP_DEVICE_ID_TYPE		0x0280
+#define INTEL_PCH_CMP2_DEVICE_ID_TYPE		0x0680
+#define INTEL_PCH_CMP_V_DEVICE_ID_TYPE		0xA380
+#define INTEL_PCH_ICP_DEVICE_ID_TYPE		0x3480
+#define INTEL_PCH_ICP2_DEVICE_ID_TYPE		0x3880
+#define INTEL_PCH_MCC_DEVICE_ID_TYPE		0x4B00
+#define INTEL_PCH_TGP_DEVICE_ID_TYPE		0xA080
+#define INTEL_PCH_TGP2_DEVICE_ID_TYPE		0x4380
+#define INTEL_PCH_JSP_DEVICE_ID_TYPE		0x4D80
+#define INTEL_PCH_ADP_DEVICE_ID_TYPE		0x7A80
+#define INTEL_PCH_ADP2_DEVICE_ID_TYPE		0x5180
+#define INTEL_PCH_ADP3_DEVICE_ID_TYPE		0x7A00
+#define INTEL_PCH_ADP4_DEVICE_ID_TYPE		0x5480
+#define INTEL_PCH_P2X_DEVICE_ID_TYPE		0x7100
+#define INTEL_PCH_P3X_DEVICE_ID_TYPE		0x7000
+#define INTEL_PCH_QEMU_DEVICE_ID_TYPE		0x2900 
+
+
 
 #define DISPLAY_INFO(__display)		((__display)->info.__device_info)
 #define DISPLAY_RUNTIME_INFO(__display)	(&(__display)->info.__runtime_info)
@@ -3184,10 +3211,1333 @@ struct intel_dmc {
 	struct dmc_fw_info dmc_info[DMC_FW_MAX];
 };
 
+enum intel_platform {
+	INTEL_PLATFORM_UNINITIALIZED = 0,
+	/* gen2 */
+	INTEL_I830,
+	INTEL_I845G,
+	INTEL_I85X,
+	INTEL_I865G,
+	/* gen3 */
+	INTEL_I915G,
+	INTEL_I915GM,
+	INTEL_I945G,
+	INTEL_I945GM,
+	INTEL_G33,
+	INTEL_PINEVIEW,
+	/* gen4 */
+	INTEL_I965G,
+	INTEL_I965GM,
+	INTEL_G45,
+	INTEL_GM45,
+	/* gen5 */
+	INTEL_IRONLAKE,
+	/* gen6 */
+	INTEL_SANDYBRIDGE,
+	/* gen7 */
+	INTEL_IVYBRIDGE,
+	INTEL_VALLEYVIEW,
+	INTEL_HASWELL,
+	/* gen8 */
+	INTEL_BROADWELL,
+	INTEL_CHERRYVIEW,
+	/* gen9 */
+	INTEL_SKYLAKE,
+	INTEL_BROXTON,
+	INTEL_KABYLAKE,
+	INTEL_GEMINILAKE,
+	INTEL_COFFEELAKE,
+	INTEL_COMETLAKE,
+	/* gen11 */
+	INTEL_ICELAKE,
+	INTEL_ELKHARTLAKE,
+	INTEL_JASPERLAKE,
+	/* gen12 */
+	INTEL_TIGERLAKE,
+	INTEL_ROCKETLAKE,
+	INTEL_DG1,
+	INTEL_ALDERLAKE_S,
+	INTEL_ALDERLAKE_P,
+	INTEL_DG2,
+	INTEL_METEORLAKE,
+	INTEL_MAX_PLATFORMS
+};
+
+#define PLATFORM_NAME(x) [INTEL_##x] = #x
+static const char * const platform_names[] = {
+	PLATFORM_NAME(I830),
+	PLATFORM_NAME(I845G),
+	PLATFORM_NAME(I85X),
+	PLATFORM_NAME(I865G),
+	PLATFORM_NAME(I915G),
+	PLATFORM_NAME(I915GM),
+	PLATFORM_NAME(I945G),
+	PLATFORM_NAME(I945GM),
+	PLATFORM_NAME(G33),
+	PLATFORM_NAME(PINEVIEW),
+	PLATFORM_NAME(I965G),
+	PLATFORM_NAME(I965GM),
+	PLATFORM_NAME(G45),
+	PLATFORM_NAME(GM45),
+	PLATFORM_NAME(IRONLAKE),
+	PLATFORM_NAME(SANDYBRIDGE),
+	PLATFORM_NAME(IVYBRIDGE),
+	PLATFORM_NAME(VALLEYVIEW),
+	PLATFORM_NAME(HASWELL),
+	PLATFORM_NAME(BROADWELL),
+	PLATFORM_NAME(CHERRYVIEW),
+	PLATFORM_NAME(SKYLAKE),
+	PLATFORM_NAME(BROXTON),
+	PLATFORM_NAME(KABYLAKE),
+	PLATFORM_NAME(GEMINILAKE),
+	PLATFORM_NAME(COFFEELAKE),
+	PLATFORM_NAME(COMETLAKE),
+	PLATFORM_NAME(ICELAKE),
+	PLATFORM_NAME(ELKHARTLAKE),
+	PLATFORM_NAME(JASPERLAKE),
+	PLATFORM_NAME(TIGERLAKE),
+	PLATFORM_NAME(ROCKETLAKE),
+	PLATFORM_NAME(DG1),
+	PLATFORM_NAME(ALDERLAKE_S),
+	PLATFORM_NAME(ALDERLAKE_P),
+	PLATFORM_NAME(DG2),
+	PLATFORM_NAME(METEORLAKE),
+};
+
+
+static const u16 subplatform_uy_ids[] = {
+	INTEL_TGL_GT2_IDS(ID),
+};
+
+static const u16 subplatform_n_ids[] = {
+	INTEL_ADLN_IDS(ID),
+};
+
+static const u16 subplatform_rpl_ids[] = {
+	INTEL_RPLS_IDS(ID),
+	INTEL_RPLU_IDS(ID),
+	INTEL_RPLP_IDS(ID),
+};
+
+static const u16 subplatform_rplu_ids[] = {
+	INTEL_RPLU_IDS(ID),
+};
+
+
+
+typedef u32 intel_engine_mask_t;
+#define INTEL_SUBPLATFORM_N    1
+#define INTEL_SUBPLATFORM_RPLU  2
+
+#define INTEL_SUBPLATFORM_ARL_H	0
+#define INTEL_SUBPLATFORM_ARL_U	1
+#define INTEL_SUBPLATFORM_ARL_S	2
+
+
+#define DEV_INFO_FOR_EACH_FLAG(func) \
+	func(is_mobile); \
+	func(require_force_probe); \
+	func(is_dgfx); \
+	/* Keep has_* in alphabetical order */ \
+	func(has_64bit_reloc); \
+	func(has_64k_pages); \
+	func(gpu_reset_clobbers_display); \
+	func(has_reset_engine); \
+	func(has_3d_pipeline); \
+	func(has_flat_ccs); \
+	func(has_global_mocs); \
+	func(has_gmd_id); \
+	func(has_gt_uc); \
+	func(has_heci_pxp); \
+	func(has_heci_gscfi); \
+	func(has_guc_deprivilege); \
+	func(has_guc_tlb_invalidation); \
+	func(has_l3_ccs_read); \
+	func(has_l3_dpf); \
+	func(has_llc); \
+	func(has_logical_ring_contexts); \
+	func(has_logical_ring_elsq); \
+	func(has_media_ratio_mode); \
+	func(has_mslice_steering); \
+	func(has_oa_bpc_reporting); \
+	func(has_oa_slice_contrib_limits); \
+	func(has_oam); \
+	func(has_one_eu_per_fuse_bit); \
+	func(has_pxp); \
+	func(has_rc6); \
+	func(has_rc6p); \
+	func(has_rps); \
+	func(has_runtime_pm); \
+	func(has_snoop); \
+	func(has_coherent_ggtt); \
+	func(tuning_thread_rr_after_dep); \
+	func(unfenced_needs_alignment); \
+	func(hws_needs_physical);
+
+struct intel_ip_version {
+	u8 ver;
+	u8 rel;
+	u8 step;
+};
+struct intel_step_info {
+	u8 graphics_step;	/* Represents the compute tile on Xe_HPC */
+	u8 media_step;
+};
+
+#define I915_GEM_PPGTT_NONE	0
+#define I915_GEM_PPGTT_ALIASING	1
+#define I915_GEM_PPGTT_FULL	2
+enum intel_ppgtt_type {
+	INTEL_PPGTT_NONE = I915_GEM_PPGTT_NONE,
+	INTEL_PPGTT_ALIASING = I915_GEM_PPGTT_ALIASING,
+	INTEL_PPGTT_FULL = I915_GEM_PPGTT_FULL,
+};
+
+enum intel_gt_type {
+	GT_PRIMARY,
+	GT_TILE,
+	GT_MEDIA,
+};
+
+struct intel_runtime_info {
+	/*
+	 * Single "graphics" IP version that represents
+	 * render, compute and copy behavior.
+	 */
+	struct {
+		struct intel_ip_version ip;
+	} graphics;
+	struct {
+		struct intel_ip_version ip;
+	} media;
+
+	/*
+	 * Platform mask is used for optimizing or-ed IS_PLATFORM calls into
+	 * single runtime conditionals, and also to provide groundwork for
+	 * future per platform, or per SKU build optimizations.
+	 *
+	 * Array can be extended when necessary if the corresponding
+	 * BUILD_BUG_ON is hit.
+	 */
+	u32 platform_mask[2];
+
+	u16 device_id;
+
+	struct intel_step_info step;
+
+	unsigned int page_sizes; /* page sizes supported by the HW */
+
+	enum intel_ppgtt_type ppgtt_type;
+	unsigned int ppgtt_size; /* log2, e.g. 31/32/48 bits */
+
+	bool has_pooled_eu;
+};
+enum i915_cache_level {
+
+	I915_CACHE_NONE = 0,
+
+	I915_CACHE_LLC,
+
+	I915_CACHE_L3_LLC,
+
+	I915_CACHE_WT,
+
+	I915_MAX_CACHE_LEVEL,
+};
+struct intel_driver_caps {
+	unsigned int scheduler;
+	bool has_logical_contexts:1;
+};
+
+struct intel_gt_definition {
+	enum intel_gt_type type;
+	char *name;
+	u32 mapping_base;
+	u32 gsi_offset;
+	intel_engine_mask_t engine_mask;
+};
+
+struct intel_device_info {
+	enum intel_platform platform;
+
+	unsigned int dma_mask_size; /* available DMA address bits */
+
+	const struct intel_gt_definition *extra_gt_list;
+
+	u8 gt; /* GT number, 0 if undefined */
+
+	intel_engine_mask_t platform_engine_mask; /* Engines supported by the HW */
+	u32 memory_regions; /* regions supported by the HW */
+
+#define DEFINE_FLAG(name) u8 name:1
+	DEV_INFO_FOR_EACH_FLAG(DEFINE_FLAG);
+#undef DEFINE_FLAG
+
+	/*
+	 * Initial runtime info. Do not access outside of i915_driver_create().
+	 */
+	const struct intel_runtime_info __runtime;
+
+	u32 cachelevel_to_pat[I915_MAX_CACHE_LEVEL];
+	u32 max_pat_index;
+};
+
+
+
+
+#define __AC(X,Y)	(X##Y)
+#define _AC(X,Y)	__AC(X,Y)
+#define _AT(T,X)	((T)(X))
+#define _UL(x)		(_AC(x, UL))
+#define UL(x)		(_UL(x))
+#define _ULL(x)		(_AC(x, ULL))
+#define ULL(x)		(_ULL(x))
+#define BIT_ULL(nr)		(ULL(1) << (nr))
+#define I915_GTT_PAGE_SIZE_4K	BIT_ULL(12)
+#define I915_GTT_PAGE_SIZE_64K	BIT_ULL(16)
+#define I915_GTT_PAGE_SIZE_2M	BIT_ULL(21)
+
+enum intel_region_id {
+	INTEL_REGION_SMEM = 0,
+	INTEL_REGION_LMEM_0,
+	INTEL_REGION_LMEM_1,
+	INTEL_REGION_LMEM_2,
+	INTEL_REGION_LMEM_3,
+	INTEL_REGION_STOLEN_SMEM,
+	INTEL_REGION_STOLEN_LMEM,
+	INTEL_REGION_UNKNOWN, /* Should be last */
+};
+
 #define GEN9_CLKGATE_DIS_0		_MMIO(0x46530)
 #define   DARBF_GATING_DIS		REG_BIT(27)
 #define CLKREQ_POLICY			_MMIO(0x101038)
 #define  CLKREQ_POLICY_MEM_UP_OVRD	REG_BIT(1)
+
+enum intel_engine_id {
+	RCS0 = 0,
+	BCS0,
+	BCS1,
+	BCS2,
+	BCS3,
+	BCS4,
+	BCS5,
+	BCS6,
+	BCS7,
+	BCS8,
+#define _BCS(n) (BCS0 + (n))
+	VCS0,
+	VCS1,
+	VCS2,
+	VCS3,
+	VCS4,
+	VCS5,
+	VCS6,
+	VCS7,
+#define _VCS(n) (VCS0 + (n))
+	VECS0,
+	VECS1,
+	VECS2,
+	VECS3,
+#define _VECS(n) (VECS0 + (n))
+	CCS0,
+	CCS1,
+	CCS2,
+	CCS3,
+#define _CCS(n) (CCS0 + (n))
+	GSC0,
+	I915_NUM_ENGINES
+#define INVALID_ENGINE ((enum intel_engine_id)-1)
+};
+
+
+#define MTL_MEDIA_GSI_BASE		0x380000
+#define GMD_ID_GRAPHICS				_MMIO(0xd8c)
+#define GMD_ID_MEDIA				_MMIO(MTL_MEDIA_GSI_BASE + 0xd8c)
+#define   GMD_ID_ARCH_MASK			REG_GENMASK(31, 22)
+#define   GMD_ID_RELEASE_MASK			REG_GENMASK(21, 14)
+#define   GMD_ID_STEP				REG_GENMASK(5, 0)
+
+#define PLATFORM2(x) .platform = (x)
+#define GEN(x) \
+	.__runtime.graphics.ip.ver = (x), \
+	.__runtime.media.ip.ver = (x)
+
+#define LEGACY_CACHELEVEL \
+	.cachelevel_to_pat = { \
+		[I915_CACHE_NONE]   = 0, \
+		[I915_CACHE_LLC]    = 1, \
+		[I915_CACHE_L3_LLC] = 2, \
+		[I915_CACHE_WT]     = 3, \
+	}
+
+#define TGL_CACHELEVEL \
+	.cachelevel_to_pat = { \
+		[I915_CACHE_NONE]   = 3, \
+		[I915_CACHE_LLC]    = 0, \
+		[I915_CACHE_L3_LLC] = 0, \
+		[I915_CACHE_WT]     = 2, \
+	}
+
+#define MTL_CACHELEVEL \
+	.cachelevel_to_pat = { \
+		[I915_CACHE_NONE]   = 2, \
+		[I915_CACHE_LLC]    = 3, \
+		[I915_CACHE_L3_LLC] = 3, \
+		[I915_CACHE_WT]     = 1, \
+	}
+
+/* Keep in gen based order, and chronological order within a gen */
+
+#define GEN_DEFAULT_PAGE_SIZES \
+	.__runtime.page_sizes = I915_GTT_PAGE_SIZE_4K
+
+#define GEN_DEFAULT_REGIONS \
+	.memory_regions = BIT(INTEL_REGION_SMEM) | BIT(INTEL_REGION_STOLEN_SMEM)
+
+#define I830_FEATURES \
+	GEN(2), \
+	.is_mobile = 1, \
+	.gpu_reset_clobbers_display = true, \
+	.has_3d_pipeline = 1, \
+	.hws_needs_physical = 1, \
+	.unfenced_needs_alignment = 1, \
+	.platform_engine_mask = BIT(RCS0), \
+	.has_snoop = true, \
+	.has_coherent_ggtt = false, \
+	.dma_mask_size = 32, \
+	.max_pat_index = 3, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+#define I845_FEATURES \
+	GEN(2), \
+	.has_3d_pipeline = 1, \
+	.gpu_reset_clobbers_display = true, \
+	.hws_needs_physical = 1, \
+	.unfenced_needs_alignment = 1, \
+	.platform_engine_mask = BIT(RCS0), \
+	.has_snoop = true, \
+	.has_coherent_ggtt = false, \
+	.dma_mask_size = 32, \
+	.max_pat_index = 3, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+static const struct intel_device_info i830_info = {
+	I830_FEATURES,
+	PLATFORM2(INTEL_I830),
+};
+
+static const struct intel_device_info i845g_info = {
+	I845_FEATURES,
+	PLATFORM2(INTEL_I845G),
+};
+
+static const struct intel_device_info i85x_info = {
+	I830_FEATURES,
+	PLATFORM2(INTEL_I85X),
+};
+
+static const struct intel_device_info i865g_info = {
+	I845_FEATURES,
+	PLATFORM2(INTEL_I865G),
+};
+
+#define GEN3_FEATURES \
+	GEN(3), \
+	.gpu_reset_clobbers_display = true, \
+	.platform_engine_mask = BIT(RCS0), \
+	.has_3d_pipeline = 1, \
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+	.dma_mask_size = 32, \
+	.max_pat_index = 3, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+static const struct intel_device_info i915g_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_I915G),
+	.has_coherent_ggtt = false,
+	.hws_needs_physical = 1,
+	.unfenced_needs_alignment = 1,
+};
+
+static const struct intel_device_info i915gm_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_I915GM),
+	.is_mobile = 1,
+	.hws_needs_physical = 1,
+	.unfenced_needs_alignment = 1,
+};
+
+static const struct intel_device_info i945g_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_I945G),
+	.hws_needs_physical = 1,
+	.unfenced_needs_alignment = 1,
+};
+
+static const struct intel_device_info i945gm_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_I945GM),
+	.is_mobile = 1,
+	.hws_needs_physical = 1,
+	.unfenced_needs_alignment = 1,
+};
+
+static const struct intel_device_info g33_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_G33),
+	.dma_mask_size = 36,
+};
+
+static const struct intel_device_info pnv_g_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_PINEVIEW),
+	.dma_mask_size = 36,
+};
+
+static const struct intel_device_info pnv_m_info = {
+	GEN3_FEATURES,
+	PLATFORM2(INTEL_PINEVIEW),
+	.is_mobile = 1,
+	.dma_mask_size = 36,
+};
+
+#define GEN4_FEATURES \
+	GEN(4), \
+	.gpu_reset_clobbers_display = true, \
+	.platform_engine_mask = BIT(RCS0), \
+	.has_3d_pipeline = 1, \
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+	.dma_mask_size = 36, \
+	.max_pat_index = 3, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+static const struct intel_device_info i965g_info = {
+	GEN4_FEATURES,
+	PLATFORM2(INTEL_I965G),
+	.hws_needs_physical = 1,
+	.has_snoop = false,
+};
+
+static const struct intel_device_info i965gm_info = {
+	GEN4_FEATURES,
+	PLATFORM2(INTEL_I965GM),
+	.is_mobile = 1,
+	.hws_needs_physical = 1,
+	.has_snoop = false,
+};
+
+static const struct intel_device_info g45_info = {
+	GEN4_FEATURES,
+	PLATFORM2(INTEL_G45),
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0),
+	.gpu_reset_clobbers_display = false,
+};
+
+static const struct intel_device_info gm45_info = {
+	GEN4_FEATURES,
+	PLATFORM2(INTEL_GM45),
+	.is_mobile = 1,
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0),
+	.gpu_reset_clobbers_display = false,
+};
+
+#define GEN5_FEATURES \
+	GEN(5), \
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0), \
+	.has_3d_pipeline = 1, \
+	.has_snoop = true, \
+	.has_coherent_ggtt = true, \
+	/* ilk does support rc6, but we do not implement [power] contexts */ \
+	.has_rc6 = 0, \
+	.dma_mask_size = 36, \
+	.max_pat_index = 3, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+static const struct intel_device_info ilk_d_info = {
+	GEN5_FEATURES,
+	PLATFORM2(INTEL_IRONLAKE),
+};
+
+static const struct intel_device_info ilk_m_info = {
+	GEN5_FEATURES,
+	PLATFORM2(INTEL_IRONLAKE),
+	.is_mobile = 1,
+	.has_rps = true,
+};
+
+#define GEN6_FEATURES \
+	GEN(6), \
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0), \
+	.has_3d_pipeline = 1, \
+	.has_coherent_ggtt = true, \
+	.has_llc = 1, \
+	.has_rc6 = 1, \
+	/* snb does support rc6p, but enabling it causes various issues */ \
+	.has_rc6p = 0, \
+	.has_rps = true, \
+	.dma_mask_size = 40, \
+	.max_pat_index = 3, \
+	.__runtime.ppgtt_type = INTEL_PPGTT_ALIASING, \
+	.__runtime.ppgtt_size = 31, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+#define SNB_D_PLATFORM \
+	GEN6_FEATURES, \
+	PLATFORM2(INTEL_SANDYBRIDGE)
+
+static const struct intel_device_info snb_d_gt1_info = {
+	SNB_D_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info snb_d_gt2_info = {
+	SNB_D_PLATFORM,
+	.gt = 2,
+};
+
+#define SNB_M_PLATFORM \
+	GEN6_FEATURES, \
+	PLATFORM2(INTEL_SANDYBRIDGE), \
+	.is_mobile = 1
+
+
+static const struct intel_device_info snb_m_gt1_info = {
+	SNB_M_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info snb_m_gt2_info = {
+	SNB_M_PLATFORM,
+	.gt = 2,
+};
+
+#define GEN7_FEATURES  \
+	GEN(7), \
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0), \
+	.has_3d_pipeline = 1, \
+	.has_coherent_ggtt = true, \
+	.has_llc = 1, \
+	.has_rc6 = 1, \
+	.has_rc6p = 1, \
+	.has_reset_engine = true, \
+	.has_rps = true, \
+	.dma_mask_size = 40, \
+	.max_pat_index = 3, \
+	.__runtime.ppgtt_type = INTEL_PPGTT_ALIASING, \
+	.__runtime.ppgtt_size = 31, \
+	GEN_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+#define IVB_D_PLATFORM \
+	GEN7_FEATURES, \
+	PLATFORM2(INTEL_IVYBRIDGE), \
+	.has_l3_dpf = 1
+
+static const struct intel_device_info ivb_d_gt1_info = {
+	IVB_D_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info ivb_d_gt2_info = {
+	IVB_D_PLATFORM,
+	.gt = 2,
+};
+
+#define IVB_M_PLATFORM \
+	GEN7_FEATURES, \
+	PLATFORM2(INTEL_IVYBRIDGE), \
+	.is_mobile = 1, \
+	.has_l3_dpf = 1
+
+static const struct intel_device_info ivb_m_gt1_info = {
+	IVB_M_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info ivb_m_gt2_info = {
+	IVB_M_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info ivb_q_info = {
+	GEN7_FEATURES,
+	PLATFORM2(INTEL_IVYBRIDGE),
+	.gt = 2,
+	.has_l3_dpf = 1,
+};
+
+static const struct intel_device_info vlv_info = {
+	PLATFORM2(INTEL_VALLEYVIEW),
+	GEN(7),
+	.has_runtime_pm = 1,
+	.has_rc6 = 1,
+	.has_reset_engine = true,
+	.has_rps = true,
+	.dma_mask_size = 40,
+	.max_pat_index = 3,
+	.__runtime.ppgtt_type = INTEL_PPGTT_ALIASING,
+	.__runtime.ppgtt_size = 31,
+	.has_snoop = true,
+	.has_coherent_ggtt = false,
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0),
+	GEN_DEFAULT_PAGE_SIZES,
+	GEN_DEFAULT_REGIONS,
+	LEGACY_CACHELEVEL,
+};
+
+#define G75_FEATURES  \
+	GEN7_FEATURES, \
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0), \
+	.has_rc6p = 0 /* RC6p removed-by HSW */, \
+	.has_runtime_pm = 1
+
+#define HSW_PLATFORM \
+	G75_FEATURES, \
+	PLATFORM2(INTEL_HASWELL), \
+	.has_l3_dpf = 1
+
+static const struct intel_device_info hsw_gt1_info = {
+	HSW_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info hsw_gt2_info = {
+	HSW_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info hsw_gt3_info = {
+	HSW_PLATFORM,
+	.gt = 3,
+};
+
+#define GEN8_FEATURES \
+	G75_FEATURES, \
+	GEN(8), \
+	.has_logical_ring_contexts = 1, \
+	.dma_mask_size = 39, \
+	.__runtime.ppgtt_type = INTEL_PPGTT_FULL, \
+	.__runtime.ppgtt_size = 48, \
+	.has_64bit_reloc = 1
+
+#define BDW_PLATFORM \
+	GEN8_FEATURES, \
+	PLATFORM2(INTEL_BROADWELL)
+
+static const struct intel_device_info bdw_gt1_info = {
+	BDW_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info bdw_gt2_info = {
+	BDW_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info bdw_rsvd_info = {
+	BDW_PLATFORM,
+	.gt = 3,
+	/* According to the device ID those devices are GT3, they were
+	 * previously treated as not GT3, keep it like that.
+	 */
+};
+
+static const struct intel_device_info bdw_gt3_info = {
+	BDW_PLATFORM,
+	.gt = 3,
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1),
+};
+
+static const struct intel_device_info chv_info = {
+	PLATFORM2(INTEL_CHERRYVIEW),
+	GEN(8),
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0),
+	.has_64bit_reloc = 1,
+	.has_runtime_pm = 1,
+	.has_rc6 = 1,
+	.has_rps = true,
+	.has_logical_ring_contexts = 1,
+	.dma_mask_size = 39,
+	.max_pat_index = 3,
+	.__runtime.ppgtt_type = INTEL_PPGTT_FULL,
+	.__runtime.ppgtt_size = 32,
+	.has_reset_engine = 1,
+	.has_snoop = true,
+	.has_coherent_ggtt = false,
+	GEN_DEFAULT_PAGE_SIZES,
+	GEN_DEFAULT_REGIONS,
+	LEGACY_CACHELEVEL,
+};
+
+#define GEN9_DEFAULT_PAGE_SIZES \
+	.__runtime.page_sizes = I915_GTT_PAGE_SIZE_4K | \
+		I915_GTT_PAGE_SIZE_64K
+
+#define GEN9_FEATURES \
+	GEN8_FEATURES, \
+	GEN(9), \
+	GEN9_DEFAULT_PAGE_SIZES, \
+	.has_gt_uc = 1
+
+#define SKL_PLATFORM \
+	GEN9_FEATURES, \
+	PLATFORM2(INTEL_SKYLAKE)
+
+static const struct intel_device_info skl_gt1_info = {
+	SKL_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info skl_gt2_info = {
+	SKL_PLATFORM,
+	.gt = 2,
+};
+
+#define SKL_GT3_PLUS_PLATFORM \
+	SKL_PLATFORM, \
+	.platform_engine_mask = \
+		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1)
+
+
+static const struct intel_device_info skl_gt3_info = {
+	SKL_GT3_PLUS_PLATFORM,
+	.gt = 3,
+};
+
+static const struct intel_device_info skl_gt4_info = {
+	SKL_GT3_PLUS_PLATFORM,
+	.gt = 4,
+};
+
+#define GEN9_LP_FEATURES \
+	GEN(9), \
+	.platform_engine_mask = BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0), \
+	.has_3d_pipeline = 1, \
+	.has_64bit_reloc = 1, \
+	.has_runtime_pm = 1, \
+	.has_rc6 = 1, \
+	.has_rps = true, \
+	.has_logical_ring_contexts = 1, \
+	.has_gt_uc = 1, \
+	.dma_mask_size = 39, \
+	.__runtime.ppgtt_type = INTEL_PPGTT_FULL, \
+	.__runtime.ppgtt_size = 48, \
+	.has_reset_engine = 1, \
+	.has_snoop = true, \
+	.has_coherent_ggtt = false, \
+	.max_pat_index = 3, \
+	GEN9_DEFAULT_PAGE_SIZES, \
+	GEN_DEFAULT_REGIONS, \
+	LEGACY_CACHELEVEL
+
+static const struct intel_device_info bxt_info = {
+	GEN9_LP_FEATURES,
+	PLATFORM2(INTEL_BROXTON),
+};
+
+static const struct intel_device_info glk_info = {
+	GEN9_LP_FEATURES,
+	PLATFORM2(INTEL_GEMINILAKE),
+};
+
+#define KBL_PLATFORM \
+	GEN9_FEATURES, \
+	PLATFORM2(INTEL_KABYLAKE)
+
+static const struct intel_device_info kbl_gt1_info = {
+	KBL_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info kbl_gt2_info = {
+	KBL_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info kbl_gt3_info = {
+	KBL_PLATFORM,
+	.gt = 3,
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1),
+};
+
+#define CFL_PLATFORM \
+	GEN9_FEATURES, \
+	PLATFORM2(INTEL_COFFEELAKE)
+
+static const struct intel_device_info cfl_gt1_info = {
+	CFL_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info cfl_gt2_info = {
+	CFL_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info cfl_gt3_info = {
+	CFL_PLATFORM,
+	.gt = 3,
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(VCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS1),
+};
+
+#define CML_PLATFORM \
+	GEN9_FEATURES, \
+	PLATFORM2(INTEL_COMETLAKE)
+
+static const struct intel_device_info cml_gt1_info = {
+	CML_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info cml_gt2_info = {
+	CML_PLATFORM,
+	.gt = 2,
+};
+
+#define GEN11_DEFAULT_PAGE_SIZES \
+	.__runtime.page_sizes = I915_GTT_PAGE_SIZE_4K | \
+		I915_GTT_PAGE_SIZE_64K |		\
+		I915_GTT_PAGE_SIZE_2M
+
+#define GEN11_FEATURES \
+	GEN9_FEATURES, \
+	GEN11_DEFAULT_PAGE_SIZES, \
+	GEN(11), \
+	.has_coherent_ggtt = false, \
+	.has_logical_ring_elsq = 1
+
+static const struct intel_device_info icl_info = {
+	GEN11_FEATURES,
+	PLATFORM2(INTEL_ICELAKE),
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
+};
+
+static const struct intel_device_info ehl_info = {
+	GEN11_FEATURES,
+	PLATFORM2(INTEL_ELKHARTLAKE),
+	.platform_engine_mask = BIT(RCS0) | BIT(BCS0) | BIT(VCS0) | BIT(VECS0),
+	.__runtime.ppgtt_size = 36,
+};
+
+static const struct intel_device_info jsl_info = {
+	GEN11_FEATURES,
+	PLATFORM2(INTEL_JASPERLAKE),
+	.platform_engine_mask = BIT(RCS0) | BIT(BCS0) | BIT(VCS0) | BIT(VECS0),
+	.__runtime.ppgtt_size = 36,
+};
+
+#define GEN12_FEATURES \
+	GEN11_FEATURES, \
+	GEN(12), \
+	TGL_CACHELEVEL, \
+	.has_global_mocs = 1, \
+	.has_pxp = 1, \
+	.max_pat_index = 3
+
+static const struct intel_device_info tgl_info = {
+	GEN12_FEATURES,
+	PLATFORM2(INTEL_TIGERLAKE),
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
+};
+
+static const struct intel_device_info adl_s_info = {
+	GEN12_FEATURES,
+	PLATFORM2(INTEL_ALDERLAKE_S),
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
+	.dma_mask_size = 39,
+};
+
+static const struct intel_device_info adl_p_info = {
+	GEN12_FEATURES,
+	PLATFORM2(INTEL_ALDERLAKE_P),
+	.platform_engine_mask =
+		BIT(RCS0) | BIT(BCS0) | BIT(VECS0) | BIT(VCS0) | BIT(VCS2),
+	.__runtime.ppgtt_size = 48,
+	.dma_mask_size = 39,
+};
+
+#define DGFX_FEATURES \
+	.is_dgfx = 1
+
+#define XE_HP_PAGE_SIZES \
+	.__runtime.page_sizes = I915_GTT_PAGE_SIZE_4K | \
+		I915_GTT_PAGE_SIZE_64K |		\
+		I915_GTT_PAGE_SIZE_2M
+
+#define XE_HP_FEATURES \
+	XE_HP_PAGE_SIZES, \
+	TGL_CACHELEVEL, \
+	.dma_mask_size = 46, \
+	.has_3d_pipeline = 1, \
+	.has_64bit_reloc = 1, \
+	.has_flat_ccs = 1, \
+	.has_global_mocs = 1, \
+	.has_gt_uc = 1, \
+	.has_llc = 1, \
+	.has_logical_ring_contexts = 1, \
+	.has_logical_ring_elsq = 1, \
+	.has_mslice_steering = 1, \
+	.has_oa_bpc_reporting = 1, \
+	.has_oa_slice_contrib_limits = 1, \
+	.has_oam = 1, \
+	.has_rc6 = 1, \
+	.has_reset_engine = 1, \
+	.has_rps = 1, \
+	.has_runtime_pm = 1, \
+	.max_pat_index = 3, \
+	.__runtime.ppgtt_size = 48, \
+	.__runtime.ppgtt_type = INTEL_PPGTT_FULL
+
+#define DG2_FEATURES \
+	XE_HP_FEATURES, \
+	DGFX_FEATURES, \
+	.__runtime.graphics.ip.ver = 12, \
+	.__runtime.graphics.ip.rel = 55, \
+	.__runtime.media.ip.ver = 12, \
+	.__runtime.media.ip.rel = 55, \
+	PLATFORM2(INTEL_DG2), \
+	.has_64k_pages = 1, \
+	.has_guc_deprivilege = 1, \
+	.has_heci_pxp = 1, \
+	.has_media_ratio_mode = 1, \
+	.platform_engine_mask = \
+		BIT(RCS0) | BIT(BCS0) | \
+		BIT(VECS0) | BIT(VECS1) | \
+		BIT(VCS0) | BIT(VCS2) | \
+		BIT(CCS0) | BIT(CCS1) | BIT(CCS2) | BIT(CCS3)
+
+static const struct intel_device_info dg2_info = {
+	DG2_FEATURES,
+};
+
+static const struct intel_device_info ats_m_info = {
+	DG2_FEATURES,
+	.require_force_probe = 1,
+	.tuning_thread_rr_after_dep = 1,
+};
+
+static const struct intel_gt_definition xelpmp_extra_gt[] = {
+	{
+		.type = GT_MEDIA,
+		.name = "Standalone Media GT",
+		.gsi_offset = MTL_MEDIA_GSI_BASE,
+		.engine_mask = BIT(VECS0) | BIT(VCS0) | BIT(VCS2) | BIT(GSC0),
+	},
+	{}
+};
+
+static const struct intel_device_info mtl_info = {
+	XE_HP_FEATURES,
+	.__runtime.graphics.ip.ver = 12,
+	.__runtime.graphics.ip.rel = 70,
+	.__runtime.media.ip.ver = 13,
+	PLATFORM2(INTEL_METEORLAKE),
+	.extra_gt_list = xelpmp_extra_gt,
+	.has_flat_ccs = 0,
+	.has_gmd_id = 1,
+	.has_guc_deprivilege = 1,
+	.has_guc_tlb_invalidation = 1,
+	.has_llc = 0,
+	.has_mslice_steering = 0,
+	.has_snoop = 1,
+	.max_pat_index = 4,
+	.has_pxp = 1,
+	.memory_regions = BIT(INTEL_REGION_SMEM) | BIT(INTEL_REGION_STOLEN_LMEM),
+	.platform_engine_mask = BIT(RCS0) | BIT(BCS0) | BIT(CCS0),
+	MTL_CACHELEVEL,
+};
+
+struct pci_device_id {
+	unsigned int  vendor, device;
+	unsigned int  subvendor, subdevice;
+	unsigned int  classb, class_mask;
+	unsigned long  driver_data;
+	unsigned int  override_only;
+};
+
+
+static const struct {
+u32 devid;
+const struct intel_device_info *desc;
+} intel_platform_ids[] = {
+	INTEL_TGL_IDS(INTEL_DISPLAY_DEVICE, &tgl_info),
+	INTEL_ADLS_IDS(INTEL_DISPLAY_DEVICE, &adl_s_info),
+	INTEL_ADLP_IDS(INTEL_DISPLAY_DEVICE, &adl_p_info),
+	INTEL_ADLN_IDS(INTEL_DISPLAY_DEVICE, &adl_p_info),
+	INTEL_RPLS_IDS(INTEL_DISPLAY_DEVICE, &adl_s_info),
+	INTEL_RPLU_IDS(INTEL_DISPLAY_DEVICE, &adl_p_info),
+	INTEL_RPLP_IDS(INTEL_DISPLAY_DEVICE, &adl_p_info),
+};
+
+struct drm_i915_private {
+	
+	struct intel_display *display;
+	const struct intel_device_info *__info; /* Use INTEL_INFO() to access. */
+	struct intel_runtime_info __runtime; /* Use RUNTIME_INFO() to access. */
+	struct intel_driver_caps caps;
+};
+
+#define GEN11_CHICKEN_DCPR_2			_MMIO(0x46434)
+#define   DCPR_MASK_MAXLATENCY_MEMUP_CLR	REG_BIT(27)
+#define   DCPR_MASK_LPMODE			REG_BIT(26)
+#define   DCPR_SEND_RESP_IMM			REG_BIT(25)
+#define   DCPR_CLEAR_MEMSTAT_DIS		REG_BIT(24)
+
+
+#define INTEL_WAKEREF_DEF ERR_PTR(-ENOENT)
+
+
+enum intel_display_power_domain {
+	POWER_DOMAIN_DISPLAY_CORE,
+	POWER_DOMAIN_PIPE_A,
+	POWER_DOMAIN_PIPE_B,
+	POWER_DOMAIN_PIPE_C,
+	POWER_DOMAIN_PIPE_D,
+	POWER_DOMAIN_PIPE_PANEL_FITTER_A,
+	POWER_DOMAIN_PIPE_PANEL_FITTER_B,
+	POWER_DOMAIN_PIPE_PANEL_FITTER_C,
+	POWER_DOMAIN_PIPE_PANEL_FITTER_D,
+	POWER_DOMAIN_TRANSCODER_A,
+	POWER_DOMAIN_TRANSCODER_B,
+	POWER_DOMAIN_TRANSCODER_C,
+	POWER_DOMAIN_TRANSCODER_D,
+	POWER_DOMAIN_TRANSCODER_EDP,
+	POWER_DOMAIN_TRANSCODER_DSI_A,
+	POWER_DOMAIN_TRANSCODER_DSI_C,
+
+	/* VDSC/joining for eDP/DSI transcoder (ICL) or pipe A (TGL) */
+	POWER_DOMAIN_TRANSCODER_VDSC_PW2,
+
+	POWER_DOMAIN_PORT_DDI_LANES_A,
+	POWER_DOMAIN_PORT_DDI_LANES_B,
+	POWER_DOMAIN_PORT_DDI_LANES_C,
+	POWER_DOMAIN_PORT_DDI_LANES_D,
+	POWER_DOMAIN_PORT_DDI_LANES_E,
+	POWER_DOMAIN_PORT_DDI_LANES_F,
+
+	POWER_DOMAIN_PORT_DDI_LANES_TC1,
+	POWER_DOMAIN_PORT_DDI_LANES_TC2,
+	POWER_DOMAIN_PORT_DDI_LANES_TC3,
+	POWER_DOMAIN_PORT_DDI_LANES_TC4,
+	POWER_DOMAIN_PORT_DDI_LANES_TC5,
+	POWER_DOMAIN_PORT_DDI_LANES_TC6,
+
+	POWER_DOMAIN_PORT_DDI_IO_A,
+	POWER_DOMAIN_PORT_DDI_IO_B,
+	POWER_DOMAIN_PORT_DDI_IO_C,
+	POWER_DOMAIN_PORT_DDI_IO_D,
+	POWER_DOMAIN_PORT_DDI_IO_E,
+	POWER_DOMAIN_PORT_DDI_IO_F,
+
+	POWER_DOMAIN_PORT_DDI_IO_TC1,
+	POWER_DOMAIN_PORT_DDI_IO_TC2,
+	POWER_DOMAIN_PORT_DDI_IO_TC3,
+	POWER_DOMAIN_PORT_DDI_IO_TC4,
+	POWER_DOMAIN_PORT_DDI_IO_TC5,
+	POWER_DOMAIN_PORT_DDI_IO_TC6,
+
+	POWER_DOMAIN_PORT_DSI,
+	POWER_DOMAIN_PORT_CRT,
+	POWER_DOMAIN_PORT_OTHER,
+	POWER_DOMAIN_VGA,
+	POWER_DOMAIN_AUDIO_MMIO,
+	POWER_DOMAIN_AUDIO_PLAYBACK,
+
+	POWER_DOMAIN_AUX_IO_A,
+	POWER_DOMAIN_AUX_IO_B,
+	POWER_DOMAIN_AUX_IO_C,
+	POWER_DOMAIN_AUX_IO_D,
+	POWER_DOMAIN_AUX_IO_E,
+	POWER_DOMAIN_AUX_IO_F,
+
+	POWER_DOMAIN_AUX_A,
+	POWER_DOMAIN_AUX_B,
+	POWER_DOMAIN_AUX_C,
+	POWER_DOMAIN_AUX_D,
+	POWER_DOMAIN_AUX_E,
+	POWER_DOMAIN_AUX_F,
+
+	POWER_DOMAIN_AUX_USBC1,
+	POWER_DOMAIN_AUX_USBC2,
+	POWER_DOMAIN_AUX_USBC3,
+	POWER_DOMAIN_AUX_USBC4,
+	POWER_DOMAIN_AUX_USBC5,
+	POWER_DOMAIN_AUX_USBC6,
+
+	POWER_DOMAIN_AUX_TBT1,
+	POWER_DOMAIN_AUX_TBT2,
+	POWER_DOMAIN_AUX_TBT3,
+	POWER_DOMAIN_AUX_TBT4,
+	POWER_DOMAIN_AUX_TBT5,
+	POWER_DOMAIN_AUX_TBT6,
+
+	POWER_DOMAIN_GMBUS,
+	POWER_DOMAIN_GT_IRQ,
+	POWER_DOMAIN_DC_OFF,
+	POWER_DOMAIN_TC_COLD_OFF,
+	POWER_DOMAIN_INIT,
+
+	POWER_DOMAIN_NUM,
+	POWER_DOMAIN_INVALID = POWER_DOMAIN_NUM,
+};
+
+#define POWER_DOMAIN_PIPE(pipe) \
+	((enum intel_display_power_domain)((pipe) - PIPE_A + POWER_DOMAIN_PIPE_A))
+#define POWER_DOMAIN_PIPE_PANEL_FITTER(pipe) \
+	((enum intel_display_power_domain)((pipe) - PIPE_A + POWER_DOMAIN_PIPE_PANEL_FITTER_A))
+#define POWER_DOMAIN_TRANSCODER(tran) \
+	((tran) == TRANSCODER_EDP ? POWER_DOMAIN_TRANSCODER_EDP : \
+	 (enum intel_display_power_domain)((tran) - TRANSCODER_A + POWER_DOMAIN_TRANSCODER_A))
+
+struct intel_power_domain_mask {
+	DECLARE_BITMAP(bits, POWER_DOMAIN_NUM);
+};
+
+struct i915_power_well_regs {
+	u32 bios;
+	u32 driver;
+	u32 kvmr;
+	u32 debug;
+};
+
+struct i915_power_well_ops {
+	const struct i915_power_well_regs *regs;
+
+};
+struct i915_power_well_desc {
+	const struct i915_power_well_ops *ops;
+	const struct i915_power_well_instance_list {
+		const struct i915_power_well_instance *list;
+		u8 count;
+	} *instances;
+
+	/* Mask of pipes whose IRQ logic is backed by the pw */
+	u16 irq_pipe_mask:4;
+	u16 always_on:1;
+	/*
+	 * Instead of waiting for the status bit to ack enables,
+	 * just wait a specific amount of time and then consider
+	 * the well enabled.
+	 */
+	u16 fixed_enable_delay:1;
+	u16 has_fuses:1;
+	/*
+	 * The pw is for an ICL+ TypeC PHY port in
+	 * Thunderbolt mode.
+	 */
+	u16 is_tc_tbt:1;
+	/* Enable timeout if greater than the default 1ms */
+	u16 enable_timeout;
+};
+
+struct i915_power_well {
+	const struct i915_power_well_desc *desc;
+	struct intel_power_domain_mask domains;
+	/* power well enable/disable usage count */
+	int count;
+	/* cached hw enabled state */
+	bool hw_enabled;
+	/* index into desc->instances->list */
+	u8 instance_idx;
+};
+
+struct i915_power_domains {
+	/*
+	 * Power wells needed for initialization at driver init and suspend
+	 * time are on. They are kept on until after the first modeset.
+	 */
+	bool initializing;
+	bool display_core_suspended;
+	int power_well_count;
+
+	u32 dc_state;
+	u32 target_dc_state;
+	u32 allowed_dc_mask;
+
+	//struct ref_tracker *init_wakeref;
+	//struct ref_tracker *disable_wakeref;
+
+	//struct mutex lock;
+	int domain_use_count[POWER_DOMAIN_NUM];
+
+	//struct delayed_work async_put_work;
+	//struct ref_tracker *async_put_wakeref;
+	struct intel_power_domain_mask async_put_domains[2];
+	int async_put_next_delay;
+
+	struct i915_power_well *power_wells;
+};
+
+
+#define DC_STATE_EN			_MMIO(0x45504)
+#define  DC_STATE_DISABLE		0
+#define  DC_STATE_EN_DC3CO		REG_BIT(30)
+#define  DC_STATE_DC3CO_STATUS		REG_BIT(29)
+#define  HOLD_PHY_CLKREQ_PG1_LATCH	REG_BIT(21)
+#define  HOLD_PHY_PG1_LATCH		REG_BIT(20)
+#define  DC_STATE_EN_UPTO_DC5		(1 << 0)
+#define  DC_STATE_EN_DC9		(1 << 3)
+#define  DC_STATE_EN_UPTO_DC6		(2 << 0)
+#define  DC_STATE_EN_UPTO_DC5_DC6_MASK   0x3
+#define DG1_DMC_DEBUG_DC5_COUNT	_MMIO(0x134154)
+
+
+struct intel_display {
+	
+	struct intel_display_platforms platform;
+	
+	enum intel_pch pch_type;
+	
+	struct {
+		const struct intel_display_device_info *__device_info;
+
+		struct intel_display_runtime_info __runtime_info;
+	} info;
+
+	struct {
+		u32 mmio_base;
+	} pps;
+	
+	struct {
+		struct i915_power_domains domains;
+
+		u32 chv_phy_control;
+
+		bool chv_phy_assert[2];
+	} power;
+	
+	struct {
+		struct intel_dmc *dmc;
+		//struct ref_tracker *wakeref;
+	} dmc;
+	
+	struct intel_panel panel;
+	ConnectorInfo bconnectors[6];
+	const struct bdb_header *bdb;
+	struct intel_vbt_data vbt;
+	struct intel_opregion opregion;
+};
 
 
 
