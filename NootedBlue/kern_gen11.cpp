@@ -88,11 +88,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 			
-			/*{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
+			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},
-			*/
-			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			
+			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
 			
 		};
@@ -1616,6 +1616,99 @@ void gen9_set_dc_state(struct intel_display *display, u32 state)
 	power_domains->dc_state = val & mask;
 }
 
+static int gen7_check_mailbox_status(u32 mbox)
+{
+	switch (mbox & GEN6_PCODE_ERROR_MASK) {
+	case GEN6_PCODE_SUCCESS:
+		return 0;
+	case GEN6_PCODE_ILLEGAL_CMD:
+		return -ENXIO;
+	case GEN7_PCODE_TIMEOUT:
+		return -ETIMEDOUT;
+	case GEN7_PCODE_ILLEGAL_DATA:
+		return -EINVAL;
+	case GEN11_PCODE_ILLEGAL_SUBCOMMAND:
+		return -ENXIO;
+	case GEN11_PCODE_LOCKED:
+		return -EBUSY;
+	case GEN11_PCODE_REJECTED:
+		return -EACCES;
+	case GEN7_PCODE_MIN_FREQ_TABLE_GT_RATIO_OUT_OF_RANGE:
+		return -EOVERFLOW;
+	default:
+		return 0;
+	}
+}
+
+
+static int snb_pcode_rw( u32 mbox,
+			  u32 *val, u32 *val1,
+			  int fast_timeout_us, int slow_timeout_ms,
+			  bool is_read)
+{
+
+	if (NBlue::callback->readReg32( GEN6_PCODE_MAILBOX) & GEN6_PCODE_READY)
+		return -EAGAIN;
+
+	NBlue::callback->writeReg32( GEN6_PCODE_DATA, *val);
+	NBlue::callback->writeReg32( GEN6_PCODE_DATA1, val1 ? *val1 : 0);
+	NBlue::callback->writeReg32( GEN6_PCODE_MAILBOX, GEN6_PCODE_READY | mbox);
+
+	u32 iVar2 = -500;
+	u32 iVar4=0;
+	do {
+		if (iVar2 == 0) return -ETIMEDOUT;
+	  IOSleep(1);
+		iVar4 = NBlue::callback->readReg32(GEN6_PCODE_MAILBOX);
+	  iVar2 = iVar2 + 1;
+	} while (iVar4 < 0);
+
+	if (is_read)
+		*val = NBlue::callback->readReg32( GEN6_PCODE_DATA);
+	if (is_read && val1)
+		*val1 = NBlue::callback->readReg32( GEN6_PCODE_DATA1);
+
+		return gen7_check_mailbox_status(mbox);
+
+}
+
+static void
+tgl_tc_cold_request(struct intel_display *display, bool block)
+{
+	u8 tries = 0;
+	int ret;
+	
+	IOSimpleLock *myLock;
+	myLock = IOSimpleLockAlloc();
+
+	while (1) {
+		u32 low_val;
+		u32 high_val = 0;
+
+		if (block)
+			low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_BLOCK_REQ;
+		else
+			low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_UNBLOCK_REQ;
+
+		IOSimpleLockLock(myLock);
+		ret = snb_pcode_rw( TGL_PCODE_TCCOLD, &low_val, &high_val, 500, 20, true);
+		IOSimpleLockUnlock(myLock);
+		if (ret == 0) {
+			if (block &&
+				(low_val & TGL_PCODE_EXIT_TCCOLD_DATA_L_EXIT_FAILED))
+				ret = -EIO;
+			else
+				break;
+		}
+
+		if (++tries == 3)
+			break;
+
+		IOSleep(1);
+	}
+	IOSimpleLockFree(myLock);
+}
+
 void Gen11::hwInitializeCState(void *that)
 {
 	
@@ -1623,6 +1716,9 @@ void Gen11::hwInitializeCState(void *that)
 	
 	gen9_set_dc_state(&NBlue::callback->display_base,DC_STATE_DISABLE);
 	
+	if (DISPLAY_VER(&NBlue::callback->display_base)== 12)
+		tgl_tc_cold_request(&NBlue::callback->display_base,false);
+
 	NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D, 0,PCH_DPMGUNIT_CLOCK_GATE_DISABLE);
 	
 	if (DISPLAY_VER(&NBlue::callback->display_base)== 12){
@@ -1675,18 +1771,16 @@ void Gen11::hwInitializeCState(void *that)
 		return ;
 	}
 	
-	
-	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
+	//skip DMC_FW_MAIN
+	for (uint8_t i = 1; i < DMC_FW_MAX; i++) {
 		if (!dmc->dmc_info[i].present)
 			continue;
 		dmc_load_program(&NBlue::callback->display_base, static_cast<intel_dmc_id>(i));
 	}
 	
-	
 	NBlue::callback->intel_de_rmw( GEN11_CHICKEN_DCPR_2, 0,
 			 DCPR_CLEAR_MEMSTAT_DIS | DCPR_SEND_RESP_IMM |
 			 DCPR_MASK_LPMODE | DCPR_MASK_MAXLATENCY_MEMUP_CLR);
-	
 	
 	NBlue::callback->intel_de_rmw( DC_STATE_DEBUG, 0,
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
@@ -1700,6 +1794,5 @@ void Gen11::hwInitializeCState(void *that)
 		NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
 	//hwConfigureCustomAUX(that, true);
-	
 	
 }
