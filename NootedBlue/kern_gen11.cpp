@@ -1726,6 +1726,10 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 	IOSimpleLockFree(myLock);
 }
 
+
+
+
+
 void Gen11::hwInitializeCState(void *that)
 {
 	

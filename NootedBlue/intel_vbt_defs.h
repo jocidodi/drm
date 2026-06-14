@@ -4478,7 +4478,7 @@ struct i915_power_domains {
 	//struct ref_tracker *init_wakeref;
 	//struct ref_tracker *disable_wakeref;
 
-	//struct mutex lock;
+	IOSimpleLock *lock;
 	int domain_use_count[POWER_DOMAIN_NUM];
 
 	//struct delayed_work async_put_work;
@@ -4514,6 +4514,12 @@ struct intel_display {
 
 		struct intel_display_runtime_info __runtime_info;
 	} info;
+	
+	struct {
+		u8 enabled_slices;
+
+		//struct intel_global_obj obj;
+	} dbuf;
 
 	struct {
 		u32 mmio_base;
@@ -4566,6 +4572,7 @@ struct intel_display {
 #define   GEN6_PCODE_FREQ_RING_RATIO_SHIFT	16
 #define GEN6_PCODE_DATA1			_MMIO(0x13812C)
 
+#define _PICK(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
 
 
 

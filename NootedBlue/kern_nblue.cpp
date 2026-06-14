@@ -1599,7 +1599,7 @@ int NBlue::intel_opregion_setup()
 	display->pch_type = intel_pch_type(display, id);
 	
 	display->power.domains.allowed_dc_mask = get_allowed_dc_mask(display, true);
-	
+	display->power.domains.lock= IOSimpleLockAlloc();
 	
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
