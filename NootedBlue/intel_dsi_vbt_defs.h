@@ -9,7 +9,7 @@
 #endif
 
 #define __packed                        __attribute__((__packed__))
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 
 typedef int8_t s8;
 typedef uint8_t u8;
@@ -18,36 +18,40 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 typedef uint64_t resource_size_t;
 
-#define BIT(nr)            (1UL << (nr))
 #define REG_BIT(n) (1UL << (n))
+#define __AC(X,Y)	(X##Y)
+#define _AC(X,Y)	__AC(X,Y)
+#define _AT(T,X)	((T)(X))
+#define _UL(x)		(_AC(x, UL))
+#define UL(x)		(_UL(x))
+#define _ULL(x)		(_AC(x, ULL))
+#define ULL(x)		(_ULL(x))
+#define BIT_ULL(nr)		(ULL(1) << (nr))
+#define BIT(nr)			(UL(1) << (nr))
 
-constexpr uint32_t REG_GENMASK(int high, int low)
-{
-	return static_cast<uint32_t>(((1ULL << (high - low + 1)) - 1ULL) << low);
-}
-template <typename T>
-inline uint32_t REG_FIELD_GET(T mask, T val)
-{
-	return static_cast<uint32_t>((val & mask) / (mask & -mask));
-}
-template <typename T>
-constexpr T BIT_TYPE(unsigned int nr)
-{
-	return static_cast<T>(1ULL << nr);
-}
+#define BITS_PER_LONG_LONG 64
+#define BITS_PER_LONG 64
+#define BITS_PER_BYTE		8
+#define BITS_PER_TYPE(type)	(sizeof(type) * BITS_PER_BYTE)
+#define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define BITS_TO_LONGS(nr)	__KERNEL_DIV_ROUND_UP(nr, BITS_PER_TYPE(long))
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define _PICK_EVEN(__index, __a, __b) ((__a) + (__index) * ((__b) - (__a)))
 
-inline uint8_t  BIT_U8(unsigned int nr)  { return BIT_TYPE<uint8_t>(nr); }
-inline uint16_t BIT_U16(unsigned int nr) { return BIT_TYPE<uint16_t>(nr); }
-inline uint32_t BIT_U32(unsigned int nr) { return BIT_TYPE<uint32_t>(nr); }
-inline uint64_t BIT_U64(unsigned int nr) { return BIT_TYPE<uint64_t>(nr); }
+#define REG_GENMASK(high, low) \
+	((uint32_t)(((1ULL << ((high) - (low) + 1)) - 1ULL) << (low)))
 
-constexpr unsigned long GENMASK(int h, int l)
-{
-	return static_cast<unsigned long>(((1ULL << (h - l + 1)) - 1ULL) << l);
-}
+#define REG_FIELD_GET(mask, val) \
+	((uint32_t)(((val) & (mask)) / ((mask) & -(mask))))
+
+#define BIT_U8(nr)  ((uint8_t)(1ULL << (nr)))
+#define BIT_U16(nr) ((uint16_t)(1ULL << (nr)))
+#define BIT_U32(nr) ((uint32_t)(1ULL << (nr)))
+#define BIT_U64(nr) ((uint64_t)(1ULL << (nr)))
+
+#define GENMASK(h, l) \
+	((unsigned long)(((1ULL << ((h) - (l) + 1)) - 1ULL) << (l)))
 
 
 #define REG_FIELD_PREP(mask, val) (((val) << (__builtin_ffsll(mask) - 1)) & (mask))

@@ -1153,6 +1153,9 @@ parse_lfp_backlight(struct intel_display *display,
 	
 	finalb->power_cycle = roundup(finalb->power_cycle, msecs_to_pps_units(100));
 	
+	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
+	if (panel->vbt.edp.bpp==18) panel->vbt.edp.bpp=24;
+	
 	OSArray *connectorArray = OSArray::withCapacity(1);
 	OSDictionary *connectorDict = OSDictionary::withCapacity(40);
 	
@@ -1241,6 +1244,7 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			display->bconnectors[i].flags=0;
 		}
 
+		int ii=0;
 		for (i = 0; i < child_device_num; i++) {
 			const u8 *base = (u8 *)(defs);
 			const struct child_device_config *child = reinterpret_cast<const struct child_device_config *>(
@@ -1296,17 +1300,17 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			u32 flags=0;
 			if (is_dp) flags=0x1+0x400;
-			if (is_edp) flags=0x1+0x0+0x10;// not builtin
+			if (is_edp) flags=0x1+0x0+0x10;
 			if (is_hdmi) flags=0x1+0x200;
 			
-			display->bconnectors[i].index=i;
-			display->bconnectors[i].busId=child->ddc_pin;
-			display->bconnectors[i].pipe=port;
-			display->bconnectors[i].pad=0;
-			display->bconnectors[i].type=type;
-			display->bconnectors[i].flags=flags;
+			if (type>ConnectorDummy) {
+				display->bconnectors[ii].busId=child->ddc_pin;
+				display->bconnectors[ii].pipe=port;
+				display->bconnectors[ii].type=type;
+				display->bconnectors[ii].flags=flags;
+				ii++;
+			}
 			
-			if (i==0) display->bconnectors[i].pipe=1; //hack
 		}
 
 		NBlue::callback->iGPU->setProperty("Bios_Connectors", connectorArray);

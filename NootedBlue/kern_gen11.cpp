@@ -37,7 +37,7 @@ bool kexttgld=false;
 bool kexttglp=false;
 IOFramebuffer *frame0;
 int hwu=4;
-
+int setpc=0;
 
 Gen11 *Gen11::callback = nullptr;
 
@@ -87,87 +87,67 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
 			{"__ZN31AppleIntelFramebufferController20hwConfigureCustomAUXEb",hwConfigureCustomAUX, this->ohwConfigureCustomAUX},
 			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
+			{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
+			{"__ZN31AppleIntelFramebufferController19setupPipeWatermarksEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParams",setupPipeWatermarks, this->osetupPipeWatermarks},
 			
 			/*{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},*/
 			
-			{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
-		//linktrainig 2 lines
-		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 		
-		//TRANS_CLK_SE
-		static const uint8_t f6c[]= {0xc1, 0xe0, 0x1d, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
-		static const uint8_t r6c[]= {0xc1, 0xe0, 0x1c, 0x41, 0x81, 0xe1, 0xff, 0xff, 0xff, 0x1f};
+		//pipe 0 fix
+		static const uint8_t f7[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0x32, 0x01, 0x00, 0x00};
+		static const uint8_t r7[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
 		
-		static const uint8_t f6c2[]= {0xb8, 0x00, 0x00, 0x00, 0x00, 0x74, 0x04};
-		static const uint8_t r6c2[]= {0xb8, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90};
-		
-		//force frame 0
-		static const uint8_t f7[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
-		static const uint8_t r7[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
-		
-		static const uint8_t f7b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
-		static const uint8_t r7b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
-		
-		static const uint8_t f7c[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x46};
-		static const uint8_t r7c[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-		
-		static const uint8_t f7d[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x37};
-		static const uint8_t r7d[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-		
-		//TRANS_
-		static const uint8_t f8[]= {0xff, 0xc9, 0x83, 0xf9, 0x04, 0x77, 0x1c, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0xff, 0xe1, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x10};
-		static const uint8_t r8[]= {0x90, 0x90, 0x83, 0xf9, 0x04, 0x90, 0x90, 0x48, 0x8d, 0x35, 0xe9, 0x03, 0x00, 0x00, 0x48, 0x63, 0x0c, 0x8e, 0x48, 0x01, 0xf1, 0x90, 0x90, 0x25, 0xff, 0xff, 0xff, 0x8f, 0x0d, 0x00, 0x00, 0x00, 0x08};
-		
-		static const uint8_t f8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0x80};
-		static const uint8_t r8b[]= {0x41, 0x81, 0xce, 0x24, 0x00, 0x00, 0xC0};
+		static const uint8_t f7a[]= {0x80, 0x7d, 0xd7, 0x00, 0x75, 0x23};
+		static const uint8_t r7a[]= {0x80, 0x7d, 0xd7, 0x00, 0xeb, 0x23};
 		
 		//builtin
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
 		
-		//regs
-		static const uint8_t f10[]= {0x40, 0xf8, 0x06, 0x00};
-		static const uint8_t r10[]= {0x40, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f10a[]= {0x70, 0xfa, 0x06, 0x00};
-		static const uint8_t r10a[]= {0x70, 0x0a, 0x06, 0x00};
-		
-		static const uint8_t f10b[]= {0x00, 0xf8, 0x06, 0x00};
-		static const uint8_t r10b[]= {0x00, 0x08, 0x06, 0x00};
-		
-		static const uint8_t f10c[]= {0x60, 0xf8, 0x06, 0x00};
-		static const uint8_t r10c[]= {0x60, 0x08, 0x06, 0x00};
-		
-		
-
 		//getHPDState register
 		static const uint8_t f19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
 		static const uint8_t r19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
 		
+		//register adresses
+		static const uint8_t f24b[]= {0xbe, 0x40, 0xf8, 0x06, 0x00};
+		static const uint8_t r24b[]= {0xbe, 0x40, 0x08, 0x06, 0x00};
+				
+		static const uint8_t f24c[]= {0x48, 0x81, 0xfb, 0x00, 0xf8, 0x06, 0x00};
+		static const uint8_t r24c[]= {0x48, 0x81, 0xfb, 0x00, 0x08, 0x06, 0x00};
+				
+		static const uint8_t f24d[]= {0xbe, 0x60, 0xf8, 0x06, 0x00};
+		static const uint8_t r24d[]= {0xbe, 0x60, 0x08, 0x06, 0x00};
+				
+		static const uint8_t f24e[]= {0xbe, 0x00, 0xf8, 0x06, 0x00};
+		static const uint8_t r24e[]= {0xbe, 0x00, 0x08, 0x06, 0x00};
+		
+		//linktrainig 2 lines
+		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
+		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
+		
+		
+		
 		LookupPatchPlus const patches[] = {
-			{&kextG11FB, f25, r25, arrsize(f25),    7},
-			{&kextG11FB, f6c, r6c, arrsize(f6c),    1},
-			{&kextG11FB, f6c2, r6c2, arrsize(f6c2),    1},
+			
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
-			{&kextG11FB, f7b, r7b, arrsize(f7b),    1},
-			{&kextG11FB, f7c, r7c, arrsize(f7c),    1},
-			{&kextG11FB, f7d, r7d, arrsize(f7d),    1},
-			{&kextG11FB, f8, r8, arrsize(f8),    1},
-			{&kextG11FB, f8b, r8b, arrsize(f8b),    1},
+			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			{&kextG11FB, f19, r19, arrsize(f19),    5},
-			{&kextG11FB, f10, r10, arrsize(f10),    12},
-			{&kextG11FB, f10a, r10a, arrsize(f10a),    1},
-			{&kextG11FB, f10b, r10b, arrsize(f10b),    32},
-			{&kextG11FB, f10c, r10c, arrsize(f10c),    11},
+			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
+			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
+			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
+			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
+			{&kextG11FB, f25, r25, arrsize(f25),    7},
+
+			
 			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
@@ -257,17 +237,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 		}
 		
-		//regs
-		static const uint8_t f4[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x71};
-		static const uint8_t r4[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-		
-		static const uint8_t f4a[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0xe9, 0x06, 0x00, 0x00};
-		static const uint8_t r4a[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x85, 0xe9, 0x06, 0x00, 0x00};
-		
-		static const uint8_t f4ap[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x50};
-		static const uint8_t r4ap[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90};
-		
-		
 		
 		//dbuff
 		static const uint8_t f5[]= {0x74, 0x5a, 0xc7, 0x83, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -287,15 +256,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f6cp[]= {0x41, 0x8b, 0x49, 0x08, 0x85, 0xc9, 0x74, 0x3f};
 		static const uint8_t r6cp[]= {0x41, 0x8b, 0x49, 0x08, 0x85, 0xc9, 0x90, 0x90};
 		
-		
 		//ReadRegister64
 		static const uint8_t f7[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0xca, 0xf5, 0x0c, 0x00};
 		static const uint8_t r7[]= {0x83, 0xc0, 0xf8, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0xca, 0xf5, 0x0c, 0x00};
 		
 		static const uint8_t f7p[]= {0x83, 0xc0, 0xfc, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0x84, 0x40, 0x08, 0x00};
 		static const uint8_t r7p[]= {0x83, 0xc0, 0xf8, 0x48, 0x39, 0xf0, 0x76, 0x11, 0x48, 0x8b, 0x47, 0x50, 0x48, 0xff, 0x05, 0x84, 0x40, 0x08, 0x00};
-
-		
 		
 		//TRANS_
 		static const uint8_t f8[]= {0x81, 0xe1, 0x00, 0x00, 0x03, 0x00, 0xb8, 0xff, 0xff, 0xfc, 0x7f};
@@ -325,13 +291,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f13pb[]= {0xff, 0x90, 0x78, 0x01, 0x00, 0x00, 0x49, 0x8b, 0x0e, 0x4c, 0x89, 0xf7, 0x89, 0xc6, 0xff, 0x91, 0x38, 0x01, 0x00, 0x00};
 		static const uint8_t r13pb[]= {0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, 0x49, 0x8b, 0x0e, 0x4c, 0x89, 0xf7, 0x89, 0xc6, 0xff, 0x91, 0x38, 0x01, 0x00, 0x00};
 
-		
 		//getPathByPipe disable logs
 		static const uint8_t f15[]= {0x74, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		static const uint8_t r15[]= {0xeb, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
-		
-
-		
 		
 		//savenvram
 		static const uint8_t f20[]= {0xff, 0x90, 0xf8, 0x09, 0x00, 0x00, 0x41, 0x89, 0xc6, 0x48, 0x85, 0xdb, 0x74, 0x17};
@@ -340,6 +302,25 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f20p[]= {0xff, 0x90, 0xf8, 0x09, 0x00, 0x00, 0x41, 0x89, 0xc6, 0x48, 0x85, 0xdb, 0x74, 0x17};
 		static const uint8_t r20p[]= {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x48, 0x85, 0xdb, 0x74, 0x17};
 
+		//production ver fix register adresses if pipe=0
+		static const uint8_t f24bp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
+		static const uint8_t r24bp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
+				
+		static const uint8_t f24cp[]= {0x00, 0x4c, 0x89, 0xea, 0x75, 0x12};
+		static const uint8_t r24cp[]= {0x00, 0x4c, 0x89, 0xea, 0xeb, 0x12};
+				
+		static const uint8_t f24dp[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
+		static const uint8_t r24dp[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
+				
+		//debug ver fix register adresses if pipe=0
+		static const uint8_t f24b[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0c};
+		static const uint8_t r24b[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0c};
+				
+		static const uint8_t f24c[]= {0x48, 0x8b, 0x55, 0xd0, 0x75, 0x13};
+		static const uint8_t r24c[]= {0x48, 0x8b, 0x55, 0xd0, 0xeb, 0x13};
+				
+		static const uint8_t f24d[]= {0x83, 0x78, 0x08, 0x00, 0x75, 0x0d};
+		static const uint8_t r24d[]= {0x83, 0x78, 0x08, 0x00, 0xeb, 0x0d};
 		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
@@ -351,8 +332,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
 				
-				{&kextG11FBT, f4, r4, arrsize(f4),	1},
-				{&kextG11FBT, f4ap, r4ap, arrsize(f4ap),	1},
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6ap, r6ap, arrsize(f6ap),    1},
 				{&kextG11FBT, f6cp, r6cp, arrsize(f6cp),    1},
@@ -362,17 +341,17 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
 				{&kextG11FBT, f20p, r20p, arrsize(f20p),	1},
+				{&kextG11FBT, f24bp, r24bp, arrsize(f24bp),	14},
+				{&kextG11FBT, f24cp, r24cp, arrsize(f24cp),	1},
+				{&kextG11FBT, f24dp, r24dp, arrsize(f24dp),	4},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
 			};
-			
 			PANIC_COND(!LookupPatchPlus::applyAll(patcher, patchesp , address, size), "nblue", "kextG11FBT Failed to apply production patches!");
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
 				
-				{&kextG11FBT, f4, r4, arrsize(f4),	1},
-				{&kextG11FBT, f4a, r4a, arrsize(f4a),	1},
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f6a, r6a, arrsize(f6a),    1},
 				{&kextG11FBT, f6c, r6c, arrsize(f6c),    1},
@@ -383,20 +362,18 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
 				{&kextG11FBT, f15, r15, arrsize(f15),	1},
 				{&kextG11FBT, f20, r20, arrsize(f20),	1},
+				{&kextG11FBT, f24b, r24b, arrsize(f24b),	11},
+				{&kextG11FBT, f24c, r24c, arrsize(f24c),	1},
+				{&kextG11FBT, f24d, r24d, arrsize(f24d),	6},
 				{&kextG11FBT, f25, r25, arrsize(f25),	6},
 
 			};
-			
 			PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FBT Failed to apply dbg patches!");
 		}
-			
-
 		return true;
-		
 		
 	}     else if (kextG11HW.loadIndex == index) {
 		NBlue::callback->setRMMIOIfNecessary();
-
 		 
 		 RouteRequestPlus requests[] = {
 			 
@@ -525,9 +502,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 	
-	getMember<uint8_t>(that, 0x1b36)=1; //dither off
-	
-		struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
+	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x6;
 	
 	pinfo[p].flags=
@@ -559,6 +534,8 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_base.bconnectors[i].flags;
 	}
 	
+	pinfo[p].connectors[0].pipe=1; // bad hack
+	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
 		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
@@ -582,8 +559,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 {
 	
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
-	
-	getMember<uint8_t>(that, 0x1b12)=1; //dither off
 	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
@@ -622,12 +597,12 @@ uint64_t  Gen11::getOSInformation(void *that)
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
 		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
-		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[1].connectors[i].index, 32));
-		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[1].connectors[i].busId, 32));
-		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[1].connectors[i].pipe, 32));
-		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[1].connectors[i].pad, 32));
-		connectorDict->setObject("type", OSNumber::withNumber(pinfo[1].connectors[i].type, 32));
-		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[1].connectors[i].flags, 32));
+		connectorDict->setObject("Index", OSNumber::withNumber(pinfo[p].connectors[i].index, 32));
+		connectorDict->setObject("busId", OSNumber::withNumber(pinfo[p].connectors[i].busId, 32));
+		connectorDict->setObject("pipe", OSNumber::withNumber(pinfo[p].connectors[i].pipe, 32));
+		connectorDict->setObject("pad", OSNumber::withNumber(pinfo[p].connectors[i].pad, 32));
+		connectorDict->setObject("type", OSNumber::withNumber(pinfo[p].connectors[i].type, 32));
+		connectorDict->setObject("flags", OSNumber::withNumber(pinfo[p].connectors[i].flags, 32));
 		connectorArray->setObject(connectorDict);
 		connectorDict->release();
 	}
@@ -1049,8 +1024,10 @@ unsigned long Gen11::hwRegsNeedUpdate
 
 int Gen11::getTranscoderOffset(void *that,void *param_1,uint param_2)
 {
-	FunctionCast(getTranscoderOffset, callback->ogetTranscoderOffset)(that,param_1,param_2 );
-	return 0;
+	auto ret=FunctionCast(getTranscoderOffset, callback->ogetTranscoderOffset)(that,param_1,param_2 );
+	
+	if (ret==0xf000) return 0;
+	return ret;
 }
 
 unsigned long  Gen11::AppleIntelPortHALinit(void *that,void *param_1)
@@ -1814,6 +1791,100 @@ void Gen11::hwInitializeCState(void *that)
 	else
 		NBlue::callback->intel_de_rmw( _PIPEDMC_CONTROL_A, 0, PIPEDMC_ENABLE);
 
-	//hwConfigureCustomAUX(that, true);
+	hwConfigureCustomAUX(that, true);
 	
+}
+
+
+void Gen11::SetupParams (void *that,void *param_1,void *param_2,CRTCParams *param_3,void *param_4)
+{
+	setpc=1;
+	FunctionCast(SetupParams, callback->oSetupParams)(that ,param_1,param_2,param_3,param_4);
+}
+
+void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3)
+{
+
+	if (setpc){
+		setpc=0;
+		
+		enum port port=PORT_A;
+		u32 val=0;
+		switch (NBlue::callback->display_base.panel.vbt.edp.bpp) {
+			case 18:
+				val |= PIPE_MISC_BPC_6;
+				break;
+			default:
+			case 24:
+				val |= PIPE_MISC_BPC_8;
+				break;
+			case 30:
+				val |= PIPE_MISC_BPC_10;
+				break;
+			case 36:
+				if (DISPLAY_VER(&NBlue::callback->display_base) >= 13)
+					val |= PIPE_MISC_BPC_12_ADLP;
+				break;
+		}
+		
+		//if (crtc_state->dither)
+		val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
+		
+		//if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
+		//	crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+		val |= PIPE_MISC_OUTPUT_COLORSPACE_YUV;
+		
+		//if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
+		val |= DISPLAY_VER(&NBlue::callback->display_base) >= 30 ? PIPE_MISC_YUV420_ENABLE :
+		PIPE_MISC_YUV420_ENABLE | PIPE_MISC_YUV420_MODE_FULL_BLEND;
+		
+		//if (DISPLAY_VER(display) >= 11 && is_hdr_mode(crtc_state))
+		val |= PIPE_MISC_HDR_MODE_PRECISION;
+		
+		//if (DISPLAY_VER(display) >= 12)
+		val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
+		
+		//if (display->platform.broadwell)
+		//	val |= PIPE_MISC_PSR_MASK_SPRITE_ENABLE;
+		
+		u32 temp;
+		temp = TRANS_DDI_FUNC_ENABLE;
+		temp |= TGL_TRANS_DDI_SELECT_PORT(port);
+		
+		switch (NBlue::callback->display_base.panel.vbt.edp.bpp) {
+			case 18:
+				temp |= TRANS_DDI_BPC_6;
+				break;
+			default:
+			case 24:
+				temp |= TRANS_DDI_BPC_8;
+				break;
+			case 30:
+				temp |= TRANS_DDI_BPC_10;
+				break;
+			case 36:
+				temp |= TRANS_DDI_BPC_12;
+				break;
+		}
+		
+		temp |= TRANS_DDI_PVSYNC;
+		temp |= TRANS_DDI_PHSYNC;
+		temp |= TRANS_DDI_MODE_SELECT_FDI_OR_128B132B;
+		temp |= DDI_PORT_WIDTH(NBlue::callback->display_base.panel.vbt.edp.lanes);
+		temp |= TRANS_DDI_MST_TRANSPORT_SELECT(TRANSCODER_A);
+		
+		
+		//param_3->TRANS_CLK_SEL=0x10000000;
+		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(port);
+		param_3->TRANS_MSA_MISC = 0x21;
+		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
+		//param_3->PIPE_MISC= 0x1800010;
+		param_3->TRANS_DDI_FUNC_CTL= temp;
+		param_3->PIPE_MISC= val;
+		//i9xx_set_pipeconf
+		param_3->TRANS_CONF= 0xc0000024;
+		
+	}
+	
+	FunctionCast(setupPipeWatermarks, callback->osetupPipeWatermarks)(that ,param_1,param_2,param_3);
 }

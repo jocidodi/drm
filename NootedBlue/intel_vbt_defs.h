@@ -2408,16 +2408,7 @@ func(novalake)
 #define __COUNT(x) 1 +
 
 #define __NUM_PLATFORMS (INTEL_DISPLAY_PLATFORMS(__COUNT) 0)
-#define BITS_PER_LONG_LONG 64
-#define BITS_PER_LONG 64
-#define BIT_MASK(nr)		(UL(1) << ((nr) % BITS_PER_LONG))
-#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-#define BIT_ULL_MASK(nr)	(ULL(1) << ((nr) % BITS_PER_LONG_LONG))
-#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
-#define BITS_PER_BYTE		8
-#define BITS_PER_TYPE(type)	(sizeof(type) * BITS_PER_BYTE)
-#define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-#define BITS_TO_LONGS(nr)	__KERNEL_DIV_ROUND_UP(nr, BITS_PER_TYPE(long))
+
 struct intel_display_platforms {
 union {
 struct {
@@ -3485,14 +3476,7 @@ struct intel_device_info {
 
 
 
-#define __AC(X,Y)	(X##Y)
-#define _AC(X,Y)	__AC(X,Y)
-#define _AT(T,X)	((T)(X))
-#define _UL(x)		(_AC(x, UL))
-#define UL(x)		(_UL(x))
-#define _ULL(x)		(_AC(x, ULL))
-#define ULL(x)		(_ULL(x))
-#define BIT_ULL(nr)		(ULL(1) << (nr))
+
 #define I915_GTT_PAGE_SIZE_4K	BIT_ULL(12)
 #define I915_GTT_PAGE_SIZE_64K	BIT_ULL(16)
 #define I915_GTT_PAGE_SIZE_2M	BIT_ULL(21)
@@ -4240,7 +4224,7 @@ static const struct intel_device_info ats_m_info = {
 static const struct intel_gt_definition xelpmp_extra_gt[] = {
 	{
 		.type = GT_MEDIA,
-		.name = "Standalone Media GT",
+		.name = (char *)"Standalone Media GT",
 		.gsi_offset = MTL_MEDIA_GSI_BASE,
 		.engine_mask = BIT(VECS0) | BIT(VCS0) | BIT(VCS2) | BIT(GSC0),
 	},
@@ -4574,7 +4558,79 @@ struct intel_display {
 
 #define _PICK(__index, ...) (((const u32 []){ __VA_ARGS__ })[__index])
 
+#define   PIPE_MISC_BPC_MASK			REG_GENMASK(7, 5)
+#define   PIPE_MISC_BPC_8			REG_FIELD_PREP(PIPE_MISC_BPC_MASK, 0)
+#define   PIPE_MISC_BPC_10			REG_FIELD_PREP(PIPE_MISC_BPC_MASK, 1)
+#define   PIPE_MISC_BPC_6			REG_FIELD_PREP(PIPE_MISC_BPC_MASK, 2)
+#define   PIPE_MISC_BPC_12_ADLP			REG_FIELD_PREP(PIPE_MISC_BPC_MASK, 4)
+#define   PIPE_MISC_DITHER_ENABLE		REG_BIT(4)
+#define   PIPE_MISC_DITHER_TYPE_MASK		REG_GENMASK(3, 2)
+#define   PIPE_MISC_DITHER_TYPE_SP		REG_FIELD_PREP(PIPE_MISC_DITHER_TYPE_MASK, 0)
+#define   PIPE_MISC_DITHER_TYPE_ST1		REG_FIELD_PREP(PIPE_MISC_DITHER_TYPE_MASK, 1)
+#define   PIPE_MISC_DITHER_TYPE_ST2		REG_FIELD_PREP(PIPE_MISC_DITHER_TYPE_MASK, 2)
+#define   PIPE_MISC_DITHER_TYPE_TEMP		REG_FIELD_PREP(PIPE_MISC_DITHER_TYPE_MASK, 3)
+#define _PIPE_MISC_A			0x70030
+#define _PIPE_MISC_B			0x71030
+#define PIPE_MISC(pipe)			_MMIO_PIPE(pipe, _PIPE_MISC_A, _PIPE_MISC_B)
+#define   PIPE_MISC_YUV420_ENABLE		REG_BIT(27)
+#define   PIPE_MISC_YUV420_MODE_FULL_BLEND	REG_BIT(26)
+#define   PIPE_MISC_HDR_MODE_PRECISION		REG_BIT(23)
+#define   PIPE_MISC_PSR_MASK_PRIMARY_FLIP	REG_BIT(23)
+#define   PIPE_MISC_PSR_MASK_SPRITE_ENABLE	REG_BIT(22)
+#define   PIPE_MISC_PSR_MASK_PIPE_REG_WRITE	REG_BIT(21)
+#define   PIPE_MISC_PSR_MASK_CURSOR_MOVE	REG_BIT(21)
+#define   PIPE_MISC_PSR_MASK_VBLANK_VSYNC_INT	REG_BIT(20)
+#define   PIPE_MISC_OUTPUT_COLORSPACE_YUV	REG_BIT(11)
+#define   PIPE_MISC_PIXEL_ROUNDING_TRUNC	REG_BIT(8)
+	
+#define  TRANS_DDI_FUNC_ENABLE		(1 << 31)
 
+#define  TRANS_DDI_PORT_SHIFT		28
+#define  TGL_TRANS_DDI_PORT_SHIFT	27
+#define  TRANS_DDI_PORT_MASK		(7 << TRANS_DDI_PORT_SHIFT)
+#define  TGL_TRANS_DDI_PORT_MASK	(0xf << TGL_TRANS_DDI_PORT_SHIFT)
+#define  TRANS_DDI_SELECT_PORT(x)	((x) << TRANS_DDI_PORT_SHIFT)
+#define  TGL_TRANS_DDI_SELECT_PORT(x)	(((x) + 1) << TGL_TRANS_DDI_PORT_SHIFT)
+#define  TRANS_DDI_MODE_SELECT_MASK	(7 << 24)
+#define  TRANS_DDI_MODE_SELECT_HDMI	(0 << 24)
+#define  TRANS_DDI_MODE_SELECT_DVI	(1 << 24)
+#define  TRANS_DDI_MODE_SELECT_DP_SST	(2 << 24)
+#define  TRANS_DDI_MODE_SELECT_DP_MST	(3 << 24)
+#define  TRANS_DDI_MODE_SELECT_FDI_OR_128B132B	(4 << 24)
+#define  TRANS_DDI_BPC_MASK		(7 << 20)
+#define  TRANS_DDI_BPC_8		(0 << 20)
+#define  TRANS_DDI_BPC_10		(1 << 20)
+#define  TRANS_DDI_BPC_6		(2 << 20)
+#define  TRANS_DDI_BPC_12		(3 << 20)
+#define  TRANS_DDI_PORT_SYNC_MASTER_SELECT_MASK	REG_GENMASK(19, 18)
+#define  TRANS_DDI_PORT_SYNC_MASTER_SELECT(x)	REG_FIELD_PREP(TRANS_DDI_PORT_SYNC_MASTER_SELECT_MASK, (x))
+#define  TRANS_DDI_PVSYNC		(1 << 17)
+#define  TRANS_DDI_PHSYNC		(1 << 16)
+#define  TRANS_DDI_PORT_SYNC_ENABLE	REG_BIT(15)
+#define  XE3_TRANS_DDI_HDCP_LINE_REKEY_DISABLE	REG_BIT(15)
+#define  TRANS_DDI_EDP_INPUT_MASK	(7 << 12)
+#define  TRANS_DDI_EDP_INPUT_A_ON	(0 << 12)
+#define  TRANS_DDI_EDP_INPUT_A_ONOFF	(4 << 12)
+#define  TRANS_DDI_EDP_INPUT_B_ONOFF	(5 << 12)
+#define  TRANS_DDI_EDP_INPUT_C_ONOFF	(6 << 12)
+#define  TRANS_DDI_EDP_INPUT_D_ONOFF	(7 << 12)
+#define  TRANS_DDI_HDCP_LINE_REKEY_DISABLE	REG_BIT(12)
+#define  TRANS_DDI_MST_TRANSPORT_SELECT_MASK	REG_GENMASK(11, 10)
+#define  TRANS_DDI_MST_TRANSPORT_SELECT(trans)	\
+	REG_FIELD_PREP(TRANS_DDI_MST_TRANSPORT_SELECT_MASK, trans)
+#define  DDI_PORT_WIDTH_MASK			REG_GENMASK(3, 1)
+#define  DDI_PORT_WIDTH_ENCODE(width)		((width) == 3 ? 4 : (width) - 1)
+#define  DDI_PORT_WIDTH_DECODE(regval)		((regval) == 4 ? 3 : (regval) + 1)
+#define  DDI_PORT_WIDTH(width)			REG_FIELD_PREP(DDI_PORT_WIDTH_MASK, \
+								   DDI_PORT_WIDTH_ENCODE(width))
+#define _TRANS_CLK_SEL_A		0x46140
+#define _TRANS_CLK_SEL_B		0x46144
+#define TRANS_CLK_SEL(tran) _MMIO_TRANS(tran, _TRANS_CLK_SEL_A, _TRANS_CLK_SEL_B)
+
+#define  TRANS_CLK_SEL_DISABLED		(0x0 << 29)
+#define  TRANS_CLK_SEL_PORT(x)		(((x) + 1) << 29)
+#define  TGL_TRANS_CLK_SEL_DISABLED	(0x0 << 28)
+#define  TGL_TRANS_CLK_SEL_PORT(x)	(((x) + 1) << 28)
 
 
 #ifdef __cplusplus

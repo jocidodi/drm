@@ -454,7 +454,42 @@ struct IGHwCsDesc {
 	uint32_t     mmioForcewakeAck;
 };
 
-
+struct PACKED CRTCParams
+{
+	uint32_t TRANS_CLK_SEL;
+	uint32_t TRANS_DDI_FUNC_CTL;
+	uint32_t TRANS_DDI_FUNC_CTL2;
+	uint32_t TRANS_MSA_MISC;
+	uint32_t TRANS_HTOTAL;
+	uint32_t TRANS_HBLANK;
+	uint32_t TRANS_HSYNC;
+	uint32_t TRANS_VTOTAL;
+	uint32_t TRANS_VBLANK;
+	uint32_t TRANS_VSYNC;
+	uint32_t PIPE_SRCSZ;
+	uint32_t TRANS_CONF;
+	uint32_t PIPE_MISC;
+	uint32_t PS_PS_WIN_POS;
+	uint32_t PS_PS_WIN_SZ;
+	uint32_t PIPE_SEAM_EXCESS;
+	uint32_t PS_HPHASE;
+	uint8_t _pad_0058[48];
+	uint32_t PPS_0;
+	uint32_t PPS_1;
+	uint32_t PPS_2;
+	uint32_t PPS_3;
+	uint32_t PPS_4;
+	uint32_t PPS_5;
+	uint32_t PPS_6;
+	uint32_t PPS_7;
+	uint32_t PPS_8;
+	uint32_t PPS_9;
+	uint32_t PPS_10;
+	uint32_t PPS_16;
+	uint8_t _pad_00B8[48];
+	uint32_t DSC_ENGINE_SEL;
+	uint32_t DSC_JOINER_CTL;
+};
 
 
 class Gen11 {
@@ -568,9 +603,11 @@ private:
 	static uint64_t	aframeBufferNotificationcallback(void *param_1,void *param_2,void *param_3,int param_4,void *param_5);
 	mach_vm_address_t oaframeBufferNotificationcallback {};
 	
-
+	static void SetupParams (void *that,void *param_1,void *param_2,CRTCParams *param_3,void *param_4);
+	mach_vm_address_t oSetupParams {};
 	
-	
+	static void setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3);
+	mach_vm_address_t osetupPipeWatermarks {};
 	
 public:
 
