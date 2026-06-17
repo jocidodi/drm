@@ -4632,6 +4632,12 @@ struct intel_display {
 #define  TGL_TRANS_CLK_SEL_DISABLED	(0x0 << 28)
 #define  TGL_TRANS_CLK_SEL_PORT(x)	(((x) + 1) << 28)
 
+enum intel_output_format {
+	INTEL_OUTPUT_FORMAT_RGB,
+	INTEL_OUTPUT_FORMAT_YCBCR420,
+	INTEL_OUTPUT_FORMAT_YCBCR444,
+};
+
 
 #ifdef __cplusplus
 //}

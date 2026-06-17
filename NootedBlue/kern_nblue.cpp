@@ -681,7 +681,7 @@ const char* port_to_string(enum port port)
 }
 
 
-int vbt_get_panel_type(const struct bdb_header *bdb)
+int vbt_get_panel_type(const struct bdb_header *bdb, struct intel_panel *panel)
 {
 	const struct bdb_lfp_options *lfp_options;
 
@@ -694,6 +694,8 @@ int vbt_get_panel_type(const struct bdb_header *bdb)
 		return -1;
 	}
 
+	panel->vbt.lvds_dither = lfp_options->pixel_dither;
+	
 	//if (devdata && devdata->child.handle == DEVICE_HANDLE_LFP2)
 	//	return lfp_options->panel_type2;
 
@@ -988,7 +990,7 @@ parse_lfp_backlight(struct intel_display *display,
 	const struct bdb_header *bdb=display->bdb;
 	const struct bdb_lfp_backlight *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
-	int panel_type = vbt_get_panel_type(bdb);
+	int panel_type = vbt_get_panel_type(bdb, panel);
 	u16 level;
 
 	panel->vbt.panel_type=panel_type;

@@ -609,6 +609,11 @@ private:
 	static void setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3);
 	mach_vm_address_t osetupPipeWatermarks {};
 	
+
+	
+	
+	
+	
 public:
 
 	void init();
