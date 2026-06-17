@@ -609,10 +609,10 @@ private:
 	static void setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3);
 	mach_vm_address_t osetupPipeWatermarks {};
 	
-
+	static unsigned long adjustPixelClockForWatermarks(void *that,void *param_2,bool param_3, CRTCParams *param_4);
+	mach_vm_address_t oadjustPixelClockForWatermarks {};
 	
-	
-	
+	static void SetupParams2 (CRTCParams *param_3);
 	
 public:
 

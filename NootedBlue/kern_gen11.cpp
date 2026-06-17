@@ -90,8 +90,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
 			{"__ZN31AppleIntelFramebufferController19setupPipeWatermarksEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParams",setupPipeWatermarks, this->osetupPipeWatermarks},
 			
-
 			
+			{"__ZN31AppleIntelFramebufferController29adjustPixelClockForWatermarksEP21AppleIntelFramebufferP21AppleIntelDisplayPathbP10CRTCParams",adjustPixelClockForWatermarks, this->oadjustPixelClockForWatermarks},
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},*/
@@ -1784,13 +1784,25 @@ void Gen11::hwInitializeCState(void *that)
 
 void Gen11::SetupParams (void *that,void *param_1,void *param_2,CRTCParams *param_3,void *param_4)
 {
-	setpc=1;
+	if (getMember<uint32_t>(param_1, 0x1dc) == 0) setpc=1;
 	FunctionCast(SetupParams, callback->oSetupParams)(that ,param_1,param_2,param_3,param_4);
+}
+
+ 
+unsigned long Gen11::adjustPixelClockForWatermarks(void *that,void *param_2,bool param_3, CRTCParams *param_4)
+{
+	if (setpc && kexticl) SetupParams2(param_4);
+	return FunctionCast(adjustPixelClockForWatermarks, callback->oadjustPixelClockForWatermarks)(that ,param_2,param_3,param_4);
 }
 
 void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3)
 {
+	if (setpc) SetupParams2(param_3);
+	FunctionCast(setupPipeWatermarks, callback->osetupPipeWatermarks)(that ,param_1,param_2,param_3);
+}
 
+void Gen11::SetupParams2 (CRTCParams *param_3)
+{
 	if (setpc){
 		setpc=0;
 		
@@ -1866,6 +1878,7 @@ void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCPara
 		
 		temp |= TRANS_DDI_PVSYNC;
 		temp |= TRANS_DDI_PHSYNC;
+		
 		//if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||intel_dp_is_uhbr(crtc_state))
 		//else
 		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
@@ -1884,7 +1897,6 @@ void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCPara
 		
 	}
 	
-	FunctionCast(setupPipeWatermarks, callback->osetupPipeWatermarks)(that ,param_1,param_2,param_3);
 }
 
 
