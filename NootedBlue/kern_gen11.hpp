@@ -466,7 +466,7 @@ struct PACKED CRTCParams
 	uint32_t TRANS_VTOTAL;
 	uint32_t TRANS_VBLANK;
 	uint32_t TRANS_VSYNC;
-	uint32_t PIPE_SRCSZ;
+	uint32_t PIPESRC;
 	uint32_t TRANS_CONF;
 	uint32_t PIPE_MISC;
 	uint32_t PS_PS_WIN_POS;
@@ -608,11 +608,8 @@ private:
 	
 	static void setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCParams *param_3);
 	mach_vm_address_t osetupPipeWatermarks {};
-	
-	static unsigned long adjustPixelClockForWatermarks(void *that,void *param_2,bool param_3, CRTCParams *param_4);
-	mach_vm_address_t oadjustPixelClockForWatermarks {};
-	
-	static void SetupParams2 (CRTCParams *param_3);
+
+	static void SetupParams2 (void *param_2, CRTCParams *param_3);
 	
 public:
 
