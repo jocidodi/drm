@@ -611,6 +611,13 @@ private:
 
 	static void SetupParams2 (void *param_2, CRTCParams *param_3);
 	
+	static void setupPlane(void *that,void *param_1,int param_2);
+	mach_vm_address_t osetupPlane {};
+	
+	static void setupPlane2(void *that,void *param_1);
+	mach_vm_address_t osetupPlane2 {};
+	
+	
 public:
 
 	void init();

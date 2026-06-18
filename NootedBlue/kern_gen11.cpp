@@ -89,7 +89,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 			{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
 			{"__ZN31AppleIntelFramebufferController19setupPipeWatermarksEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParams",setupPipeWatermarks, this->osetupPipeWatermarks},
-
+			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPathi",setupPlane, this->osetupPlane},
+			
+			
 			{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},*/
@@ -136,7 +138,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		
 		LookupPatchPlus const patches[] = {
-			
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
@@ -146,7 +147,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
 			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
-
 			
 			
 		};
@@ -193,8 +193,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
-			
-			
+			{"__ZN26AppleIntelDSBAccessManager13isDSBRegisterEj", dozero},
+			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPath",setupPlane2, this->osetupPlane2},
+
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
 		
@@ -317,7 +318,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod){
 			LookupPatchPlus const patchesp[] = {// tgl production kext
-				
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f7p, r7p, arrsize(f7p),	1},
 				{&kextG11FBT, f9p, r9p, arrsize(f9p),	1},
@@ -334,7 +334,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 		else {
 			LookupPatchPlus const patches[] = {// tgl debug kext
-				
 				{&kextG11FBT, f5, r5, arrsize(f5),	1},
 				{&kextG11FBT, f7, r7, arrsize(f7),	1},
 				{&kextG11FBT, f9, r9, arrsize(f9),	1},
@@ -1754,7 +1753,7 @@ void Gen11::hwInitializeCState(void *that)
 	}
 	
 	//skip DMC_FW_MAIN
-	for (uint8_t i = 1; i < DMC_FW_MAX; i++) {
+	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
 		if (!dmc->dmc_info[i].present)
 			continue;
 		dmc_load_program(&NBlue::callback->display_base, static_cast<intel_dmc_id>(i));
@@ -1779,6 +1778,27 @@ void Gen11::hwInitializeCState(void *that)
 	
 }
 
+void Gen11::setupPlane(void *that,void *param_1,int param_2)
+{
+	FunctionCast(setupPlane, callback->osetupPlane)(that ,param_1,param_2);
+	
+	//PLANE_CTL_1_A (0x00070180): 0x84000400
+	//PLANE_STRIDE_1_A (0x00070188): 0x0000000d
+	
+	getMember<uint32_t>(that, 0x100)=0x84000400;
+	getMember<uint32_t>(that, 0x118)=0xd;
+}
+
+void Gen11::setupPlane2(void *that,void *param_1)
+{
+	FunctionCast(setupPlane2, callback->osetupPlane2)(that ,param_1);
+	
+	//PLANE_CTL_1_A (0x00070180): 0x84000400
+	//PLANE_STRIDE_1_A (0x00070188): 0x0000000d
+	
+	getMember<uint32_t>(that, 0x100)=0x84000400;
+	getMember<uint32_t>(that, 0x118)=0xd;
+}
 
 void Gen11::SetupParams (void *that,void *param_1,void *param_2,CRTCParams *param_3,void *param_4)
 {
@@ -1887,8 +1907,8 @@ void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 		//i9xx_set_pipeconf
 		param_3->TRANS_CONF= 0xc0000024;
 		
-		uint32_t fScanoutHeight=getMember<uint32_t>(param_2, kexticl ? 0x2fc : 0xfc);
-		uint32_t fLinkScanoutWidth=getMember<uint32_t>(param_2, kexticl ? 0x2f8 : 0xf8);
+		int fScanoutHeight=getMember<int>(param_2, kexticl ? 0x2fc : 0xfc);
+		int fLinkScanoutWidth=getMember<int>(param_2, kexticl ? 0x2f8 : 0xf8);
 		param_3->PIPESRC =
 			 fScanoutHeight - 1 & 0x1fff |
 			 param_3->PIPESRC & 0xe000e000 |
