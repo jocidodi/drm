@@ -1206,6 +1206,13 @@ parse_lfp_backlight(struct intel_display *display,
 }
 
 
+static enum hpd_pin tgl_hpd_pin(enum port port)
+{
+	if (port >= PORT_TC1)
+		return  static_cast<enum hpd_pin>( HPD_PORT_TC1 + port - PORT_TC1);
+	else
+		return static_cast<enum hpd_pin>( HPD_PORT_A + port - PORT_A);
+}
 
 void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
@@ -1257,6 +1264,9 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 
 			enum port port = dvo_port_to_port(display, child->dvo_port);
 			
+			if (port == PORT_A) display->child0=child;
+			
+			
 			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
 				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
 				else if (child->dvo_port == DVO_PORT_MIPIC) port = (DISPLAY_VER(display) >= 11) ? PORT_B : PORT_C;
@@ -1274,6 +1284,12 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			char buf2[6];
 			
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
+			
+			display->hotplug.hpd_pin=tgl_hpd_pin(port);
+			display->port0=port;
+			display->phy0=phy;
+			display->aux_ch0=aux_ch;
+			display->port_clock = 270000;
 			
 			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
 

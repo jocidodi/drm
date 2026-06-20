@@ -494,7 +494,7 @@ struct PACKED CRTCParams
 
 class Gen11 {
 	friend class NBlue;
-private:
+public:
 	
 	void* gPlatformInformationList{nullptr};
 	void* kIGHwCsDesc {};
@@ -616,6 +616,24 @@ private:
 	
 	static void setupPlane2(void *that,void *param_1);
 	mach_vm_address_t osetupPlane2 {};
+	
+	static uint64_t  linkTraining(void *that,void *param_1);
+	mach_vm_address_t olinkTraining {};
+	
+	static uint64_t hwSetPanelPower(void *that,uint param_1);
+	mach_vm_address_t ohwSetPanelPower {};
+	
+	static int writeAUX(void *that,uint param_1,void *param_2,uint param_3);
+	mach_vm_address_t owriteAUX {};
+	
+	static int readAUX(void *that,uint param_1,void *param_2,uint param_3);
+	mach_vm_address_t oreadAUX {};
+	
+	static uint64_t disableVDDForAux(void *that);
+	mach_vm_address_t odisableVDDForAux {};
+	
+	
+	
 	
 	
 public:

@@ -4487,11 +4487,597 @@ struct i915_power_domains {
 #define DG1_DMC_DEBUG_DC5_COUNT	_MMIO(0x134154)
 
 
+#define _TRANS(tran, a, b)		_PICK_EVEN(tran, a, b)
+#define _MMIO_TRANS(tran, a, b)		_MMIO(_TRANS(tran, a, b))
+#define DISPLAY_MMIO_BASE(display)	(DISPLAY_INFO((display))->mmio_offset)
+#define INTEL_DISPLAY_DEVICE_TRANS_OFFSET(display, trans) \
+	(DISPLAY_INFO((display))->trans_offsets[(trans)] - \
+	 DISPLAY_INFO((display))->trans_offsets[TRANSCODER_A] + \
+	 DISPLAY_MMIO_BASE((display)))
+#define _MMIO_TRANS2(display, trans, reg)	_MMIO(INTEL_DISPLAY_DEVICE_TRANS_OFFSET((display), (trans)) + (reg))
+#define _TRANS_DDI_FUNC_CTL_A		0x60400
+#define _TRANS_DDI_FUNC_CTL_B		0x61400
+#define _TRANS_DDI_FUNC_CTL_C		0x62400
+#define _TRANS_DDI_FUNC_CTL_D		0x63400
+#define _TRANS_DDI_FUNC_CTL_EDP		0x6F400
+#define _TRANS_DDI_FUNC_CTL_DSI0	0x6b400
+#define _TRANS_DDI_FUNC_CTL_DSI1	0x6bc00
+#define TRANS_DDI_FUNC_CTL(dev_priv, tran) _MMIO_TRANS2(dev_priv, tran, _TRANS_DDI_FUNC_CTL_A)
+#define _ICL_COMBOPHY_A				0x162000
+#define _ICL_COMBOPHY_B				0x6C000
+#define _EHL_COMBOPHY_C				0x160000
+#define _RKL_COMBOPHY_D				0x161000
+#define _ADL_COMBOPHY_E				0x16B000
+
+#define _ICL_COMBOPHY(phy)			_PICK(phy, _ICL_COMBOPHY_A, \
+							  _ICL_COMBOPHY_B, \
+							  _EHL_COMBOPHY_C, \
+							  _RKL_COMBOPHY_D, \
+							  _ADL_COMBOPHY_E)
+
+#define _ICL_PORT_CL_DW(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 4 * (dw))
+#define ICL_PORT_CL_DW10(phy)			_MMIO(_ICL_PORT_CL_DW(10, phy))
+#define  PWR_DOWN_LN_MASK			REG_GENMASK(7, 4)
+#define  PWR_DOWN_LN_3_2			REG_FIELD_PREP(PWR_DOWN_LN_MASK, 0xc)
+#define  SPLITTER_ENABLE			(1 << 31)
+#define  SPLITTER_CONFIGURATION_MASK		REG_GENMASK(26, 25)
+#define  OVERLAP_PIXELS_MASK			(0xf << 16)
+#define _ICL_PIPE_DSS_CTL1_PB			0x78200
+#define _ICL_PIPE_DSS_CTL1_PC			0x78400
+#define ICL_PIPE_DSS_CTL1(pipe)			_MMIO_PIPE((pipe) - PIPE_B, \
+							   _ICL_PIPE_DSS_CTL1_PB, \
+							   _ICL_PIPE_DSS_CTL1_PC)
+#define DP_SET_POWER                        0x600
+#define DP_SOURCE_OUI			    0x300
+#define DP_SET_POWER_D0                    0x1
+#define  PWR_DOWN_LN_1_0			REG_FIELD_PREP(PWR_DOWN_LN_MASK, 0x3)
+#define  PWR_UP_ALL_LANES			REG_FIELD_PREP(PWR_DOWN_LN_MASK, 0x0)
+
+
+
+#define _ICL_PORT_TX_GRP			0x680
+#define   TX_TRAINING_EN			REG_BIT(31)
+#define _ICL_PORT_TX_LN(ln)			(0x880 + (ln) * 0x100)
+#define   SUS_CLOCK_CONFIG			REG_GENMASK(1, 0)
+#define   LOADGEN_SELECT			REG_BIT(31)
+#define _ICL_PORT_PCS_GRP			0x600
+#define   COMMON_KEEPER_EN			REG_BIT(26)
+#define _ICL_PORT_PCS_LN(ln)			(0x800 + (ln) * 0x100)
+#define _ICL_PORT_PCS_DW_LN(dw, ln, phy)	 (_ICL_COMBOPHY(phy) + \
+						  _ICL_PORT_PCS_LN(ln) + 4 * (dw))
+#define ICL_PORT_PCS_DW1_LN(ln, phy)		_MMIO(_ICL_PORT_PCS_DW_LN(1, ln, phy))
+#define _ICL_PORT_PCS_DW_GRP(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 _ICL_PORT_PCS_GRP + 4 * (dw))
+#define ICL_PORT_PCS_DW1_GRP(phy)		_MMIO(_ICL_PORT_PCS_DW_GRP(1, phy))
+#define ICL_PORT_TX_DW4_LN(ln, phy)		_MMIO(_ICL_PORT_TX_DW_LN(4, ln, phy))
+#define _ICL_PORT_CL_DW(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 4 * (dw))
+#define _ICL_PORT_TX_DW_LN(dw, ln, phy) 	(_ICL_COMBOPHY(phy) + \
+						  _ICL_PORT_TX_LN(ln) + 4 * (dw))
+#define _ICL_PORT_TX_DW_GRP(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 _ICL_PORT_TX_GRP + 4 * (dw))
+#define ICL_PORT_CL_DW5(phy)			_MMIO(_ICL_PORT_CL_DW(5, phy))
+#define ICL_PORT_TX_DW5_LN(ln, phy)		_MMIO(_ICL_PORT_TX_DW_LN(5, ln, phy))
+#define ICL_PORT_TX_DW5_GRP(phy)		_MMIO(_ICL_PORT_TX_DW_GRP(5, phy))
+
+
+struct hsw_ddi_buf_trans {
+	u32 trans1;	/* balance leg enable, de-emph level */
+	u32 trans2;	/* vref sel, vswing */
+	u8 i_boost;	/* SKL: I_boost; valid: 0x0, 0x1, 0x3, 0x7 */
+};
+
+struct bxt_ddi_buf_trans {
+	u8 margin;	/* swing value */
+	u8 scale;	/* scale value */
+	u8 enable;	/* scale enable */
+	u8 deemphasis;
+};
+
+struct icl_ddi_buf_trans {
+	u8 dw2_swing_sel;
+	u8 dw7_n_scalar;
+	u8 dw4_cursor_coeff;
+	u8 dw4_post_cursor_2;
+	u8 dw4_post_cursor_1;
+};
+
+struct icl_mg_phy_ddi_buf_trans {
+	u8 cri_txdeemph_override_11_6;
+	u8 cri_txdeemph_override_5_0;
+	u8 cri_txdeemph_override_17_12;
+};
+
+struct tgl_dkl_phy_ddi_buf_trans {
+	u8 vswing;
+	u8 preshoot;
+	u8 de_emphasis;
+};
+
+struct dg2_snps_phy_buf_trans {
+	u8 vswing;
+	u8 pre_cursor;
+	u8 post_cursor;
+};
+
+struct xe3plpd_lt_phy_buf_trans {
+	u8 txswing;
+	u8 txswing_level;
+	u8 pre_cursor;
+	u8 main_cursor;
+	u8 post_cursor;
+};
+union intel_ddi_buf_trans_entry {
+	struct hsw_ddi_buf_trans hsw;
+	struct bxt_ddi_buf_trans bxt;
+	struct icl_ddi_buf_trans icl;
+	struct icl_mg_phy_ddi_buf_trans mg;
+	struct tgl_dkl_phy_ddi_buf_trans dkl;
+	struct dg2_snps_phy_buf_trans snps;
+	struct xe3plpd_lt_phy_buf_trans lt;
+};
+
+struct intel_ddi_buf_trans {
+	const union intel_ddi_buf_trans_entry *entries;
+	u8 num_entries;
+	u8 hdmi_default_entry;
+};
+static const union intel_ddi_buf_trans_entry _tgl_combo_phy_trans_dp_hbr[] = {
+							/* NT mV Trans mV db    */
+	{ .icl = { 0xA, 0x32, 0x3F, 0x00, 0x00 } },	/* 350   350      0.0   */
+	{ .icl = { 0xA, 0x4F, 0x37, 0x00, 0x08 } },	/* 350   500      3.1   */
+	{ .icl = { 0xC, 0x71, 0x2F, 0x00, 0x10 } },	/* 350   700      6.0   */
+	{ .icl = { 0x6, 0x7D, 0x2B, 0x00, 0x14 } },	/* 350   900      8.2   */
+	{ .icl = { 0xA, 0x4C, 0x3F, 0x00, 0x00 } },	/* 500   500      0.0   */
+	{ .icl = { 0xC, 0x73, 0x34, 0x00, 0x0B } },	/* 500   700      2.9   */
+	{ .icl = { 0x6, 0x7F, 0x2F, 0x00, 0x10 } },	/* 500   900      5.1   */
+	{ .icl = { 0xC, 0x6C, 0x3C, 0x00, 0x03 } },	/* 650   700      0.6   */
+	{ .icl = { 0x6, 0x7F, 0x35, 0x00, 0x0A } },	/* 600   900      3.5   */
+	{ .icl = { 0x6, 0x7F, 0x3F, 0x00, 0x00 } },	/* 900   900      0.0   */
+};
+static const union intel_ddi_buf_trans_entry _tgl_uy_combo_phy_trans_dp_hbr2[] = {
+							/* NT mV Trans mV db    */
+	{ .icl = { 0xA, 0x35, 0x3F, 0x00, 0x00 } },	/* 350   350      0.0   */
+	{ .icl = { 0xA, 0x4F, 0x36, 0x00, 0x09 } },	/* 350   500      3.1   */
+	{ .icl = { 0xC, 0x60, 0x32, 0x00, 0x0D } },	/* 350   700      6.0   */
+	{ .icl = { 0xC, 0x7F, 0x2D, 0x00, 0x12 } },	/* 350   900      8.2   */
+	{ .icl = { 0xC, 0x47, 0x3F, 0x00, 0x00 } },	/* 500   500      0.0   */
+	{ .icl = { 0xC, 0x6F, 0x36, 0x00, 0x09 } },	/* 500   700      2.9   */
+	{ .icl = { 0x6, 0x7D, 0x32, 0x00, 0x0D } },	/* 500   900      5.1   */
+	{ .icl = { 0x6, 0x60, 0x3C, 0x00, 0x03 } },	/* 650   700      0.6   */
+	{ .icl = { 0x6, 0x7F, 0x34, 0x00, 0x0B } },	/* 600   900      3.5   */
+	{ .icl = { 0x6, 0x7F, 0x3F, 0x00, 0x00 } },	/* 900   900      0.0   */
+};
+
+static const union intel_ddi_buf_trans_entry _tgl_combo_phy_trans_dp_hbr2[] = {
+							/* NT mV Trans mV db    */
+	{ .icl = { 0xA, 0x35, 0x3F, 0x00, 0x00 } },	/* 350   350      0.0   */
+	{ .icl = { 0xA, 0x4F, 0x37, 0x00, 0x08 } },	/* 350   500      3.1   */
+	{ .icl = { 0xC, 0x63, 0x2F, 0x00, 0x10 } },	/* 350   700      6.0   */
+	{ .icl = { 0x6, 0x7F, 0x2B, 0x00, 0x14 } },	/* 350   900      8.2   */
+	{ .icl = { 0xA, 0x47, 0x3F, 0x00, 0x00 } },	/* 500   500      0.0   */
+	{ .icl = { 0xC, 0x63, 0x34, 0x00, 0x0B } },	/* 500   700      2.9   */
+	{ .icl = { 0x6, 0x7F, 0x2F, 0x00, 0x10 } },	/* 500   900      5.1   */
+	{ .icl = { 0xC, 0x61, 0x3C, 0x00, 0x03 } },	/* 650   700      0.6   */
+	{ .icl = { 0x6, 0x7B, 0x35, 0x00, 0x0A } },	/* 600   900      3.5   */
+	{ .icl = { 0x6, 0x7F, 0x3F, 0x00, 0x00 } },	/* 900   900      0.0   */
+};
+
+static const struct intel_ddi_buf_trans tgl_uy_combo_phy_trans_dp_hbr2 = {
+	.entries = _tgl_uy_combo_phy_trans_dp_hbr2,
+	.num_entries = ARRAY_SIZE(_tgl_uy_combo_phy_trans_dp_hbr2),
+};
+static const struct intel_ddi_buf_trans tgl_combo_phy_trans_dp_hbr = {
+	.entries = _tgl_combo_phy_trans_dp_hbr,
+	.num_entries = ARRAY_SIZE(_tgl_combo_phy_trans_dp_hbr),
+};
+
+static const struct intel_ddi_buf_trans tgl_combo_phy_trans_dp_hbr2 = {
+	.entries = _tgl_combo_phy_trans_dp_hbr2,
+	.num_entries = ARRAY_SIZE(_tgl_combo_phy_trans_dp_hbr2),
+};
+
+#define   SCALING_MODE_SEL_MASK			REG_GENMASK(20, 18)
+#define   RTERM_SELECT_MASK			REG_GENMASK(5, 3)
+#define   COEFF_POLARITY			REG_BIT(25)
+#define   CURSOR_PROGRAM			REG_BIT(26)
+#define   TAP2_DISABLE				REG_BIT(30)
+#define   TAP3_DISABLE				REG_BIT(29)
+#define   SCALING_MODE_SEL_MASK			REG_GENMASK(20, 18)
+#define   SCALING_MODE_SEL(x)			REG_FIELD_PREP(SCALING_MODE_SEL_MASK, (x))
+#define   RTERM_SELECT_MASK			REG_GENMASK(5, 3)
+#define   RTERM_SELECT(x)			REG_FIELD_PREP(RTERM_SELECT_MASK, (x))
+
+#define ICL_PORT_TX_DW2_LN(ln, phy)		_MMIO(_ICL_PORT_TX_DW_LN(2, ln, phy))
+#define   SWING_SEL_UPPER_MASK			REG_BIT(15)
+#define   SWING_SEL_LOWER_MASK			REG_GENMASK(13, 11)
+#define   RCOMP_SCALAR_MASK			REG_GENMASK(7, 0)
+#define   RCOMP_SCALAR(x)			REG_FIELD_PREP(RCOMP_SCALAR_MASK, (x))
+#define   SWING_SEL_UPPER(x)			REG_FIELD_PREP(SWING_SEL_UPPER_MASK, (x) >> 3)
+#define   SWING_SEL_LOWER(x)			REG_FIELD_PREP(SWING_SEL_LOWER_MASK, (x) & 0x7)
+#define   POST_CURSOR_1_MASK			REG_GENMASK(17, 12)
+#define   POST_CURSOR_1(x)			REG_FIELD_PREP(POST_CURSOR_1_MASK, (x))
+#define   POST_CURSOR_2_MASK			REG_GENMASK(11, 6)
+#define   POST_CURSOR_2(x)			REG_FIELD_PREP(POST_CURSOR_2_MASK, (x))
+#define   CURSOR_COEFF_MASK			REG_GENMASK(5, 0)
+#define   CURSOR_COEFF(x)			REG_FIELD_PREP(CURSOR_COEFF_MASK, (x))
+#define ICL_PORT_TX_DW7_AUX(phy)		_MMIO(_ICL_PORT_TX_DW_AUX(7, phy))
+#define ICL_PORT_TX_DW7_GRP(phy)		_MMIO(_ICL_PORT_TX_DW_GRP(7, phy))
+#define ICL_PORT_TX_DW7_LN(ln, phy)		_MMIO(_ICL_PORT_TX_DW_LN(7, ln, phy))
+#define   N_SCALAR_MASK				REG_GENMASK(30, 24)
+#define   N_SCALAR(x)				REG_FIELD_PREP(N_SCALAR_MASK, (x))
+
+static const u8 index_to_dp_signal_levels[] = {
+	[0] = DP_TRAIN_VOLTAGE_SWING_LEVEL_0 | DP_TRAIN_PRE_EMPH_LEVEL_0,
+	[1] = DP_TRAIN_VOLTAGE_SWING_LEVEL_0 | DP_TRAIN_PRE_EMPH_LEVEL_1,
+	[2] = DP_TRAIN_VOLTAGE_SWING_LEVEL_0 | DP_TRAIN_PRE_EMPH_LEVEL_2,
+	[3] = DP_TRAIN_VOLTAGE_SWING_LEVEL_0 | DP_TRAIN_PRE_EMPH_LEVEL_3,
+	[4] = DP_TRAIN_VOLTAGE_SWING_LEVEL_1 | DP_TRAIN_PRE_EMPH_LEVEL_0,
+	[5] = DP_TRAIN_VOLTAGE_SWING_LEVEL_1 | DP_TRAIN_PRE_EMPH_LEVEL_1,
+	[6] = DP_TRAIN_VOLTAGE_SWING_LEVEL_1 | DP_TRAIN_PRE_EMPH_LEVEL_2,
+	[7] = DP_TRAIN_VOLTAGE_SWING_LEVEL_2 | DP_TRAIN_PRE_EMPH_LEVEL_0,
+	[8] = DP_TRAIN_VOLTAGE_SWING_LEVEL_2 | DP_TRAIN_PRE_EMPH_LEVEL_1,
+	[9] = DP_TRAIN_VOLTAGE_SWING_LEVEL_3 | DP_TRAIN_PRE_EMPH_LEVEL_0,
+};
+
+enum drm_dp_phy {
+	DP_PHY_DPRX,
+
+	DP_PHY_LTTPR1,
+	DP_PHY_LTTPR2,
+	DP_PHY_LTTPR3,
+	DP_PHY_LTTPR4,
+	DP_PHY_LTTPR5,
+	DP_PHY_LTTPR6,
+	DP_PHY_LTTPR7,
+	DP_PHY_LTTPR8,
+
+	DP_MAX_LTTPR_COUNT = DP_PHY_LTTPR8,
+};
+
+#define DP_LINK_STATUS_SIZE	   6
+#define DP_TRAINING_PATTERN_SET	            0x102
+# define DP_TRAINING_PATTERN_DISABLE	    0
+# define DP_TRAINING_PATTERN_1		    1
+# define DP_TRAINING_PATTERN_2		    2
+# define DP_TRAINING_PATTERN_2_CDS	    3	    /* 2.0 E11 */
+# define DP_TRAINING_PATTERN_3		    3	    /* 1.2 */
+# define DP_TRAINING_PATTERN_4              7       /* 1.4 */
+# define DP_TRAINING_PATTERN_MASK	    0x3
+# define DP_TRAINING_PATTERN_MASK_1_4	    0xf
+# define DP_LINK_SCRAMBLING_DISABLE	    (1 << 5)
+#define DP_PHY_LTTPR(i)					    (DP_PHY_LTTPR1 + (i))
+
+#define __DP_LTTPR1_BASE				    0xf0010 /* 1.3 */
+#define __DP_LTTPR2_BASE				    0xf0060 /* 1.3 */
+#define DP_LTTPR_BASE(dp_phy) \
+	(__DP_LTTPR1_BASE + (__DP_LTTPR2_BASE - __DP_LTTPR1_BASE) * \
+		((dp_phy) - DP_PHY_LTTPR1))
+
+#define DP_LTTPR_REG(dp_phy, lttpr1_reg) \
+	(DP_LTTPR_BASE(dp_phy) - DP_LTTPR_BASE(DP_PHY_LTTPR1) + (lttpr1_reg))
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER1		    0xf0010 /* 1.3 */
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER(dp_phy) \
+	DP_LTTPR_REG(dp_phy, DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
+#define _DP_TP_CTL_A			0x64040
+#define _DP_TP_CTL_B			0x64140
+#define _TGL_DP_TP_CTL_A		0x60540
+#define DP_TP_CTL(port) _MMIO_PORT(port, _DP_TP_CTL_A, _DP_TP_CTL_B)
+#define TGL_DP_TP_CTL(dev_priv, tran) _MMIO_TRANS2(dev_priv, (tran), _TGL_DP_TP_CTL_A)
+#define   DP_TP_CTL_LINK_TRAIN_MASK		REG_GENMASK(10, 8)
+#define   DP_TP_CTL_LINK_TRAIN_MASK		REG_GENMASK(10, 8)
+#define   DP_TP_CTL_LINK_TRAIN_PAT1		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 0)
+#define   DP_TP_CTL_LINK_TRAIN_PAT2		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 1)
+#define   DP_TP_CTL_LINK_TRAIN_PAT3		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 4)
+#define   DP_TP_CTL_LINK_TRAIN_PAT4		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 5)
+#define   DP_TP_CTL_LINK_TRAIN_IDLE		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 2)
+#define   DP_TP_CTL_LINK_TRAIN_NORMAL		REG_FIELD_PREP(DP_TP_CTL_LINK_TRAIN_MASK, 3)
+#define   DP_TP_CTL_SCRAMBLE_DISABLE		REG_BIT(7)
+#define DP_LANE0_1_STATUS		    0x202
+#define DP_LANE2_3_STATUS		    0x203
+#define DP_LANE_CR_DONE		    (1 << 0)
+#define DP_SINK_STATUS			    0x205
+# define DP_RECEIVE_PORT_0_STATUS	    (1 << 0)
+# define DP_RECEIVE_PORT_1_STATUS	    (1 << 1)
+# define DP_STREAM_REGENERATION_STATUS      (1 << 2) /* 2.0 */
+# define DP_INTRA_HOP_AUX_REPLY_INDICATION	(1 << 3) /* 2.0 */
+
+#define DP_ADJUST_REQUEST_LANE0_1	    0x206
+#define DP_ADJUST_REQUEST_LANE2_3	    0x207
+# define DP_ADJUST_VOLTAGE_SWING_LANE0_MASK  0x03
+# define DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT 0
+# define DP_ADJUST_PRE_EMPHASIS_LANE0_MASK   0x0c
+# define DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT  2
+# define DP_ADJUST_VOLTAGE_SWING_LANE1_MASK  0x30
+# define DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT 4
+# define DP_ADJUST_PRE_EMPHASIS_LANE1_MASK   0xc0
+# define DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT  6
+# define DP_TRAIN_PRE_EMPHASIS_SHIFT	    3
+#define DP_TRAINING_LANE0_SET		    0x103
+#define DP_TRAINING_LANE0_SET_PHY_REPEATER1		    0xf0011 /* 1.3 */
+#define DP_TRAINING_LANE0_SET_PHY_REPEATER(dp_phy) \
+	DP_LTTPR_REG(dp_phy, DP_TRAINING_LANE0_SET_PHY_REPEATER1)
+# define DP_TRAIN_MAX_PRE_EMPHASIS_REACHED  (1 << 5)
+
+#define DP_SET_ANSI_8B10B		    (1 << 0)
+#define DP_DOWNSPREAD_CTRL		    0x107
+#define	DP_LINK_BW_SET		            0x100
+
+enum hpd_pin {
+	HPD_NONE = 0,
+	HPD_TV = HPD_NONE,     /* TV is known to be unreliable */
+	HPD_CRT,
+	HPD_SDVO_B,
+	HPD_SDVO_C,
+	HPD_PORT_A,
+	HPD_PORT_B,
+	HPD_PORT_C,
+	HPD_PORT_D,
+	HPD_PORT_E,
+	HPD_PORT_TC1,
+	HPD_PORT_TC2,
+	HPD_PORT_TC3,
+	HPD_PORT_TC4,
+	HPD_PORT_TC5,
+	HPD_PORT_TC6,
+
+	HPD_NUM_PINS
+};
+
+
+
+struct intel_psr {
+	/* Mutex for PSR state of the transcoder */
+	//struct mutex lock;
+
+#define I915_PSR_DEBUG_MODE_MASK		0x0f
+#define I915_PSR_DEBUG_DEFAULT			0x00
+#define I915_PSR_DEBUG_DISABLE			0x01
+#define I915_PSR_DEBUG_ENABLE			0x02
+#define I915_PSR_DEBUG_FORCE_PSR1		0x03
+#define I915_PSR_DEBUG_ENABLE_SEL_FETCH		0x4
+#define I915_PSR_DEBUG_IRQ			0x10
+#define I915_PSR_DEBUG_SU_REGION_ET_DISABLE	0x20
+#define I915_PSR_DEBUG_PANEL_REPLAY_DISABLE	0x40
+
+	u32 debug;
+	bool sink_support;
+	bool source_support;
+	bool enabled;
+	int pause_counter;
+	enum pipe pipe;
+	enum transcoder transcoder;
+	bool active;
+	//struct work_struct work;
+	unsigned int busy_frontbuffer_bits;
+	bool link_standby;
+	bool sel_update_enabled;
+	bool psr2_sel_fetch_enabled;
+	bool psr2_sel_fetch_cff_enabled;
+	bool su_region_et_enabled;
+	bool req_psr2_sdp_prior_scanline;
+	//ktime_t last_entry_attempt;
+	//ktime_t last_exit;
+	bool sink_not_reliable;
+	bool irq_aux_error;
+	u16 su_w_granularity;
+	u16 su_y_granularity;
+	bool source_panel_replay_support;
+	bool sink_panel_replay_support;
+	bool panel_replay_enabled;
+	u32 dc3co_exitline;
+	u32 dc3co_exit_delay;
+	//struct delayed_work dc3co_work;
+	u8 entry_setup_frames;
+
+	u8 io_wake_lines;
+	u8 fast_wake_lines;
+
+	bool link_ok;
+	bool pkg_c_latency_used;
+
+	u8 active_non_psr_pipes;
+
+	const char *no_psr_reason;
+};
+
+struct intel_dp {
+	u32 output_reg;
+	u32 DP;
+	int link_rate;
+	u8 lane_count;
+	u8 sink_count;
+	bool downstream_port_changed;
+	bool needs_modeset_retry;
+	bool use_max_params;
+	
+	struct intel_psr psr;
+	
+	/*u8 dpcd[DP_RECEIVER_CAP_SIZE];
+
+	u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
+	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
+	u8 lttpr_common_caps[DP_LTTPR_COMMON_CAP_SIZE];
+	u8 lttpr_phy_caps[DP_MAX_LTTPR_COUNT][DP_LTTPR_PHY_CAP_SIZE];
+	u8 pcon_dsc_dpcd[DP_PCON_DSC_ENCODER_CAP_SIZE];
+*/
+	int num_source_rates;
+	const int *source_rates;
+	/* sink rates as reported by DP_MAX_LINK_RATE/DP_SUPPORTED_LINK_RATES */
+	int num_sink_rates;
+	//int sink_rates[DP_MAX_SUPPORTED_RATES];
+	bool use_rate_select;
+	/* Max sink lane count as reported by DP_MAX_LANE_COUNT */
+	int max_sink_lane_count;
+	/* intersection of source and sink rates */
+	int num_common_rates;
+	//int common_rates[DP_MAX_SUPPORTED_RATES];
+	struct {
+		/* TODO: move the rest of link specific fields to here */
+		bool active;
+		/* common rate,lane_count configs in bw order */
+		int num_configs;
+
+		/* Max lane count for the current link */
+		int max_lane_count;
+		/* Max rate for the current link */
+		int max_rate;
+		/*
+		 * Link parameters for which the MST topology was probed.
+		 * Tracking these ensures that the MST path resources are
+		 * re-enumerated whenever the link is retrained with new link
+		 * parameters, as required by the DP standard.
+		 */
+		int mst_probed_lane_count;
+		int mst_probed_rate;
+		int force_lane_count;
+		int force_rate;
+		bool retrain_disabled;
+		/* Sequential link training failures after a passing LT */
+		int seq_train_failures;
+		int force_train_failure;
+		bool force_retrain;
+	} link;
+	bool reset_link_params;
+	int mso_link_count;
+	int mso_pixel_overlap;
+	/* sink or branch descriptor */
+	//struct drm_dp_desc desc;
+	//struct drm_dp_aux aux;
+	u32 aux_busy_last_status;
+	u8 train_set[4];
+
+	struct intel_pps pps;
+
+	bool is_mst;
+	//enum drm_dp_mst_mode mst_detect;
+
+	/* connector directly attached - won't be use for modeset in mst world */
+	//struct intel_connector *attached_connector;
+	bool as_sdp_supported;
+
+	//struct drm_dp_tunnel *tunnel;
+	bool tunnel_suspended:1;
+
+	struct {
+		//struct intel_dp_mst_encoder *stream_encoders[I915_MAX_PIPES];
+		//struct drm_dp_mst_topology_mgr mgr;
+		int active_streams;
+	} mst;
+
+	/* Downstream facing port caps */
+	struct {
+		int min_tmds_clock, max_tmds_clock;
+		int max_dotclock;
+		int pcon_max_frl_bw;
+		u8 max_bpc;
+		bool ycbcr_444_to_420;
+		bool ycbcr420_passthrough;
+		bool rgb_to_ycbcr;
+	} dfp;
+
+	/* Display stream compression testing */
+	bool force_dsc_en;
+	int force_dsc_output_format;
+	bool force_dsc_fractional_bpp_en;
+	int force_dsc_bpc;
+
+	bool hobl_failed;
+	bool hobl_active;
+
+
+	/* When we last wrote the OUI for eDP */
+	unsigned long last_oui_write;
+	bool oui_valid;
+
+	bool colorimetry_support;
+
+	struct {
+		enum transcoder transcoder;
+		//struct mutex lock;
+
+		bool lobf_disable_debug;
+		bool sink_alpm_error;
+	} alpm;
+
+	u8 alpm_dpcd;
+
+	struct {
+		unsigned long mask;
+	} quirks;
+};
+
+
+struct intel_hotplug {
+	//struct delayed_work hotplug_work;
+	enum hpd_pin hpd_pin;
+	const u32 *hpd, *pch_hpd;
+
+	struct {
+		unsigned long last_jiffies;
+		int count;
+		int blocked_count;
+		enum {
+			HPD_ENABLED = 0,
+			HPD_DISABLED = 1,
+			HPD_MARK_DISABLED = 2
+		} state;
+	} stats[HPD_NUM_PINS];
+	u32 event_bits;
+	u32 retry_bits;
+	//struct delayed_work reenable_work;
+
+	u32 long_hpd_pin_mask;
+	u32 short_hpd_pin_mask;
+	//struct work_struct dig_port_work;
+
+	//struct work_struct poll_init_work;
+	bool poll_enabled;
+
+	/*
+	 * Queuing of hotplug_work, reenable_work and poll_init_work is
+	 * enabled. Protected by intel_display::irq::lock.
+	 */
+	bool detection_work_enabled;
+
+	unsigned int hpd_storm_threshold;
+	/* Whether or not to count short HPD IRQs in HPD storms */
+	u8 hpd_short_storm_enabled;
+
+	/* Last state reported by oob_hotplug_event for each encoder */
+	unsigned long oob_hotplug_last_state;
+
+	/*
+	 * if we get a HPD irq from DP and a HPD irq from non-DP
+	 * the non-DP HPD could block the workqueue on a mode config
+	 * mutex getting, that userspace may have taken. However
+	 * userspace is waiting on the DP workqueue to run which is
+	 * blocked behind the non-DP one.
+	 */
+	//struct workqueue_struct *dp_wq;
+
+	/*
+	 * Flag to track if long HPDs need not to be processed
+	 *
+	 * Some panels generate long HPDs while keep connected to the port.
+	 * This can cause issues with CI tests results. In CI systems we
+	 * don't expect to disconnect the panels and could ignore the long
+	 * HPDs generated from the faulty panels. This flag can be used as
+	 * cue to ignore the long HPDs and can be set / unset using debugfs.
+	 */
+	bool ignore_long_hpd;
+};
+
 struct intel_display {
 	
 	struct intel_display_platforms platform;
 	
 	enum intel_pch pch_type;
+	
+	struct intel_hotplug hotplug;
+	
+	int port_clock;
 	
 	struct {
 		const struct intel_display_device_info *__device_info;
@@ -4527,6 +5113,13 @@ struct intel_display {
 	const struct bdb_header *bdb;
 	struct intel_vbt_data vbt;
 	struct intel_opregion opregion;
+	
+	struct intel_dp intel_dp0;
+	const struct child_device_config *child0;
+	enum port port0;
+	enum phy phy0;
+	enum aux_ch aux_ch0;
+	
 };
 
 #define   TGL_PCODE_TCCOLD			0x26
@@ -4637,6 +5230,272 @@ enum intel_output_format {
 	INTEL_OUTPUT_FORMAT_YCBCR420,
 	INTEL_OUTPUT_FORMAT_YCBCR444,
 };
+
+#define DP_LANE_ALIGN_STATUS_UPDATED                    0x204
+#define  DP_INTERLANE_ALIGN_DONE                        (1 << 0)
+#define DP_LANE0_1_STATUS		    0x202
+#define DP_LANE2_3_STATUS		    0x203
+# define DP_LANE_CR_DONE		    (1 << 0)
+# define DP_LANE_CHANNEL_EQ_DONE	    (1 << 1)
+# define DP_LANE_SYMBOL_LOCKED		    (1 << 2)
+
+#define DP_CHANNEL_EQ_BITS (DP_LANE_CR_DONE |		\
+				DP_LANE_CHANNEL_EQ_DONE |	\
+				DP_LANE_SYMBOL_LOCKED)
+
+#define	DP_LINK_BW_SET		            0x100
+# define DP_LINK_RATE_TABLE		    0x00    /* eDP 1.4 */
+# define DP_LINK_BW_1_62		    0x06
+# define DP_LINK_BW_2_7			    0x0a
+# define DP_LINK_BW_5_4			    0x14    /* 1.2 */
+# define DP_LINK_BW_8_1			    0x1e    /* 1.4 */
+# define DP_LINK_BW_10                      0x01    /* 2.0 128b/132b Link Layer */
+# define DP_LINK_BW_13_5                    0x04    /* 2.0 128b/132b Link Layer */
+# define DP_LINK_BW_20                      0x02
+# define DP_LANE_COUNT_ENHANCED_FRAME_EN    (1 << 7)
+
+#define _PORT(port, a, b)		_PICK_EVEN(port, a, b)
+#define _MMIO_PORT(port, a, b)		_MMIO(_PORT(port, a, b))
+
+
+#define _DDI_BUF_CTL_A				0x64000
+#define _DDI_BUF_CTL_B				0x64100
+/* Known as DDI_CTL_DE in MTL+ */
+#define DDI_BUF_CTL(port) _MMIO_PORT(port, _DDI_BUF_CTL_A, _DDI_BUF_CTL_B)
+#define  DDI_BUF_CTL_ENABLE			REG_BIT(31)
+#define  XE2LPD_DDI_BUF_D2D_LINK_ENABLE		REG_BIT(29)
+#define  XE2LPD_DDI_BUF_D2D_LINK_STATE		REG_BIT(28)
+#define  DDI_BUF_EMP_MASK			REG_GENMASK(27, 24)
+#define  DDI_BUF_PORT_DATA_MASK			REG_GENMASK(19, 18)
+#define  DDI_BUF_TRANS_SELECT(n)		REG_FIELD_PREP(DDI_BUF_EMP_MASK, (n))
+#define  DDI_BUF_PORT_DATA_MASK			REG_GENMASK(19, 18)
+#define  DDI_BUF_PORT_DATA_10BIT		REG_FIELD_PREP(DDI_BUF_PORT_DATA_MASK, 0)
+#define  DDI_BUF_PORT_DATA_20BIT		REG_FIELD_PREP(DDI_BUF_PORT_DATA_MASK, 1)
+#define  DDI_BUF_PORT_DATA_40BIT		REG_FIELD_PREP(DDI_BUF_PORT_DATA_MASK, 2)
+
+
+#define   DP_TP_CTL_ENABLE			REG_BIT(31)
+#define _DP_TP_CTL_A			0x64040
+#define _DP_TP_CTL_B			0x64140
+#define _TGL_DP_TP_CTL_A		0x60540
+#define DP_TP_CTL(port) _MMIO_PORT(port, _DP_TP_CTL_A, _DP_TP_CTL_B)
+#define TGL_DP_TP_CTL(dev_priv, tran) _MMIO_TRANS2(dev_priv, (tran), _TGL_DP_TP_CTL_A)
+#define   DP_TP_CTL_ENABLE			REG_BIT(31)
+#define   DP_TP_CTL_FEC_ENABLE			REG_BIT(30)
+#define   DP_TP_CTL_MODE_MASK			REG_BIT(27)
+#define   DP_TP_CTL_MODE_SST			REG_FIELD_PREP(DP_TP_CTL_MODE_MASK, 0)
+#define   DP_TP_CTL_ENHANCED_FRAME_ENABLE	REG_BIT(18)
+
+
+enum intel_dpll_id {
+	/**
+	 * @DPLL_ID_PRIVATE: non-shared dpll in use
+	 */
+	DPLL_ID_PRIVATE = -1,
+
+	/**
+	 * @DPLL_ID_PCH_PLL_A: DPLL A in ILK, SNB and IVB
+	 */
+	DPLL_ID_PCH_PLL_A = 0,
+	/**
+	 * @DPLL_ID_PCH_PLL_B: DPLL B in ILK, SNB and IVB
+	 */
+	DPLL_ID_PCH_PLL_B = 1,
+
+
+	/**
+	 * @DPLL_ID_WRPLL1: HSW and BDW WRPLL1
+	 */
+	DPLL_ID_WRPLL1 = 0,
+	/**
+	 * @DPLL_ID_WRPLL2: HSW and BDW WRPLL2
+	 */
+	DPLL_ID_WRPLL2 = 1,
+	/**
+	 * @DPLL_ID_SPLL: HSW and BDW SPLL
+	 */
+	DPLL_ID_SPLL = 2,
+	/**
+	 * @DPLL_ID_LCPLL_810: HSW and BDW 0.81 GHz LCPLL
+	 */
+	DPLL_ID_LCPLL_810 = 3,
+	/**
+	 * @DPLL_ID_LCPLL_1350: HSW and BDW 1.35 GHz LCPLL
+	 */
+	DPLL_ID_LCPLL_1350 = 4,
+	/**
+	 * @DPLL_ID_LCPLL_2700: HSW and BDW 2.7 GHz LCPLL
+	 */
+	DPLL_ID_LCPLL_2700 = 5,
+
+
+	/**
+	 * @DPLL_ID_SKL_DPLL0: SKL and later DPLL0
+	 */
+	DPLL_ID_SKL_DPLL0 = 0,
+	/**
+	 * @DPLL_ID_SKL_DPLL1: SKL and later DPLL1
+	 */
+	DPLL_ID_SKL_DPLL1 = 1,
+	/**
+	 * @DPLL_ID_SKL_DPLL2: SKL and later DPLL2
+	 */
+	DPLL_ID_SKL_DPLL2 = 2,
+	/**
+	 * @DPLL_ID_SKL_DPLL3: SKL and later DPLL3
+	 */
+	DPLL_ID_SKL_DPLL3 = 3,
+
+
+	/**
+	 * @DPLL_ID_ICL_DPLL0: ICL/TGL combo PHY DPLL0
+	 */
+	DPLL_ID_ICL_DPLL0 = 0,
+	/**
+	 * @DPLL_ID_ICL_DPLL1: ICL/TGL combo PHY DPLL1
+	 */
+	DPLL_ID_ICL_DPLL1 = 1,
+	/**
+	 * @DPLL_ID_EHL_DPLL4: EHL combo PHY DPLL4
+	 */
+	DPLL_ID_EHL_DPLL4 = 2,
+	/**
+	 * @DPLL_ID_ICL_TBTPLL: ICL/TGL TBT PLL
+	 */
+	DPLL_ID_ICL_TBTPLL = 2,
+	/**
+	 * @DPLL_ID_ICL_MGPLL1: ICL MG PLL 1 port 1 (C),
+	 *                      TGL TC PLL 1 port 1 (TC1)
+	 */
+	DPLL_ID_ICL_MGPLL1 = 3,
+	/**
+	 * @DPLL_ID_ICL_MGPLL2: ICL MG PLL 1 port 2 (D)
+	 *                      TGL TC PLL 1 port 2 (TC2)
+	 */
+	DPLL_ID_ICL_MGPLL2 = 4,
+	/**
+	 * @DPLL_ID_ICL_MGPLL3: ICL MG PLL 1 port 3 (E)
+	 *                      TGL TC PLL 1 port 3 (TC3)
+	 */
+	DPLL_ID_ICL_MGPLL3 = 5,
+	/**
+	 * @DPLL_ID_ICL_MGPLL4: ICL MG PLL 1 port 4 (F)
+	 *                      TGL TC PLL 1 port 4 (TC4)
+	 */
+	DPLL_ID_ICL_MGPLL4 = 6,
+	/**
+	 * @DPLL_ID_TGL_MGPLL5: TGL TC PLL port 5 (TC5)
+	 */
+	DPLL_ID_TGL_MGPLL5 = 7,
+	/**
+	 * @DPLL_ID_TGL_MGPLL6: TGL TC PLL port 6 (TC6)
+	 */
+	DPLL_ID_TGL_MGPLL6 = 8,
+
+	/**
+	 * @DPLL_ID_DG1_DPLL0: DG1 combo PHY DPLL0
+	 */
+	DPLL_ID_DG1_DPLL0 = 0,
+	/**
+	 * @DPLL_ID_DG1_DPLL1: DG1 combo PHY DPLL1
+	 */
+	DPLL_ID_DG1_DPLL1 = 1,
+	/**
+	 * @DPLL_ID_DG1_DPLL2: DG1 combo PHY DPLL2
+	 */
+	DPLL_ID_DG1_DPLL2 = 2,
+	/**
+	 * @DPLL_ID_DG1_DPLL3: DG1 combo PHY DPLL3
+	 */
+	DPLL_ID_DG1_DPLL3 = 3,
+};
+
+enum tc_port {
+	TC_PORT_NONE = -1,
+
+	TC_PORT_1 = 0,
+	TC_PORT_2,
+	TC_PORT_3,
+	TC_PORT_4,
+	TC_PORT_5,
+	TC_PORT_6,
+
+	I915_MAX_TC_PORTS
+};
+
+#define ICL_DPCLKA_CFGCR0			_MMIO(0x164280)
+#define  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(phy)	(1 << _PICK(phy, 10, 11, 24, 4, 5))
+#define  RKL_DPCLKA_CFGCR0_DDI_CLK_OFF(phy)	REG_BIT((phy) + 10)
+#define  ICL_DPCLKA_CFGCR0_TC_CLK_OFF(tc_port)	(1 << ((tc_port) < TC_PORT_4 ? \
+						   (tc_port) + 12 : \
+						   (tc_port) - TC_PORT_4 + 21))
+#define  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy)	((phy) * 2)
+#define  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy)	(3 << ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy))
+#define  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(pll, phy)	((pll) << ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy))
+#define  RKL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy)	_PICK(phy, 0, 2, 4, 27)
+#define  RKL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy) \
+(3 << RKL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy))
+#define  RKL_DPCLKA_CFGCR0_DDI_CLK_SEL(pll, phy) \
+((pll) << RKL_DPCLKA_CFGCR0_DDI_CLK_SEL_SHIFT(phy))
+
+#define DP_PROTOCOL_CONVERTER_CONTROL_0		0x3050 /* DP 1.3 */
+#define DP_PROTOCOL_CONVERTER_CONTROL_1		0x3051 /* DP 1.3 */
+#define DP_PROTOCOL_CONVERTER_CONTROL_2		0x3052
+# define DP_CONVERSION_RGB_YCBCR_MASK	       (7 << 4)
+# define DP_MSA_TIMING_PAR_IGNORE_EN	    (1 << 7) /* eDP */
+
+
+#define DP_PSR_ERROR_STATUS                 0x2006  /* XXX 1.2? */
+#define DP_SINK_DEVICE_PR_AND_FRAME_LOCK_STATUS        0x2022  /* DP 2.1 */
+#define DP_PSR_STATUS                       0x2008  /* XXX 1.2? */
+#define DP_PANEL_REPLAY_ERROR_STATUS                   0x2020  /* DP 2.1*/
+# define DP_PSR_SINK_STATE_MASK             0x07
+
+#define   EDP_PSR_ENABLE			REG_BIT(31)
+#define HSW_SRD_CTL				_MMIO(0x64800)
+#define _SRD_CTL_A				0x60800
+#define _SRD_CTL_EDP				0x6f800
+#define EDP_PSR_CTL(dev_priv, tran)			_MMIO_TRANS2(dev_priv, tran, _SRD_CTL_A)
+#define HSW_SRD_STATUS				_MMIO(0x64840)
+#define _SRD_STATUS_A				0x60840
+#define _SRD_STATUS_EDP				0x6f840
+#define EDP_PSR_STATUS(dev_priv, tran)			_MMIO_TRANS2(dev_priv, tran, _SRD_STATUS_A)
+#define   EDP_PSR_STATUS_STATE_MASK		REG_GENMASK(31, 29)
+#define GEN8_CHICKEN_DCPR_1			_MMIO(0x46430)
+#define   _LATENCY_REPORTING_REMOVED_PIPE_D	REG_BIT(31)
+#define   SKL_SELECT_ALTERNATE_DC_EXIT		REG_BIT(30)
+#define   _LATENCY_REPORTING_REMOVED_PIPE_C	REG_BIT(25)
+#define   _LATENCY_REPORTING_REMOVED_PIPE_B	REG_BIT(24)
+#define   _LATENCY_REPORTING_REMOVED_PIPE_A	REG_BIT(23)
+#define   LATENCY_REPORTING_REMOVED(pipe)	_PICK((pipe), \
+							  _LATENCY_REPORTING_REMOVED_PIPE_A, \
+							  _LATENCY_REPORTING_REMOVED_PIPE_B, \
+							  _LATENCY_REPORTING_REMOVED_PIPE_C, \
+							  _LATENCY_REPORTING_REMOVED_PIPE_D)
+#define _PSR2_CTL_A				0x60900
+#define _PSR2_CTL_EDP				0x6f900
+#define EDP_PSR2_CTL(dev_priv, tran)			_MMIO_TRANS2(dev_priv, tran, _PSR2_CTL_A)
+#define   EDP_PSR2_IDLE_FRAMES_MASK		REG_GENMASK(3, 0)
+#define   EDP_PSR2_IDLE_FRAMES(x)		REG_FIELD_PREP(EDP_PSR2_IDLE_FRAMES_MASK, (x))
+#define DP_PSR_EN_CFG				0x170   /* XXX 1.2? */
+#define DP_RECEIVER_ALPM_CONFIG		    0x116   /* eDP 1.4 */
+#define DP_PSR_ESI                          0x2007  /* XXX 1.2? */
+# define DP_PSR_CAPS_CHANGE                 (1 << 0)
+# define DP_PSR_SINK_INTERNAL_ERROR         7
+#define DP_PSR_ERROR_STATUS                 0x2006  /* XXX 1.2? */
+# define DP_PSR_LINK_CRC_ERROR              (1 << 0)
+# define DP_PSR_RFB_STORAGE_ERROR           (1 << 1)
+# define DP_PSR_VSC_SDP_UNCORRECTABLE_ERROR (1 << 2) /* eDP 1.4 */
+#define   DP_PORT_EN			REG_BIT(31)
+#define   PP_ON				REG_BIT(31)
+#define  EDP_FORCE_VDD			REG_BIT(3)
+
+
+
+
+
+
+
 
 
 #ifdef __cplusplus
