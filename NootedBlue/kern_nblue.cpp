@@ -1295,9 +1295,8 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
 			
-			display->hotplug.hpd_pin=tgl_hpd_pin(port);
-			
 			if (port == PORT_A) {
+				display->hotplug.hpd_pin=tgl_hpd_pin(port);
 				display->child0=child;
 				display->port0=port;
 				display->phy0=phy;
@@ -1513,7 +1512,7 @@ struct intel_display *intel_display_device_probe(struct intel_display *display)
 }
 
 static enum intel_pch
-intel_pch_type(const struct intel_display *display, unsigned short id)
+intel_pch_type(unsigned short id)
 {
 	switch (id) {
 	case INTEL_PCH_IBX_DEVICE_ID_TYPE:
@@ -1633,7 +1632,7 @@ int NBlue::intel_opregion_setup()
 	display->dmc.dmc->max_fw_size=0x20000;
 	
 	unsigned short id = deviceId & INTEL_PCH_DEVICE_ID_MASK;
-	display->pch_type = intel_pch_type(display, id);
+	display->pch_type = intel_pch_type( id);
 	
 	display->power.domains.allowed_dc_mask = get_allowed_dc_mask(display, true);
 	display->power.domains.lock= IOSimpleLockAlloc();

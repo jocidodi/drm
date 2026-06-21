@@ -537,6 +537,9 @@ public:
 	static uint32_t enableVDDForAux(void *that,void *param_1);
 	mach_vm_address_t oenableVDDForAux {};
 	
+	static uint64_t enableVDDForAux2(void *that,void *param_1);
+	mach_vm_address_t oenableVDDForAux2 {};
+	
 	static IOReturn wrapSetAttributeForConnection(void* framebuffer, int32_t connectIndex, uint32_t attribute,
 												  unsigned long value);
 	mach_vm_address_t owrapSetAttributeForConnection {};

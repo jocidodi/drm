@@ -92,11 +92,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPathi",setupPlane, this->osetupPlane},
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
-			{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
+			{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux2, this->oenableVDDForAux2},
 			{"__ZN31AppleIntelFramebufferController16disableVDDForAuxEP14AppleIntelPort",disableVDDForAux2, this->odisableVDDForAux2},
 			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
-			
+
 			
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
@@ -827,7 +827,21 @@ uint32_t Gen11::enableVDDForAux(void *that,void *param_1)
 	auto ret= FunctionCast(enableVDDForAux, callback->oenableVDDForAux)( that,param_1);
 
 	if (ret==0xe00002eb) {
-		if (getMember<bool>(that, kexttgld ? 0xe62 : 0xe55) == true) {
+		if (getMember<bool>(that, 0xe62 ) == true) {
+			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
+			r->setProperty("AAPL,LCD-PowerState-ON", true);
+		}
+	}
+	return ret;
+
+};
+
+uint64_t Gen11::enableVDDForAux2(void *that,void *param_1)
+{//icl
+	auto ret= FunctionCast(enableVDDForAux2, callback->oenableVDDForAux2)( that,param_1);
+
+	if (ret==0xe00002eb) {
+		if (getMember<bool>(that, 0xe48) == true) {
 			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
 			r->setProperty("AAPL,LCD-PowerState-ON", true);
 		}
@@ -841,7 +855,7 @@ uint64_t Gen11::disableVDDForAux2(void *that,void *param_1)
 	auto ret= FunctionCast(disableVDDForAux2, callback->odisableVDDForAux2)( that,param_1);
 
 	if (ret==0xe00002eb) {
-		if (getMember<bool>(that, kexttgld ? 0xe62 : 0xe55) == true) {
+		if (getMember<bool>(that, 0xe48) == true) {
 			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
 			r->setProperty("AAPL,LCD-PowerState-ON", false);
 		}
@@ -855,7 +869,7 @@ uint64_t Gen11::disableVDDForAux(void *that)
 	auto ret= FunctionCast(disableVDDForAux, callback->odisableVDDForAux)( that);
 
 	if (ret==0xe00002eb) {
-		if (getMember<bool>(that, kexttgld ? 0xe62 : 0xe55) == true) {
+		if (getMember<bool>(that,  0xe62 ) == true) {
 			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
 			r->setProperty("AAPL,LCD-PowerState-ON", false);
 		}
@@ -873,7 +887,7 @@ IOReturn Gen11::getAttributeForConnection(void* framebuffer, int32_t connectInde
 	
 	if (attribute != 'bklt') { return ret; }
 	
-	unsigned long v=NBlue::callback->display_base.panel.backlight.level;
+	u32 v=NBlue::callback->display_base.panel.backlight.level;
 	if (getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58)<v)  getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58)=v;
 	
 	*value=getMember<uint32_t>(ccont2, kexticl ? 0xe4c: kexttgld ? 0xe64 : 0xe58);
@@ -1004,7 +1018,7 @@ void Gen11::sanitizeCDClockFrequency(void *that) {
 	callback->orgDisableCDClock(that);
 	
 	callback->orgSetCDClockFrequency(that, newPLLFrequency);
-	NBlue::callback->readReg32( ICL_REG_CDCLK_CTL) & 0x7FF;
+	NBlue::callback->readReg32( ICL_REG_CDCLK_CTL) ;
 }
 
 uint32_t Gen11::wrapProbeCDClockFrequency(void *that) {
@@ -3012,6 +3026,8 @@ write_dsc_decompression_flag( u8 flag, bool set)
 
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
+	//return FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
+	
 	linkp=that;
 	struct intel_display *display=&NBlue::callback->display_base;
 	int port_clock= display->port_clock;
@@ -3020,6 +3036,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	enum port port=display->port0;
 	struct intel_dp *intel_dp=&display->intel_dp0;
 	//hsw_get_pipe_config
+	
 	
 	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp->link_rate = port_clock;
@@ -3030,8 +3047,11 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_dp_enable_port(intel_dp);
 
-	enableVDDForAux(ccont2,that);
+	if (!kexticl) enableVDDForAux(ccont2,that);
+	else enableVDDForAux2(ccont2,that);
+	
 	hwSetPanelPower(ccont2,2);
+	
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
 	
