@@ -5069,11 +5069,22 @@ struct intel_hotplug {
 	bool ignore_long_hpd;
 };
 
+enum intel_output_format {
+	INTEL_OUTPUT_FORMAT_RGB,
+	INTEL_OUTPUT_FORMAT_YCBCR420,
+	INTEL_OUTPUT_FORMAT_YCBCR444,
+};
+
+
 struct intel_display {
 	
 	struct intel_display_platforms platform;
 	
 	enum intel_pch pch_type;
+	
+	enum intel_output_format output_format;
+	enum intel_output_format sink_format;
+	enum transcoder cpu_transcoder;
 	
 	struct intel_hotplug hotplug;
 	
@@ -5119,6 +5130,7 @@ struct intel_display {
 	enum port port0;
 	enum phy phy0;
 	enum aux_ch aux_ch0;
+	enum pipe pipe0;
 	
 };
 
@@ -5225,11 +5237,6 @@ struct intel_display {
 #define  TGL_TRANS_CLK_SEL_DISABLED	(0x0 << 28)
 #define  TGL_TRANS_CLK_SEL_PORT(x)	(((x) + 1) << 28)
 
-enum intel_output_format {
-	INTEL_OUTPUT_FORMAT_RGB,
-	INTEL_OUTPUT_FORMAT_YCBCR420,
-	INTEL_OUTPUT_FORMAT_YCBCR444,
-};
 
 #define DP_LANE_ALIGN_STATUS_UPDATED                    0x204
 #define  DP_INTERLANE_ALIGN_DONE                        (1 << 0)
@@ -5491,6 +5498,182 @@ enum tc_port {
 #define  EDP_FORCE_VDD			REG_BIT(3)
 
 
+enum intel_display_wa {
+	INTEL_DISPLAY_WA_1409120013,
+	INTEL_DISPLAY_WA_1409767108,
+	INTEL_DISPLAY_WA_13012396614,
+	INTEL_DISPLAY_WA_14010477008,
+	INTEL_DISPLAY_WA_14010480278,
+	INTEL_DISPLAY_WA_14010547955,
+	INTEL_DISPLAY_WA_14010685332,
+	INTEL_DISPLAY_WA_14011294188,
+	INTEL_DISPLAY_WA_14011503030,
+	INTEL_DISPLAY_WA_14011503117,
+	INTEL_DISPLAY_WA_14011508470,
+	INTEL_DISPLAY_WA_14011765242,
+	INTEL_DISPLAY_WA_14014143976,
+	INTEL_DISPLAY_WA_14016740474,
+	INTEL_DISPLAY_WA_14020863754,
+	INTEL_DISPLAY_WA_14025769978,
+	INTEL_DISPLAY_WA_15013987218,
+	INTEL_DISPLAY_WA_15018326506,
+	INTEL_DISPLAY_WA_16011181250,
+	INTEL_DISPLAY_WA_16011303918,
+	INTEL_DISPLAY_WA_16011342517,
+	INTEL_DISPLAY_WA_16011863758,
+	INTEL_DISPLAY_WA_16023588340,
+	INTEL_DISPLAY_WA_16025573575,
+	INTEL_DISPLAY_WA_16025596647,
+	INTEL_DISPLAY_WA_18034343758,
+	INTEL_DISPLAY_WA_22010178259,
+	INTEL_DISPLAY_WA_22010947358,
+	INTEL_DISPLAY_WA_22011320316,
+	INTEL_DISPLAY_WA_22012278275,
+	INTEL_DISPLAY_WA_22012358565,
+	INTEL_DISPLAY_WA_22014263786,
+	INTEL_DISPLAY_WA_22021048059,
+};
+
+#define IS_DISPLAY_VERx100(__display, from, until) ( \
+	(DISPLAY_VERx100(__display) >= (from) && \
+	 DISPLAY_VERx100(__display) <= (until)))
+#define IS_DISPLAY_VERx100_STEP(__display, ipver, from, until) \
+	(IS_DISPLAY_VERx100((__display), (ipver), (ipver)) && \
+	 IS_DISPLAY_STEP((__display), (from), (until)))
+#define INTEL_DISPLAY_STEP(__display)	(DISPLAY_RUNTIME_INFO(__display)->step)
+#define INTEL_PCH_TYPE(_display)		((_display)->pch_type)
+#define IS_DISPLAY_STEP(__display, since, until) \
+	 INTEL_DISPLAY_STEP(__display) >= (since) && INTEL_DISPLAY_STEP(__display) < (until)
+
+bool __intel_display_wa(struct intel_display *display, enum intel_display_wa wa, const char *name)
+{
+	switch (wa) {
+	case INTEL_DISPLAY_WA_1409120013:
+		return IS_DISPLAY_VER(display, 11, 12);
+	case INTEL_DISPLAY_WA_1409767108:
+		return (display->platform.alderlake_s ||
+			(display->platform.rocketlake &&
+			 IS_DISPLAY_STEP(display, STEP_A0, STEP_B0)));
+	case INTEL_DISPLAY_WA_13012396614:
+		return DISPLAY_VERx100(display) == 3000 ||
+			DISPLAY_VERx100(display) == 3500;
+	case INTEL_DISPLAY_WA_14010477008:
+		return display->platform.dg1 || display->platform.rocketlake ||
+			(display->platform.tigerlake &&
+			 IS_DISPLAY_STEP(display, STEP_A0, STEP_D0));
+	case INTEL_DISPLAY_WA_14010480278:
+		return (IS_DISPLAY_VER(display, 10, 12));
+	case INTEL_DISPLAY_WA_14010547955:
+		return display->platform.dg2;
+	case INTEL_DISPLAY_WA_14010685332:
+		return INTEL_PCH_TYPE(display) >= PCH_CNP &&
+			INTEL_PCH_TYPE(display) < PCH_DG1;
+	case INTEL_DISPLAY_WA_14011294188:
+		return INTEL_PCH_TYPE(display) >= PCH_TGP &&
+			INTEL_PCH_TYPE(display) < PCH_DG1;
+	case INTEL_DISPLAY_WA_14011503030:
+	case INTEL_DISPLAY_WA_14011503117:
+	case INTEL_DISPLAY_WA_22012358565:
+		return DISPLAY_VER(display) == 13;
+	case INTEL_DISPLAY_WA_14011508470:
+		return (IS_DISPLAY_VERx100(display, 1200, 1300));
+	case INTEL_DISPLAY_WA_14011765242:
+		return display->platform.alderlake_s &&
+			IS_DISPLAY_STEP(display, STEP_A0, STEP_A2);
+	case INTEL_DISPLAY_WA_14014143976:
+		return IS_DISPLAY_STEP(display, STEP_E0, STEP_FOREVER);
+	case INTEL_DISPLAY_WA_14016740474:
+		return IS_DISPLAY_VERx100_STEP(display, 1400, STEP_A0, STEP_C0);
+	case INTEL_DISPLAY_WA_14020863754:
+		return DISPLAY_VERx100(display) == 3000 ||
+			DISPLAY_VERx100(display) == 2000 ||
+			DISPLAY_VERx100(display) == 1401;
+	case INTEL_DISPLAY_WA_14025769978:
+		return DISPLAY_VER(display) == 35;
+	case INTEL_DISPLAY_WA_15013987218:
+		return DISPLAY_VER(display) == 20;
+	case INTEL_DISPLAY_WA_15018326506:
+		return display->platform.battlemage;
+	case INTEL_DISPLAY_WA_16011303918:
+	case INTEL_DISPLAY_WA_22011320316:
+		return display->platform.alderlake_p &&
+			IS_DISPLAY_STEP(display, STEP_A0, STEP_B0);
+	case INTEL_DISPLAY_WA_16011181250:
+		return display->platform.rocketlake || display->platform.alderlake_s ||
+			display->platform.dg2;
+	case INTEL_DISPLAY_WA_16011342517:
+		return display->platform.alderlake_p &&
+			IS_DISPLAY_STEP(display, STEP_A0, STEP_D0);
+	case INTEL_DISPLAY_WA_16011863758:
+		return DISPLAY_VER(display) >= 11;
+	case INTEL_DISPLAY_WA_16023588340:
+		return false;
+	case INTEL_DISPLAY_WA_16025573575:
+		return false;
+	case INTEL_DISPLAY_WA_16025596647:
+		return DISPLAY_VER(display) == 20 &&
+			IS_DISPLAY_VERx100_STEP(display, 3000,
+						STEP_A0, STEP_B0);
+	case INTEL_DISPLAY_WA_18034343758:
+		return DISPLAY_VER(display) == 20 ||
+			(display->platform.pantherlake &&
+			 IS_DISPLAY_STEP(display, STEP_A0, STEP_B0));
+	case INTEL_DISPLAY_WA_22010178259:
+		return DISPLAY_VER(display) == 12;
+	case INTEL_DISPLAY_WA_22010947358:
+		return display->platform.alderlake_p;
+	case INTEL_DISPLAY_WA_22012278275:
+		return display->platform.alderlake_p &&
+			IS_DISPLAY_STEP(display, STEP_A0, STEP_E0);
+	case INTEL_DISPLAY_WA_22014263786:
+		return IS_DISPLAY_VERx100(display, 1100, 1400);
+	case INTEL_DISPLAY_WA_22021048059:
+		return IS_DISPLAY_VER(display, 14, 35);
+	default:
+		break;
+	}
+
+	return false;
+}
+
+#define __stringify_1(x...)	#x
+#define __stringify(x...)	__stringify_1(x)
+
+#define intel_display_wa(__display, __wa) \
+	__intel_display_wa((__display), __wa, __stringify(__wa))
+
+#define _CLKGATE_DIS_PSL_EXT_A		0x4654C
+#define _CLKGATE_DIS_PSL_EXT_B		0x46550
+#define   PIPEDMC_GATING_DIS		REG_BIT(12)
+
+#define CLKGATE_DIS_PSL_EXT(pipe) \
+	_MMIO_PIPE(pipe, _CLKGATE_DIS_PSL_EXT_A, _CLKGATE_DIS_PSL_EXT_B)
+
+#define _PIPEDMC_CONTROL_A		0x45250
+#define _PIPEDMC_CONTROL_B		0x45254
+#define PIPEDMC_CONTROL(pipe)		_MMIO_PIPE(pipe, \
+						   _PIPEDMC_CONTROL_A, \
+						   _PIPEDMC_CONTROL_B)
+# define DP_CONVERSION_TO_YCBCR420_ENABLE	(1 << 0)
+# define DP_CONVERSION_BT709_RGB_YCBCR_ENABLE  (1 << 5)
+#define DP_A			_MMIO(0x64000) /* eDP */
+#define DP_B			_MMIO(0x64100)
+#define DP_C			_MMIO(0x64200)
+#define DP_D			_MMIO(0x64300)
+#define   EDP_PLL_FREQ_MASK		REG_GENMASK(17, 16)
+#define   EDP_PLL_FREQ_162MHZ		REG_FIELD_PREP(EDP_PLL_FREQ_MASK, 1)
+#define  DDI_BUF_PORT_REVERSAL			REG_BIT(16)
+#define DP_DSC_ENABLE                       0x160   /* DP 1.4 */
+# define DP_DECOMPRESSION_EN                (1 << 0)
+# define DP_DSC_PASSTHROUGH_EN		    (1 << 1)
+#define PANEL_REPLAY_CONFIG                             0x1b0  /* DP 2.0 */
+# define DP_PANEL_REPLAY_ENABLE                         (1 << 0)
+#define _ICL_PIPE_DSS_CTL2_PB			0x78204
+#define _ICL_PIPE_DSS_CTL2_PC			0x78404
+#define ICL_PIPE_DSS_CTL2(pipe)			_MMIO_PIPE((pipe) - PIPE_B, \
+							   _ICL_PIPE_DSS_CTL2_PB, \
+							   _ICL_PIPE_DSS_CTL2_PC)
+#define  VDSC0_ENABLE				REG_BIT(31)
 
 
 

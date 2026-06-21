@@ -967,20 +967,23 @@ int msecs_to_pps_units(int msecs)
 	return msecs * 10;
 }
 
- u32 ilk_get_pp_control(struct intel_panel *panel)
+
+
+static enum intel_output_format
+bdw_get_pipe_misc_output_format()
 {
-	u32 control;
+	u32 tmp;
 
-	//lockdep_assert_held(&display->pps.mutex);
-	control = NBlue::callback->readReg32(panel->regs.pp_ctrl);
-	if ((control & PANEL_UNLOCK_MASK) != PANEL_UNLOCK_REGS) {
-		control &= ~PANEL_UNLOCK_MASK;
-		control |= PANEL_UNLOCK_REGS;
+	tmp = NBlue::callback->readReg32( PIPE_MISC(PIPE_A));
+
+	if (tmp & PIPE_MISC_YUV420_ENABLE) {
+		return INTEL_OUTPUT_FORMAT_YCBCR420;
+	} else if (tmp & PIPE_MISC_OUTPUT_COLORSPACE_YUV) {
+		return INTEL_OUTPUT_FORMAT_YCBCR444;
+	} else {
+		return INTEL_OUTPUT_FORMAT_RGB;
 	}
-	return control;
 }
-
-
 
 
 void
@@ -992,6 +995,13 @@ parse_lfp_backlight(struct intel_display *display,
 	const struct lfp_backlight_data_entry *entry;
 	int panel_type = vbt_get_panel_type(bdb, panel);
 	u16 level;
+	
+	display->output_format = bdw_get_pipe_misc_output_format();
+	display->sink_format = display->output_format;
+	if ((NBlue::callback->readReg32( DP_A) & EDP_PLL_FREQ_MASK) == EDP_PLL_FREQ_162MHZ)
+		display->port_clock = 162000;
+	else
+		display->port_clock = 270000;
 
 	panel->vbt.panel_type=panel_type;
 
@@ -1214,6 +1224,8 @@ static enum hpd_pin tgl_hpd_pin(enum port port)
 		return static_cast<enum hpd_pin>( HPD_PORT_A + port - PORT_A);
 }
 
+
+
 void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
 	const void *block_data = find_raw_section(bdb, section_id);
@@ -1289,7 +1301,9 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			display->port0=port;
 			display->phy0=phy;
 			display->aux_ch0=aux_ch;
-			display->port_clock = 270000;
+			if (port == PORT_A) display->pipe0=PIPE_A;
+			if (port == PORT_A)  display->cpu_transcoder = (enum transcoder) PIPE_A;
+			
 			
 			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
 
