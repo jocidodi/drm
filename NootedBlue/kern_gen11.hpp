@@ -557,9 +557,6 @@ public:
 	static unsigned long  setSliceConfig(void *that, uint32_t val);
 	mach_vm_address_t osetSliceConfig {};
 	
-	static void  setPanelPowerState(void *that ,bool param_1);
-	mach_vm_address_t osetPanelPowerState {};
-	
 	static void initCDClock(void *that);
 	mach_vm_address_t oinitCDClock {};
 	
@@ -632,7 +629,8 @@ public:
 	static uint64_t disableVDDForAux(void *that);
 	mach_vm_address_t odisableVDDForAux {};
 	
-	
+	static uint64_t disableVDDForAux2(void *that,void *param_1);
+	mach_vm_address_t odisableVDDForAux2 {};
 	
 	
 	

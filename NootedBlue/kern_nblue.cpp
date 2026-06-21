@@ -1276,8 +1276,6 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 
 			enum port port = dvo_port_to_port(display, child->dvo_port);
 			
-			if (port == PORT_A) display->child0=child;
-			
 			
 			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
 				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
@@ -1298,12 +1296,15 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
 			
 			display->hotplug.hpd_pin=tgl_hpd_pin(port);
-			display->port0=port;
-			display->phy0=phy;
-			display->aux_ch0=aux_ch;
-			if (port == PORT_A) display->pipe0=PIPE_A;
-			if (port == PORT_A)  display->cpu_transcoder = (enum transcoder) PIPE_A;
 			
+			if (port == PORT_A) {
+				display->child0=child;
+				display->port0=port;
+				display->phy0=phy;
+				display->aux_ch0=aux_ch;
+				display->pipe0=PIPE_A;
+				display->cpu_transcoder = (enum transcoder) PIPE_A;
+			}
 			
 			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
 

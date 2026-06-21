@@ -82,7 +82,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController21hwSetPanelPowerConfigEj", hwSetPanelPowerConfig,this->ohwSetPanelPowerConfig},
 			{"__ZN31AppleIntelFramebufferController17updateSliceConfigEj",updateSliceConfig, this->oupdateSliceConfig},
 			{"__ZN31AppleIntelFramebufferController18setAsyncSliceCountE13IGSliceConfig",setAsyncSliceCount, this->osetAsyncSliceCount},
-			{"__ZN21AppleIntelFramebuffer18setPanelPowerStateEb",setPanelPowerState, this->osetPanelPowerState},
 			{"__ZN21AppleIntelFramebuffer4initEP31AppleIntelFramebufferControllerj",AppleIntelFramebufferinit, this->oAppleIntelFramebufferinit},
 			{"__ZN31AppleIntelFramebufferController21probeCDClockFrequencyEv",wrapProbeCDClockFrequency,	this->orgProbeCDClockFrequency},
 			{"__ZN31AppleIntelFramebufferController18hwInitializeCStateEv",hwInitializeCState, this->ohwInitializeCState},
@@ -91,10 +90,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
 			{"__ZN31AppleIntelFramebufferController19setupPipeWatermarksEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParams",setupPipeWatermarks, this->osetupPipeWatermarks},
 			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPathi",setupPlane, this->osetupPlane},
-			
-			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
+			{"__ZN31AppleIntelFramebufferController15enableVDDForAuxEP14AppleIntelPort",enableVDDForAux, this->oenableVDDForAux},
+			{"__ZN31AppleIntelFramebufferController16disableVDDForAuxEP14AppleIntelPort",disableVDDForAux2, this->odisableVDDForAux2},
+			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
+			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
+			
 			
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
@@ -117,6 +119,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//builtin
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
+		
+		static const uint8_t f9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
+		static const uint8_t r9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
 		
 		//getHPDState register
 		static const uint8_t f19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
@@ -145,6 +150,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
+			{&kextG11FB, f9b, r9b, arrsize(f9b),    1},
 			{&kextG11FB, f19, r19, arrsize(f19),    5},
 			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
 			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
@@ -322,7 +328,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
+		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 
 
 
@@ -830,6 +836,20 @@ uint32_t Gen11::enableVDDForAux(void *that,void *param_1)
 
 };
 
+uint64_t Gen11::disableVDDForAux2(void *that,void *param_1)
+{//icl
+	auto ret= FunctionCast(disableVDDForAux2, callback->odisableVDDForAux2)( that,param_1);
+
+	if (ret==0xe00002eb) {
+		if (getMember<bool>(that, kexttgld ? 0xe62 : 0xe55) == true) {
+			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
+			r->setProperty("AAPL,LCD-PowerState-ON", false);
+		}
+	}
+	return ret;
+
+};
+
 uint64_t Gen11::disableVDDForAux(void *that)
 {
 	auto ret= FunctionCast(disableVDDForAux, callback->odisableVDDForAux)( that);
@@ -952,11 +972,6 @@ void Gen11::setAsyncSliceCount2(void *that, uint32_t val)
 }
 
 
-
-void  Gen11::setPanelPowerState(void *that ,bool param_1)
-{
-	frame0->setProperty("AAPL,LCD-PowerState-ON", param_1);
-}
 
 
 void Gen11::sanitizeCDClockFrequency(void *that) {
@@ -1809,7 +1824,7 @@ void Gen11::hwInitializeCState(void *that)
 }
 
 void Gen11::setupPlane(void *that,void *param_1,int param_2)
-{
+{//icl
 	FunctionCast(setupPlane, callback->osetupPlane)(that ,param_1,param_2);
 	
 	//PLANE_CTL_1_A (0x00070180): 0x84000400
@@ -1820,7 +1835,7 @@ void Gen11::setupPlane(void *that,void *param_1,int param_2)
 }
 
 void Gen11::setupPlane2(void *that,void *param_1)
-{
+{ //tgl
 	FunctionCast(setupPlane2, callback->osetupPlane2)(that ,param_1);
 	
 	//PLANE_CTL_1_A (0x00070180): 0x84000400
@@ -3017,7 +3032,8 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 
 	enableVDDForAux(ccont2,that);
 	hwSetPanelPower(ccont2,2);
-	disableVDDForAux(ccont2);
+	if (!kexticl) disableVDDForAux(ccont2);
+	else disableVDDForAux2(ccont2,that);
 	
 	
 	
