@@ -3096,8 +3096,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_ddi_prepare_link_retrain(intel_dp);
 	
 	u8 link_config[2];
-	bool is_vrr=false;
+	bool is_vrr=(DISPLAY_VER(display) >= 11);
 	
+	//drm_dp_sink_can_do_video_without_timing_msa
 	link_config[0] = is_vrr ? DP_MSA_TIMING_PAR_IGNORE_EN : 0;
 	link_config[1] = DP_SET_ANSI_8B10B;
 	writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config, 2);
@@ -3123,7 +3124,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	//intel_ddi_set_dp_msa
 	//intel_hpd_unblock(encoder);
 	
-	//return 0; // hack
+	return 0; // hack
 	
 	if (ret) return 0;
 	panic("x");
