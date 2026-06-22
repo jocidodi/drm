@@ -6112,7 +6112,107 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 #define   DPFC_CHICKEN_COMP_DUMMY_PIXEL		REG_BIT(14) /* glk+ */
 #define   DPFC_CHICKEN_FORCE_SLB_INVALIDATION	REG_BIT(13) /* icl+ */
 #define   DPFC_DISABLE_DUMMY0			REG_BIT(8) /* ivb+ */
+#define  DDI_BUF_IS_IDLE			REG_BIT(7)
+#define   DP_TP_STATUS_IDLE_DONE		REG_BIT(25)
 
+#define _DP_TP_STATUS_A			0x64044
+#define _DP_TP_STATUS_B			0x64144
+#define _TGL_DP_TP_STATUS_A		0x60544
+#define DP_TP_STATUS(port) _MMIO_PORT(port, _DP_TP_STATUS_A, _DP_TP_STATUS_B)
+#define TGL_DP_TP_STATUS(dev_priv, tran) _MMIO_TRANS2(dev_priv, (tran), _TGL_DP_TP_STATUS_A)
+#define   DP_TP_STATUS_FEC_ENABLE_LIVE		REG_BIT(28)
+#define   DP_TP_STATUS_IDLE_DONE		REG_BIT(25)
+#define   DP_TP_STATUS_ACT_SENT			REG_BIT(24)
+#define   DP_TP_STATUS_MODE_STATUS_MST		REG_BIT(23)
+#define   DP_TP_STATUS_STREAMS_ENABLED_MASK	REG_GENMASK(18, 16) /* 17:16 on hsw but bit 18 mbz */
+#define   DP_TP_STATUS_AUTOTRAIN_DONE		REG_BIT(12)
+#define   DP_TP_STATUS_PAYLOAD_MAPPING_VC2_MASK REG_GENMASK(9, 8)
+#define   DP_TP_STATUS_PAYLOAD_MAPPING_VC1_MASK	REG_GENMASK(5, 4)
+#define   DP_TP_STATUS_PAYLOAD_MAPPING_VC0_MASK	REG_GENMASK(1, 0)
+
+#define GEN8_DE_PIPE_ISR(pipe) _MMIO(0x44400 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IMR(pipe) _MMIO(0x44404 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IIR(pipe) _MMIO(0x44408 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IER(pipe) _MMIO(0x4440c + (0x10 * (pipe)))
+#define  GEN8_PIPE_FIFO_UNDERRUN	REG_BIT(31)
+#define  GEN8_PIPE_CDCLK_CRC_ERROR	REG_BIT(29)
+#define  GEN8_PIPE_CDCLK_CRC_DONE	REG_BIT(28)
+#define  GEN12_PIPEDMC_INTERRUPT	REG_BIT(26) /* tgl+ */
+#define  GEN12_PIPEDMC_FAULT		REG_BIT(25) /* tgl-mtl */
+#define  MTL_PIPEDMC_ATS_FAULT		REG_BIT(24) /* mtl */
+#define  GEN12_PIPEDMC_FLIPQ_DONE	REG_BIT(24) /* tgl-adl */
+#define  GEN11_PIPE_PLANE7_FAULT	REG_BIT(22) /* icl/tgl */
+#define  GEN11_PIPE_PLANE6_FAULT	REG_BIT(21) /* icl/tgl */
+#define  GEN11_PIPE_PLANE5_FAULT	REG_BIT(20) /* icl+ */
+#define  GEN12_PIPE_VBLANK_UNMOD	REG_BIT(19) /* tgl+ */
+#define  MTL_PLANE_ATS_FAULT		REG_BIT(18) /* mtl+ */
+#define  GEN11_PIPE_PLANE7_FLIP_DONE	REG_BIT(18) /* icl/tgl */
+#define  MTL_PIPEDMC_FLIPQ_DONE		REG_BIT(17) /* mtl */
+#define  GEN11_PIPE_PLANE6_FLIP_DONE	REG_BIT(17) /* icl/tgl */
+#define  GEN11_PIPE_PLANE5_FLIP_DONE	REG_BIT(16) /* icl+ */
+#define  GEN12_DSB_2_INT		REG_BIT(15) /* tgl+ */
+#define  GEN12_DSB_1_INT		REG_BIT(14) /* tgl+ */
+#define  GEN12_DSB_0_INT		REG_BIT(13) /* tgl+ */
+#define  GEN12_DSB_INT(dsb_id)		REG_BIT(13 + (dsb_id))
+#define  GEN9_PIPE_CURSOR_FAULT		REG_BIT(11) /* skl+ */
+#define  GEN9_PIPE_PLANE4_FAULT		REG_BIT(10) /* skl+ */
+#define  GEN8_PIPE_CURSOR_FAULT		REG_BIT(10) /* bdw */
+#define  GEN9_PIPE_PLANE3_FAULT		REG_BIT(9) /* skl+ */
+#define  GEN8_PIPE_SPRITE_FAULT		REG_BIT(9) /* bdw */
+#define  GEN9_PIPE_PLANE2_FAULT		REG_BIT(8) /* skl+ */
+#define  GEN8_PIPE_PRIMARY_FAULT	REG_BIT(8) /* bdw */
+#define  GEN9_PIPE_PLANE1_FAULT		REG_BIT(7) /* skl+ */
+#define  GEN9_PIPE_PLANE4_FLIP_DONE	REG_BIT(6) /* skl+ */
+#define  GEN9_PIPE_PLANE3_FLIP_DONE	REG_BIT(5) /* skl+ */
+#define  GEN8_PIPE_SPRITE_FLIP_DONE	REG_BIT(5) /* bdw */
+#define  GEN9_PIPE_PLANE2_FLIP_DONE	REG_BIT(4) /* skl+ */
+#define  GEN8_PIPE_PRIMARY_FLIP_DONE	REG_BIT(4) /* bdw */
+#define  GEN9_PIPE_PLANE1_FLIP_DONE	REG_BIT(3) /* skl+ */
+#define  GEN9_PIPE_PLANE_FLIP_DONE(plane_id) \
+	REG_BIT(((plane_id) >= PLANE_5 ? 16 - PLANE_5 : 3 - PLANE_1) + (plane_id)) /* skl+ */
+#define  GEN8_PIPE_SCAN_LINE_EVENT	REG_BIT(2)
+#define  GEN8_PIPE_VSYNC		REG_BIT(1)
+#define  GEN8_PIPE_VBLANK		REG_BIT(0)
+
+#define GEN8_DE_PORT_ISR _MMIO(0x44440)
+#define GEN8_DE_PORT_IMR _MMIO(0x44444)
+#define GEN8_DE_PORT_IIR _MMIO(0x44448)
+#define GEN8_DE_PORT_IER _MMIO(0x4444c)
+#define  DSI1_NON_TE			(1 << 31)
+#define  DSI0_NON_TE			(1 << 30)
+#define  ICL_AUX_CHANNEL_E		(1 << 29)
+#define  ICL_AUX_CHANNEL_F		(1 << 28)
+#define  GEN9_AUX_CHANNEL_D		(1 << 27)
+#define  GEN9_AUX_CHANNEL_C		(1 << 26)
+#define  GEN9_AUX_CHANNEL_B		(1 << 25)
+#define  DSI1_TE			(1 << 24)
+#define  DSI0_TE			(1 << 23)
+#define  GEN8_DE_PORT_HOTPLUG(hpd_pin)	REG_BIT(3 + _HPD_PIN_DDI(hpd_pin))
+#define  BXT_DE_PORT_HOTPLUG_MASK	(GEN8_DE_PORT_HOTPLUG(HPD_PORT_A) | \
+					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_B) | \
+					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_C))
+#define  BDW_DE_PORT_HOTPLUG_MASK	GEN8_DE_PORT_HOTPLUG(HPD_PORT_A)
+#define  BXT_DE_PORT_GMBUS		(1 << 1)
+#define  GEN8_AUX_CHANNEL_A		(1 << 0)
+#define  TGL_DE_PORT_AUX_USBC6		REG_BIT(13)
+#define  XELPD_DE_PORT_AUX_DDIE		REG_BIT(13)
+#define  TGL_DE_PORT_AUX_USBC5		REG_BIT(12)
+#define  XELPD_DE_PORT_AUX_DDID		REG_BIT(12)
+#define  TGL_DE_PORT_AUX_USBC4		REG_BIT(11)
+#define  TGL_DE_PORT_AUX_USBC3		REG_BIT(10)
+#define  TGL_DE_PORT_AUX_USBC2		REG_BIT(9)
+#define  TGL_DE_PORT_AUX_USBC1		REG_BIT(8)
+#define  TGL_DE_PORT_AUX_DDIC		REG_BIT(2)
+#define  TGL_DE_PORT_AUX_DDIB		REG_BIT(1)
+#define  TGL_DE_PORT_AUX_DDIA		REG_BIT(0)
+
+#define GEN8_DE_PORT_IRQ_REGS		I915_IRQ_REGS(GEN8_DE_PORT_IMR, \
+							  GEN8_DE_PORT_IER, \
+							  GEN8_DE_PORT_IIR)
+#define   DP_VOLTAGE_MASK		REG_GENMASK(27, 25)
+#define   DP_VOLTAGE_0_4		REG_FIELD_PREP(DP_VOLTAGE_MASK, 0)
+#define   DP_PRE_EMPHASIS_MASK		REG_GENMASK(24, 22)
+#define   DP_PRE_EMPHASIS_0		REG_FIELD_PREP(DP_PRE_EMPHASIS_MASK, 0)
 
 
 

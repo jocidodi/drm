@@ -3018,11 +3018,10 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 		IODelay(delay_us >> 2);
 		
 		
-		Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
-		/*if (drm_dp_dpcd_read_phy_link_status(&intel_dp->aux, dp_phy,
-							 link_status) < 0) {
+		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
+		if (r != 0) {
 			return false;
-		}*/
+		}
 
 		if (drm_dp_clock_recovery_ok(link_status, display->panel.vbt.edp.lanes)) {
 			return true;
@@ -3109,12 +3108,11 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	for (tries = 0; tries < 5; tries++) {
 		IODelay(delay_us >> 2);
 
-		Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
+		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
 		
-		/*if (drm_dp_dpcd_read_phy_link_status(&intel_dp->aux, dp_phy,
-							 link_status) < 0) {
+		if (r != 0) {
 			break;
-		}*/
+		}
 
 
 		if (!drm_dp_clock_recovery_ok(link_status,
@@ -3215,8 +3213,93 @@ static void intel_ddi_init_dp_buf_reg(struct intel_dp *intel_dp)
 
 		intel_dp->DP |= DDI_BUF_LANE_STAGGER_DELAY(delay);
 	}*/
+	
 }
 
+
+
+
+int intel_de_wait_ms(struct intel_display *display, UInt32 reg, UInt32 mask,u32 value,
+										UInt32 timeoutUs)
+{
+	AbsoluteTime deadline;
+	int waitMax = 1000, wait = 10;
+	UInt32 regValue;
+	int ret=1;
+	bool isAtomic=false;
+	
+	nanoseconds_to_absolutetime((uint64_t)timeoutUs * NSEC_PER_USEC, &deadline);
+	deadline += mach_absolute_time();
+
+	if (timeoutUs <= 10) {
+		isAtomic = true;
+		wait = 1;
+	}
+
+	for (;;) {
+		bool expired = mach_absolute_time() > deadline;
+
+		regValue = NBlue::callback->readReg32(reg);
+
+		if ((regValue & mask) == value)
+			return 0;
+
+		if (expired)
+			return 1;
+
+		if (isAtomic || wait < 1000)
+			IODelay(wait);
+		else
+			IOSleep(wait / 1000 + 1);
+
+		if (wait < waitMax)
+			wait <<= 1;
+	}
+
+
+	return ret;
+}
+
+int intel_de_wait_for_set_us(struct intel_display *display, u32 reg,
+				 u32 mask, unsigned int timeout_us)
+{
+	return intel_de_wait_ms(display, reg, mask, mask, timeout_us);
+}
+
+int intel_de_wait_for_clear_us(struct intel_display *display, u32 reg,
+				   u32 mask, unsigned int timeout_us)
+{
+	return intel_de_wait_ms(display, reg, mask, 0, timeout_us);
+}
+
+int intel_de_wait_for_set_ms(struct intel_display *display, u32 reg,
+				 u32 mask, unsigned int timeout_ms)
+{
+	return intel_de_wait_ms(display, reg, mask, mask, timeout_ms*1000);
+}
+
+int intel_de_wait_for_clear_ms(struct intel_display *display, u32 reg,
+				   u32 mask, unsigned int timeout_ms)
+{
+	return intel_de_wait_ms(display, reg, mask, 0, timeout_ms*1000);
+}
+
+static u32 intel_ddi_buf_status_reg(struct intel_display *display, enum port port)
+{
+	if (DISPLAY_VER(display) >= 14)
+		return 0;//XELPDP_PORT_BUF_CTL1(display, port);
+	else
+		return DDI_BUF_CTL(port);
+}
+static void intel_wait_ddi_buf_active()
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	enum port port = display->port0;
+
+
+	intel_de_wait_for_clear_ms(display, intel_ddi_buf_status_reg(display, port),
+								  DDI_BUF_IS_IDLE, 10);
+}
 
 static void intel_ddi_buf_enable( u32 buf_ctl)
 {
@@ -3226,8 +3309,7 @@ static void intel_ddi_buf_enable( u32 buf_ctl)
 	NBlue::callback->writeReg32( DDI_BUF_CTL(port), buf_ctl | DDI_BUF_CTL_ENABLE);
 	NBlue::callback->readReg32( DDI_BUF_CTL(port));
 
-	IODelay(10);
-	//intel_wait_ddi_buf_active(encoder);
+	intel_wait_ddi_buf_active();
 }
 
 static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
@@ -3417,88 +3499,6 @@ write_dsc_decompression_flag( u8 flag, bool set)
 }
 
 
-
-#define GEN8_DE_PIPE_ISR(pipe) _MMIO(0x44400 + (0x10 * (pipe)))
-#define GEN8_DE_PIPE_IMR(pipe) _MMIO(0x44404 + (0x10 * (pipe)))
-#define GEN8_DE_PIPE_IIR(pipe) _MMIO(0x44408 + (0x10 * (pipe)))
-#define GEN8_DE_PIPE_IER(pipe) _MMIO(0x4440c + (0x10 * (pipe)))
-#define  GEN8_PIPE_FIFO_UNDERRUN	REG_BIT(31)
-#define  GEN8_PIPE_CDCLK_CRC_ERROR	REG_BIT(29)
-#define  GEN8_PIPE_CDCLK_CRC_DONE	REG_BIT(28)
-#define  GEN12_PIPEDMC_INTERRUPT	REG_BIT(26) /* tgl+ */
-#define  GEN12_PIPEDMC_FAULT		REG_BIT(25) /* tgl-mtl */
-#define  MTL_PIPEDMC_ATS_FAULT		REG_BIT(24) /* mtl */
-#define  GEN12_PIPEDMC_FLIPQ_DONE	REG_BIT(24) /* tgl-adl */
-#define  GEN11_PIPE_PLANE7_FAULT	REG_BIT(22) /* icl/tgl */
-#define  GEN11_PIPE_PLANE6_FAULT	REG_BIT(21) /* icl/tgl */
-#define  GEN11_PIPE_PLANE5_FAULT	REG_BIT(20) /* icl+ */
-#define  GEN12_PIPE_VBLANK_UNMOD	REG_BIT(19) /* tgl+ */
-#define  MTL_PLANE_ATS_FAULT		REG_BIT(18) /* mtl+ */
-#define  GEN11_PIPE_PLANE7_FLIP_DONE	REG_BIT(18) /* icl/tgl */
-#define  MTL_PIPEDMC_FLIPQ_DONE		REG_BIT(17) /* mtl */
-#define  GEN11_PIPE_PLANE6_FLIP_DONE	REG_BIT(17) /* icl/tgl */
-#define  GEN11_PIPE_PLANE5_FLIP_DONE	REG_BIT(16) /* icl+ */
-#define  GEN12_DSB_2_INT		REG_BIT(15) /* tgl+ */
-#define  GEN12_DSB_1_INT		REG_BIT(14) /* tgl+ */
-#define  GEN12_DSB_0_INT		REG_BIT(13) /* tgl+ */
-#define  GEN12_DSB_INT(dsb_id)		REG_BIT(13 + (dsb_id))
-#define  GEN9_PIPE_CURSOR_FAULT		REG_BIT(11) /* skl+ */
-#define  GEN9_PIPE_PLANE4_FAULT		REG_BIT(10) /* skl+ */
-#define  GEN8_PIPE_CURSOR_FAULT		REG_BIT(10) /* bdw */
-#define  GEN9_PIPE_PLANE3_FAULT		REG_BIT(9) /* skl+ */
-#define  GEN8_PIPE_SPRITE_FAULT		REG_BIT(9) /* bdw */
-#define  GEN9_PIPE_PLANE2_FAULT		REG_BIT(8) /* skl+ */
-#define  GEN8_PIPE_PRIMARY_FAULT	REG_BIT(8) /* bdw */
-#define  GEN9_PIPE_PLANE1_FAULT		REG_BIT(7) /* skl+ */
-#define  GEN9_PIPE_PLANE4_FLIP_DONE	REG_BIT(6) /* skl+ */
-#define  GEN9_PIPE_PLANE3_FLIP_DONE	REG_BIT(5) /* skl+ */
-#define  GEN8_PIPE_SPRITE_FLIP_DONE	REG_BIT(5) /* bdw */
-#define  GEN9_PIPE_PLANE2_FLIP_DONE	REG_BIT(4) /* skl+ */
-#define  GEN8_PIPE_PRIMARY_FLIP_DONE	REG_BIT(4) /* bdw */
-#define  GEN9_PIPE_PLANE1_FLIP_DONE	REG_BIT(3) /* skl+ */
-#define  GEN9_PIPE_PLANE_FLIP_DONE(plane_id) \
-	REG_BIT(((plane_id) >= PLANE_5 ? 16 - PLANE_5 : 3 - PLANE_1) + (plane_id)) /* skl+ */
-#define  GEN8_PIPE_SCAN_LINE_EVENT	REG_BIT(2)
-#define  GEN8_PIPE_VSYNC		REG_BIT(1)
-#define  GEN8_PIPE_VBLANK		REG_BIT(0)
-
-#define GEN8_DE_PORT_ISR _MMIO(0x44440)
-#define GEN8_DE_PORT_IMR _MMIO(0x44444)
-#define GEN8_DE_PORT_IIR _MMIO(0x44448)
-#define GEN8_DE_PORT_IER _MMIO(0x4444c)
-#define  DSI1_NON_TE			(1 << 31)
-#define  DSI0_NON_TE			(1 << 30)
-#define  ICL_AUX_CHANNEL_E		(1 << 29)
-#define  ICL_AUX_CHANNEL_F		(1 << 28)
-#define  GEN9_AUX_CHANNEL_D		(1 << 27)
-#define  GEN9_AUX_CHANNEL_C		(1 << 26)
-#define  GEN9_AUX_CHANNEL_B		(1 << 25)
-#define  DSI1_TE			(1 << 24)
-#define  DSI0_TE			(1 << 23)
-#define  GEN8_DE_PORT_HOTPLUG(hpd_pin)	REG_BIT(3 + _HPD_PIN_DDI(hpd_pin))
-#define  BXT_DE_PORT_HOTPLUG_MASK	(GEN8_DE_PORT_HOTPLUG(HPD_PORT_A) | \
-					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_B) | \
-					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_C))
-#define  BDW_DE_PORT_HOTPLUG_MASK	GEN8_DE_PORT_HOTPLUG(HPD_PORT_A)
-#define  BXT_DE_PORT_GMBUS		(1 << 1)
-#define  GEN8_AUX_CHANNEL_A		(1 << 0)
-#define  TGL_DE_PORT_AUX_USBC6		REG_BIT(13)
-#define  XELPD_DE_PORT_AUX_DDIE		REG_BIT(13)
-#define  TGL_DE_PORT_AUX_USBC5		REG_BIT(12)
-#define  XELPD_DE_PORT_AUX_DDID		REG_BIT(12)
-#define  TGL_DE_PORT_AUX_USBC4		REG_BIT(11)
-#define  TGL_DE_PORT_AUX_USBC3		REG_BIT(10)
-#define  TGL_DE_PORT_AUX_USBC2		REG_BIT(9)
-#define  TGL_DE_PORT_AUX_USBC1		REG_BIT(8)
-#define  TGL_DE_PORT_AUX_DDIC		REG_BIT(2)
-#define  TGL_DE_PORT_AUX_DDIB		REG_BIT(1)
-#define  TGL_DE_PORT_AUX_DDIA		REG_BIT(0)
-
-#define GEN8_DE_PORT_IRQ_REGS		I915_IRQ_REGS(GEN8_DE_PORT_IMR, \
-							  GEN8_DE_PORT_IER, \
-							  GEN8_DE_PORT_IIR)
-
-
 static u32 gen8_de_pipe_fault_mask(struct intel_display *display)
 {
 	if (DISPLAY_VER(display) >= 20)
@@ -3601,6 +3601,18 @@ static u32 gen8_de_port_aux_mask(struct intel_display *display)
 	return mask;
 }
 
+static u32 dp_tp_status_reg()
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+
+	if (DISPLAY_VER(display) >= 12)
+		return TGL_DP_TP_STATUS(display,
+								display->cpu_transcoder);
+	else
+		return DP_TP_STATUS(display->port0);
+}
+
+
 static void intel_ddi_set_idle_link_train(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -3612,17 +3624,17 @@ static void intel_ddi_set_idle_link_train(struct intel_dp *intel_dp)
 	if (port == PORT_A && DISPLAY_VER(display) < 12)
 		return;
 
-	IODelay(2);
+	intel_de_wait_for_set_ms(display,
+					 dp_tp_status_reg( ),
+							 DP_TP_STATUS_IDLE_DONE, 2);
 
 }
 
 static bool intel_dp_link_train_all_phys(struct intel_dp *intel_dp)
 {
-	bool ret = true;
+	bool ret;
 
-
-	if (ret)
-		ret = intel_dp_link_train_phy(intel_dp, DP_PHY_DPRX);
+	ret = intel_dp_link_train_phy(intel_dp, DP_PHY_DPRX);
 
 	intel_dp_disable_dpcd_training_pattern(intel_dp, DP_PHY_DPRX);
 	intel_ddi_set_idle_link_train(intel_dp);
@@ -3794,7 +3806,8 @@ intel_dp_init_source_oui(struct intel_dp *intel_dp)
 	u8 oui[] = { 0x00, 0xaa, 0x01 };
 	u8 buf[3] = {};
 
-	Gen11::callback->readAUX(linkp,DP_SOURCE_OUI,buf, sizeof(buf));
+	int r=Gen11::callback->readAUX(linkp,DP_SOURCE_OUI,buf, sizeof(buf));
+	if (r!=0) return;
 	
 	if (memcmp(oui, buf, sizeof(oui)) == 0) {
 		return;
@@ -3846,6 +3859,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_dp->lane_count = lane_count;
 	intel_dp->output_reg = DDI_BUF_CTL(port);
 	
+	icl_set_pipe_chicken();//???
 	
 	intel_ddi_init_dp_buf_reg(intel_dp);
 	
@@ -3858,8 +3872,8 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
+	/*
 	
-	icl_set_pipe_chicken();
 	
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
@@ -3888,7 +3902,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	NBlue::callback->intel_de_rmw( ICL_PIPE_DSS_CTL1(display->pipe0),
 			 SPLITTER_ENABLE | SPLITTER_CONFIGURATION_MASK |
 			 OVERLAP_PIXELS_MASK, dss1);
-	
+	*/
 	
 	intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
 	
