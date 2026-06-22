@@ -903,9 +903,9 @@ uint32_t Gen11::fsetAttribute(void *that,uint param_1,unsigned long param_2)
 	if (param_1 == 'wsrv' && param_2!=0 && hwu==4)
 	{
 		fsetAttribute(that, 'powr',1);
-		IOSleep(2);
+		IODelay(2);
 		fsetAttribute(that, 'powr',2);
-		IOSleep(2);
+		IODelay(2);
 	}
 	auto ret=FunctionCast(fsetAttribute,callback->ofsetAttribute)(that, param_1, param_2);
 	
@@ -1689,7 +1689,7 @@ static int snb_pcode_rw( u32 mbox,
 	u32 iVar4=0;
 	do {
 		if (iVar2 == 0) return -ETIMEDOUT;
-	  IOSleep(1);
+	  IODelay(1);
 		iVar4 = NBlue::callback->readReg32(GEN6_PCODE_MAILBOX);
 	  iVar2 = iVar2 + 1;
 	} while (iVar4 < 0);
@@ -1735,7 +1735,7 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 		if (++tries == 3)
 			break;
 
-		IOSleep(1);
+		IODelay(1);
 	}
 	IOSimpleLockFree(myLock);
 }
@@ -1764,7 +1764,7 @@ void Gen11::hwInitializeCState(void *that)
 		NBlue::callback->intel_de_rmw( CLKREQ_POLICY, CLKREQ_POLICY_MEM_UP_OVRD, 0);
 	}
 	
-	struct intel_dmc *dmc=NBlue::callback->display_base.dmc.dmc;
+	struct intel_dmc *dmc=display->dmc.dmc;
 	
 	struct intel_css_header *css_header;
 	struct intel_package_header *package_header;
@@ -1778,7 +1778,7 @@ void Gen11::hwInitializeCState(void *that)
 		return;
 	}
 	
-	initialize_stepping_info(&NBlue::callback->display_base, &si);
+	initialize_stepping_info(display, &si);
 	
 	css_header = (struct intel_css_header *)fw.data;
 	r = parse_dmc_fw_css(dmc, css_header, fw.size);
@@ -1872,6 +1872,54 @@ void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCPara
 	FunctionCast(setupPipeWatermarks, callback->osetupPipeWatermarks)(that ,param_1,param_2,param_3);
 }
 
+static u32
+intel_ddi_transcoder_func_reg_val_get()
+{
+	struct intel_display *display=&NBlue::callback->display_base;
+	enum pipe pipe = display->pipe0;
+	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	enum port port = display->port0;
+	u32 temp;
+
+	
+	/* Enable TRANS_DDI_FUNC_CTL for the pipe to work in HDMI mode */
+	temp = TRANS_DDI_FUNC_ENABLE;
+	if (DISPLAY_VER(display) >= 12)
+		temp |= TGL_TRANS_DDI_SELECT_PORT(port);
+	else
+		temp |= TRANS_DDI_SELECT_PORT(port);
+
+	switch (display->panel.vbt.edp.bpp) {
+	default:
+	case 18:
+		temp |= TRANS_DDI_BPC_6;
+		break;
+	case 24:
+		temp |= TRANS_DDI_BPC_8;
+		break;
+	case 30:
+		temp |= TRANS_DDI_BPC_10;
+		break;
+	case 36:
+		temp |= TRANS_DDI_BPC_12;
+		break;
+	}
+
+	//if (crtc_state->hw.adjusted_mode.flags & DRM_MODE_FLAG_PVSYNC)
+		temp |= TRANS_DDI_PVSYNC;
+	//if (crtc_state->hw.adjusted_mode.flags & DRM_MODE_FLAG_PHSYNC)
+		temp |= TRANS_DDI_PHSYNC;
+
+
+
+		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
+		temp |= DDI_PORT_WIDTH(display->panel.vbt.edp.lanes);
+	
+
+	return temp;
+}
+
+
 void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -1912,44 +1960,19 @@ void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 		//if (DISPLAY_VER(display) >= 11 && is_hdr_mode(crtc_state))
 		val |= PIPE_MISC_HDR_MODE_PRECISION;
 		
+		
 		if (DISPLAY_VER(display) >= 12)
 			val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
 		
 		
-		u32 temp;
-		temp = TRANS_DDI_FUNC_ENABLE;
-		temp |= TGL_TRANS_DDI_SELECT_PORT(port);
 		
-		switch (display->panel.vbt.edp.bpp) {
-			case 18:
-				temp |= TRANS_DDI_BPC_6;
-				break;
-			default:
-			case 24:
-				temp |= TRANS_DDI_BPC_8;
-				break;
-			case 30:
-				temp |= TRANS_DDI_BPC_10;
-				break;
-			case 36:
-				temp |= TRANS_DDI_BPC_12;
-				break;
-		}
-		
-		temp |= TRANS_DDI_PVSYNC;
-		temp |= TRANS_DDI_PHSYNC;
-		
-		//if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||intel_dp_is_uhbr(crtc_state))
-		//else
-		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
-		temp |= DDI_PORT_WIDTH(display->panel.vbt.edp.lanes);
 		
 		
 		//param_3->TRANS_CLK_SEL=0x10000000;
 		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(port);
 		param_3->TRANS_MSA_MISC = 0x21;
 		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
-		param_3->TRANS_DDI_FUNC_CTL= temp;
+		param_3->TRANS_DDI_FUNC_CTL= intel_ddi_transcoder_func_reg_val_get();
 		//param_3->PIPE_MISC= 0x1800010;
 		param_3->PIPE_MISC= val;
 		//i9xx_set_pipeconf
@@ -2126,7 +2149,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 
 static void icl_combo_phy_set_signal_levels(struct intel_display *display)
 {
-	enum phy phy = PHY_A;
+	enum phy phy = display->phy0;
 	u32 val;
 	int ln;
 
@@ -2505,9 +2528,9 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 	bool max_vswing_reached = false;
 	int delay_us;
 	struct intel_display *display = &NBlue::callback->display_base;
+	
 	delay_us = 100;
 
-	
 	
 	if (!intel_dp_reset_link_train( intel_dp,dp_phy,
 					   DP_TRAINING_PATTERN_1 |
@@ -2515,12 +2538,11 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 		return false;
 	}
 
-	
 		max_cr_tries = 80;
 
 	voltage_tries = 1;
 	for (cr_tries = 0; cr_tries < max_cr_tries; ++cr_tries) {
-		IODelay(delay_us);
+		IODelay(delay_us >> 2);
 		
 		
 		Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
@@ -2612,7 +2634,7 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	}
 
 	for (tries = 0; tries < 5; tries++) {
-		IODelay(delay_us);
+		IODelay(delay_us >> 2);
 
 		Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
 		
@@ -2731,7 +2753,7 @@ static void intel_ddi_buf_enable( u32 buf_ctl)
 	NBlue::callback->writeReg32( DDI_BUF_CTL(port), buf_ctl | DDI_BUF_CTL_ENABLE);
 	NBlue::callback->readReg32( DDI_BUF_CTL(port));
 
-	IOSleep(100);
+	IODelay(10);
 	//intel_wait_ddi_buf_active(encoder);
 }
 
@@ -2743,13 +2765,15 @@ static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 	dp_tp_ctl = NBlue::callback->readReg32( dp_tp_ctl_reg());
 
 
+	bool enhanced_framing =	dp_tp_ctl &	DP_TP_CTL_ENHANCED_FRAME_ENABLE;
+	
 	dp_tp_ctl = DP_TP_CTL_ENABLE | DP_TP_CTL_LINK_TRAIN_PAT1;
 	/*if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||
 		intel_dp_is_uhbr(crtc_state)) {
 		dp_tp_ctl |= DP_TP_CTL_MODE_MST;
 	} else {*/
 		dp_tp_ctl |= DP_TP_CTL_MODE_SST;
-		//if (crtc_state->enhanced_framing)
+		if (enhanced_framing)
 			dp_tp_ctl |= DP_TP_CTL_ENHANCED_FRAME_ENABLE;
 	//}
 	NBlue::callback->writeReg32( dp_tp_ctl_reg(), dp_tp_ctl);
@@ -2890,109 +2914,6 @@ void intel_dp_configure_protocol_converter(struct intel_dp *intel_dp)
 }
 
 
-
-
-static int psr_get_status_and_error_status(struct intel_dp *intel_dp,
-					   u8 *status, u8 *error_status)
-{
-	int ret;
-	unsigned int offset;
-
-	offset = /*intel_dp->psr.panel_replay_enabled ?
-		 DP_SINK_DEVICE_PR_AND_FRAME_LOCK_STATUS :*/ DP_PSR_STATUS;
-
-	ret=Gen11::callback->readAUX(linkp,offset, status,1);
-	
-	if (ret != 0)
-		return ret;
-
-	offset = /*intel_dp->psr.panel_replay_enabled ?
-		 DP_PANEL_REPLAY_ERROR_STATUS :*/ DP_PSR_ERROR_STATUS;
-
-	ret=Gen11::callback->readAUX(linkp,offset, error_status,1);
-	if (ret != 0)
-		return ret;
-
-	*status = *status & DP_PSR_SINK_STATE_MASK;
-
-	return 0;
-}
-
-
-
-
-static void intel_psr_exit(struct intel_dp *intel_dp)
-{
-	struct intel_display *display = &NBlue::callback->display_base;
-
-
-	/*gen9_set_dc_state(display, DC_STATE_EN_UPTO_DC6);
-
-	NBlue::callback->intel_de_rmw( EDP_PSR2_CTL(display, display->cpu_transcoder),
-			 EDP_PSR2_IDLE_FRAMES_MASK,
-			 EDP_PSR2_IDLE_FRAMES(0));*/
-	
-	NBlue::callback->intel_de_rmw(
-					EDP_PSR_CTL(display, display->cpu_transcoder),
-				   EDP_PSR_ENABLE, 0);
-
-}
-
-static void intel_psr_wait_exit_locked(struct intel_dp *intel_dp)
-{
-	struct intel_display *display = &NBlue::callback->display_base;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
-	u32 psr_status;
-	u32 psr_status_mask;
-
-
-		psr_status = EDP_PSR_STATUS(display, cpu_transcoder);
-		psr_status_mask = EDP_PSR_STATUS_STATE_MASK;
-	
-	IOSleep(2000);
-
-}
-
-static void intel_psr_disable_locked(struct intel_dp *intel_dp)
-{
-	struct intel_display *display = &NBlue::callback->display_base;
-
-
-	intel_psr_exit(intel_dp);
-	intel_psr_wait_exit_locked(intel_dp);
-
-
-	if (DISPLAY_VER(display) >= 11)
-		NBlue::callback->intel_de_rmw( GEN8_CHICKEN_DCPR_1,
-				 LATENCY_REPORTING_REMOVED(display->pipe0), 0);
-
-
-	u8 val=0;
-
-	Gen11::callback->writeAUX(linkp,DP_PSR_EN_CFG, &val,1);
-
-}
-
-static void psr_capability_changed_check(struct intel_dp *intel_dp)
-{
-	struct intel_display *display = &NBlue::callback->display_base;
-	u8 val;
-	int r;
-
-	
-	r=Gen11::callback->readAUX(linkp,DP_PSR_ESI, &val,1);
-	if (r != 0) {
-		return;
-	}
-
-	if (val & DP_PSR_CAPS_CHANGE) {
-		intel_psr_disable_locked(intel_dp);
-		Gen11::callback->writeAUX(linkp,DP_PSR_ESI, &val,1);
-	}
-}
-
-
-
 static void intel_dp_enable_port(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -3011,7 +2932,7 @@ write_dsc_decompression_flag( u8 flag, bool set)
 	u8 val;
 
 	err = Gen11::callback->readAUX(linkp,DP_DSC_ENABLE,&val,1);
-	if (err < 0)
+	if (err != 0)
 		return err;
 
 	if (set)
@@ -3020,6 +2941,48 @@ write_dsc_decompression_flag( u8 flag, bool set)
 		val &= ~flag;
 	
 	return Gen11::callback->writeAUX(linkp,DP_DSC_ENABLE,&val,1);
+}
+
+void intel_ddi_set_dp_msa()
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	u32 temp;
+
+
+
+	temp = DP_MSA_MISC_SYNC_CLOCK;
+
+	switch (display->panel.vbt.edp.bpp) {
+	case 18:
+		temp |= DP_MSA_MISC_6_BPC;
+		break;
+	case 24:
+		temp |= DP_MSA_MISC_8_BPC;
+		break;
+	case 30:
+		temp |= DP_MSA_MISC_10_BPC;
+		break;
+	case 36:
+		temp |= DP_MSA_MISC_12_BPC;
+		break;
+	default:
+		break;
+	}
+
+
+	//if (display->limited_color_range)
+	//	temp |= DP_MSA_MISC_COLOR_CEA_RGB;
+
+	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+		temp |= DP_MSA_MISC_COLOR_YCBCR_444_BT709;
+
+
+	//if (intel_dp_needs_vsc_sdp(crtc_state, conn_state))
+	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
+
+	NBlue::callback->writeReg32( TRANS_MSA_MISC(display, cpu_transcoder),
+			   temp);
 }
 
 
@@ -3043,10 +3006,58 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_dp->lane_count = lane_count;
 	intel_dp->output_reg = DDI_BUF_CTL(port);
 	
+	
 	intel_ddi_init_dp_buf_reg(intel_dp);
 	
 	intel_dp_enable_port(intel_dp);
+	
+	
+	u32 pp;
+	u32 pp_stat_reg, pp_ctrl_reg;
 
+
+	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
+	pp |= EDP_FORCE_VDD;
+
+	pp_ctrl_reg = display->panel.regs.pp_ctrl;
+	pp_stat_reg = display->panel.regs.pp_stat;
+
+	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
+	NBlue::callback->readReg32( pp_ctrl_reg);
+	
+	
+	if (IS_DISPLAY_VER(display, 13, 14))
+		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
+				 0, PCH_DPLSUNIT_CLOCK_GATE_DISABLE);
+	
+	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
+	pp |= PANEL_POWER_ON;
+
+	pp_ctrl_reg = display->panel.regs.pp_ctrl;
+	pp_stat_reg = display->panel.regs.pp_stat;
+
+	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
+	NBlue::callback->readReg32( pp_ctrl_reg);
+	
+	IODelay(display->panel.pps.panel_power_up_delay);
+	
+	if (IS_DISPLAY_VER(display, 13, 14))
+		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
+				 PCH_DPLSUNIT_CLOCK_GATE_DISABLE, 0);
+	
+	
+	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
+	pp &= ~EDP_FORCE_VDD;
+
+	pp_ctrl_reg = display->panel.regs.pp_ctrl;
+	pp_stat_reg = display->panel.regs.pp_stat;
+
+	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
+	NBlue::callback->readReg32( pp_ctrl_reg);
+	
+	IODelay(display->panel.pps.panel_power_up_delay);
+	
+/*
 	if (!kexticl) enableVDDForAux(ccont2,that);
 	else enableVDDForAux2(ccont2,that);
 	
@@ -3054,7 +3065,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
-	
+	*/
 	
 	
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
@@ -3069,7 +3080,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	NBlue::callback->writeReg32( TRANS_CLK_SEL(display->cpu_transcoder), val);
 	u32 ctl;
 
-	ctl = NBlue::callback->readReg32(TRANS_DDI_FUNC_CTL(display, display->cpu_transcoder));
+	ctl = intel_ddi_transcoder_func_reg_val_get();
 	ctl &= ~TRANS_DDI_FUNC_ENABLE;
 	NBlue::callback->writeReg32( TRANS_DDI_FUNC_CTL(display, display->cpu_transcoder),
 			   ctl);
@@ -3103,52 +3114,46 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 			break;
 		IODelay(1);
 	}
-	
+
 	intel_dp_configure_protocol_converter(intel_dp);
 	
 	u32 dss_ctl2;
 	dss_ctl2 = NBlue::callback->readReg32( ICL_PIPE_DSS_CTL2(display->pipe0));
-	//compression_enable
+
 	if (dss_ctl2 & VDSC0_ENABLE) {
 		write_dsc_decompression_flag(DP_DSC_PASSTHROUGH_EN, true);
 		write_dsc_decompression_flag( DP_DECOMPRESSION_EN, true);
 	}
 
 	
-	const u8 errors = DP_PSR_RFB_STORAGE_ERROR |
-			  DP_PSR_VSC_SDP_UNCORRECTABLE_ERROR |
-			  DP_PSR_LINK_CRC_ERROR;
-	u8 status, error_status;
-	psr_get_status_and_error_status(intel_dp, &status, &error_status);
-	if (status == DP_PSR_SINK_INTERNAL_ERROR ||
-		(error_status & errors)) {
-		intel_psr_disable_locked(intel_dp);
-	}
-	writeAUX(linkp,DP_PSR_ERROR_STATUS,&error_status, 1);
-	psr_capability_changed_check(intel_dp);
 
 	//intel_hpd_block
 	
 	intel_ddi_prepare_link_retrain(intel_dp);
 	
 	u8 link_config[2];
-	bool is_vrr=(DISPLAY_VER(display) >= 11);
+	bool is_vrr=false;
 	
 	//drm_dp_sink_can_do_video_without_timing_msa
 	link_config[0] = is_vrr ? DP_MSA_TIMING_PAR_IGNORE_EN : 0;
 	link_config[1] = DP_SET_ANSI_8B10B;
-	writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config, 2);
+	writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config,  ARRAY_SIZE(link_config));
 	
 	u8 link_bw;
 	link_bw = drm_dp_link_rate_to_bw_code(port_clock);
+	
+	readAUX(linkp,DP_EDP_DPCD_REV,intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd));
+	
 	
 	//DP and eDP v1.3 and earlier link bw set method.
 	link_config[0] = link_bw;
 	link_config[1] = lane_count;
 	link_config[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
-	
-	writeAUX(linkp,DP_LINK_BW_SET,link_config, ARRAY_SIZE(link_config));
 		
+	writeAUX(linkp,DP_LINK_BW_SET,link_config, ARRAY_SIZE(link_config));
+	
+	//u8 v=DP_ALTERNATE_SCRAMBLER_RESET_ENABLE;
+	//writeAUX(linkp,DP_EDP_CONFIGURATION_SET,&v, 1);
 	
 	bool ret= intel_dp_link_train_phy(intel_dp,DP_PHY_DPRX);
 	
@@ -3156,8 +3161,10 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	NBlue::callback->intel_de_rmw( TGL_DP_TP_CTL(display, display->cpu_transcoder),
 			 DP_TP_CTL_LINK_TRAIN_MASK, DP_TP_CTL_LINK_TRAIN_IDLE);
+	IODelay(2);
 	
-	//intel_ddi_set_dp_msa
+	intel_ddi_set_dp_msa();
+	
 	//intel_hpd_unblock(encoder);
 	
 	return 0; // hack

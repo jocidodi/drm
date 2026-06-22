@@ -4894,9 +4894,10 @@ struct intel_dp {
 	
 	struct intel_psr psr;
 	
-	/*u8 dpcd[DP_RECEIVER_CAP_SIZE];
-
-	u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
+	u8 dpcd[0xf];
+	u8 edp_dpcd[5];
+	
+	/*u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
 	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
 	u8 lttpr_common_caps[DP_LTTPR_COMMON_CAP_SIZE];
 	u8 lttpr_phy_caps[DP_MAX_LTTPR_COUNT][DP_LTTPR_PHY_CAP_SIZE];
@@ -5674,6 +5675,68 @@ bool __intel_display_wa(struct intel_display *display, enum intel_display_wa wa,
 							   _ICL_PIPE_DSS_CTL2_PB, \
 							   _ICL_PIPE_DSS_CTL2_PC)
 #define  VDSC0_ENABLE				REG_BIT(31)
+#define DP_EDP_DPCD_REV			    0x700    /* eDP 1.2 */
+# define DP_EDP_14			    0x03
+#define DP_MSA_MISC_SYNC_CLOCK			(1 << 0)
+#define DP_MSA_MISC_INTERLACE_VTOTAL_EVEN	(1 << 8)
+#define DP_MSA_MISC_STEREO_NO_3D		(0 << 9)
+#define DP_MSA_MISC_STEREO_PROG_RIGHT_EYE	(1 << 9)
+#define DP_MSA_MISC_STEREO_PROG_LEFT_EYE	(3 << 9)
+/* bits per component for non-RAW */
+#define DP_MSA_MISC_6_BPC			(0 << 5)
+#define DP_MSA_MISC_8_BPC			(1 << 5)
+#define DP_MSA_MISC_10_BPC			(2 << 5)
+#define DP_MSA_MISC_12_BPC			(3 << 5)
+#define DP_MSA_MISC_16_BPC			(4 << 5)
+/* bits per component for RAW */
+#define DP_MSA_MISC_RAW_6_BPC			(1 << 5)
+#define DP_MSA_MISC_RAW_7_BPC			(2 << 5)
+#define DP_MSA_MISC_RAW_8_BPC			(3 << 5)
+#define DP_MSA_MISC_RAW_10_BPC			(4 << 5)
+#define DP_MSA_MISC_RAW_12_BPC			(5 << 5)
+#define DP_MSA_MISC_RAW_14_BPC			(6 << 5)
+#define DP_MSA_MISC_RAW_16_BPC			(7 << 5)
+/* pixel encoding/colorimetry format */
+#define _DP_MSA_MISC_COLOR(misc1_7, misc0_21, misc0_3, misc0_4) \
+	((misc1_7) << 15 | (misc0_4) << 4 | (misc0_3) << 3 | ((misc0_21) << 1))
+#define DP_MSA_MISC_COLOR_RGB			_DP_MSA_MISC_COLOR(0, 0, 0, 0)
+#define DP_MSA_MISC_COLOR_CEA_RGB		_DP_MSA_MISC_COLOR(0, 0, 1, 0)
+#define DP_MSA_MISC_COLOR_RGB_WIDE_FIXED	_DP_MSA_MISC_COLOR(0, 3, 0, 0)
+#define DP_MSA_MISC_COLOR_RGB_WIDE_FLOAT	_DP_MSA_MISC_COLOR(0, 3, 0, 1)
+#define DP_MSA_MISC_COLOR_Y_ONLY		_DP_MSA_MISC_COLOR(1, 0, 0, 0)
+#define DP_MSA_MISC_COLOR_RAW			_DP_MSA_MISC_COLOR(1, 1, 0, 0)
+#define DP_MSA_MISC_COLOR_YCBCR_422_BT601	_DP_MSA_MISC_COLOR(0, 1, 1, 0)
+#define DP_MSA_MISC_COLOR_YCBCR_422_BT709	_DP_MSA_MISC_COLOR(0, 1, 1, 1)
+#define DP_MSA_MISC_COLOR_YCBCR_444_BT601	_DP_MSA_MISC_COLOR(0, 2, 1, 0)
+#define DP_MSA_MISC_COLOR_YCBCR_444_BT709	_DP_MSA_MISC_COLOR(0, 2, 1, 1)
+#define DP_MSA_MISC_COLOR_XVYCC_422_BT601	_DP_MSA_MISC_COLOR(0, 1, 0, 0)
+#define DP_MSA_MISC_COLOR_XVYCC_422_BT709	_DP_MSA_MISC_COLOR(0, 1, 0, 1)
+#define DP_MSA_MISC_COLOR_XVYCC_444_BT601	_DP_MSA_MISC_COLOR(0, 2, 0, 0)
+#define DP_MSA_MISC_COLOR_XVYCC_444_BT709	_DP_MSA_MISC_COLOR(0, 2, 0, 1)
+#define DP_MSA_MISC_COLOR_OPRGB			_DP_MSA_MISC_COLOR(0, 0, 1, 1)
+#define DP_MSA_MISC_COLOR_DCI_P3		_DP_MSA_MISC_COLOR(0, 3, 1, 0)
+#define DP_MSA_MISC_COLOR_COLOR_PROFILE		_DP_MSA_MISC_COLOR(0, 3, 1, 1)
+#define DP_MSA_MISC_COLOR_VSC_SDP		(1 << 14)
+#define _TRANSA_MSA_MISC		0x60410
+#define _TRANSB_MSA_MISC		0x61410
+#define _TRANSC_MSA_MISC		0x62410
+#define _TRANS_EDP_MSA_MISC		0x6f410
+#define TRANS_MSA_MISC(dev_priv, tran) _MMIO_TRANS2(dev_priv, tran, _TRANSA_MSA_MISC)
+
+
+#define DMC_DEFAULT_FW_OFFSET		0xFFFFFFFF
+#define PACKAGE_MAX_FW_INFO_ENTRIES	20
+#define PACKAGE_V2_MAX_FW_INFO_ENTRIES	32
+#define DMC_V1_MAX_MMIO_COUNT		8
+#define DMC_V3_MAX_MMIO_COUNT		20
+#define DMC_V1_MMIO_START_RANGE		0x80000
+
+#define PIPE_TO_DMC_ID(pipe)		 (DMC_FW_PIPEA + ((pipe) - PIPE_A))
+#define DP_EDP_CONFIGURATION_SET            0x10a   /* XXX 1.2? */
+# define DP_ALTERNATE_SCRAMBLER_RESET_ENABLE (1 << 0)
+# define DP_FRAMING_CHANGE_ENABLE	    (1 << 1)
+# define DP_PANEL_SELF_TEST_ENABLE	    (1 << 7)
+
 
 
 
