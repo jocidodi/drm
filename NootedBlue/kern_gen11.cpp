@@ -842,7 +842,7 @@ uint64_t Gen11::enableVDDForAux2(void *that,void *param_1)
 
 	if (ret==0xe00002eb) {
 		if (getMember<bool>(that, 0xe48) == true) {
-			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
+			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd18);
 			r->setProperty("AAPL,LCD-PowerState-ON", true);
 		}
 	}
@@ -856,7 +856,7 @@ uint64_t Gen11::disableVDDForAux2(void *that,void *param_1)
 
 	if (ret==0xe00002eb) {
 		if (getMember<bool>(that, 0xe48) == true) {
-			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd60);
+			IOFramebuffer *r= (IOFramebuffer *)getMember<void *>(that, 0xd18);
 			r->setProperty("AAPL,LCD-PowerState-ON", false);
 		}
 	}
@@ -1742,6 +1742,415 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 
 
 
+static void intel_pch_reset_handshake(struct intel_display *display,
+					  bool enable)
+{
+	u32 reg;
+	u32 reset_bits;
+
+	if (DISPLAY_VER(display) >= 35)
+		return;
+
+	if (display->platform.ivybridge) {
+
+	} else {
+		reg = HSW_NDE_RSTWRN_OPT;
+		reset_bits = RESET_PCH_HANDSHAKE_ENABLE;
+	}
+
+	//if (DISPLAY_VER(display) >= 14)
+	//	reset_bits |= MTL_RESET_PICA_HANDSHAKE_EN;
+
+	NBlue::callback->intel_de_rmw( reg, reset_bits, enable ? reset_bits : 0);
+}
+
+
+
+static bool check_phy_reg(struct intel_display *display,
+			  enum phy phy, u32 reg, u32 mask,
+			  u32 expected_val)
+{
+	u32 val = NBlue::callback->intel_de_read(display, reg);
+
+	if ((val & mask) != expected_val) {
+		return false;
+	}
+
+	return true;
+}
+static const struct icl_procmon *
+icl_get_procmon_ref_values(struct intel_display *display, enum phy phy)
+{
+	u32 val;
+
+	val = NBlue::callback->intel_de_read(display, ICL_PORT_COMP_DW3(phy));
+	switch (val & (PROCESS_INFO_MASK | VOLTAGE_INFO_MASK)) {
+	default:
+	case VOLTAGE_INFO_0_85V | PROCESS_INFO_DOT_0:
+		return &icl_procmon_values[PROCMON_0_85V_DOT_0];
+	case VOLTAGE_INFO_0_95V | PROCESS_INFO_DOT_0:
+		return &icl_procmon_values[PROCMON_0_95V_DOT_0];
+	case VOLTAGE_INFO_0_95V | PROCESS_INFO_DOT_1:
+		return &icl_procmon_values[PROCMON_0_95V_DOT_1];
+	case VOLTAGE_INFO_1_05V | PROCESS_INFO_DOT_0:
+		return &icl_procmon_values[PROCMON_1_05V_DOT_0];
+	case VOLTAGE_INFO_1_05V | PROCESS_INFO_DOT_1:
+		return &icl_procmon_values[PROCMON_1_05V_DOT_1];
+	}
+}
+
+static bool icl_verify_procmon_ref_values(struct intel_display *display,
+					  enum phy phy)
+{
+	const struct icl_procmon *procmon;
+	bool ret;
+
+	procmon = icl_get_procmon_ref_values(display, phy);
+
+	ret = check_phy_reg(display, phy, ICL_PORT_COMP_DW1(phy),
+				(0xff << 16) | 0xff, procmon->dw1);
+	ret &= check_phy_reg(display, phy, ICL_PORT_COMP_DW9(phy),
+				 -1U, procmon->dw9);
+	ret &= check_phy_reg(display, phy, ICL_PORT_COMP_DW10(phy),
+				 -1U, procmon->dw10);
+
+	return ret;
+}
+static bool has_phy_misc(struct intel_display *display, enum phy phy)
+{
+
+	if (display->platform.alderlake_s)
+		return phy == PHY_A;
+	else if ((display->platform.jasperlake || display->platform.elkhartlake) ||
+		 display->platform.rocketlake ||
+		 display->platform.dg1)
+		return phy < PHY_C;
+
+	return true;
+}
+static bool icl_combo_phy_enabled(struct intel_display *display,
+				  enum phy phy)
+{
+	if (!has_phy_misc(display, phy))
+		return NBlue::callback->intel_de_read(display, ICL_PORT_COMP_DW0(phy)) & COMP_INIT;
+	else
+		return !(NBlue::callback->intel_de_read(display, ICL_PHY_MISC(phy)) &
+			 ICL_PHY_MISC_DE_IO_COMP_PWR_DOWN) &&
+			(NBlue::callback->intel_de_read(display, ICL_PORT_COMP_DW0(phy)) & COMP_INIT);
+}
+static bool phy_is_master(struct intel_display *display, enum phy phy)
+{
+
+	if (phy == PHY_A)
+		return true;
+	else if (display->platform.alderlake_s)
+		return phy == PHY_D;
+	else if (display->platform.dg1 || display->platform.rocketlake)
+		return phy == PHY_C;
+
+	return false;
+}
+static bool icl_combo_phy_verify_state(struct intel_display *display,
+					   enum phy phy)
+{
+	bool ret = true;
+	u32 expected_val = 0;
+
+	if (!icl_combo_phy_enabled(display, phy))
+		return false;
+
+	if (DISPLAY_VER(display) >= 12) {
+		ret &= check_phy_reg(display, phy, ICL_PORT_TX_DW8_LN(0, phy),
+					 ICL_PORT_TX_DW8_ODCC_CLK_SEL |
+					 ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_MASK,
+					 ICL_PORT_TX_DW8_ODCC_CLK_SEL |
+					 ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_DIV2);
+
+		ret &= check_phy_reg(display, phy, ICL_PORT_PCS_DW1_LN(0, phy),
+					 DCC_MODE_SELECT_MASK, RUN_DCC_ONCE);
+	}
+
+	ret &= icl_verify_procmon_ref_values(display, phy);
+
+	if (phy_is_master(display, phy)) {
+		ret &= check_phy_reg(display, phy, ICL_PORT_COMP_DW8(phy),
+					 IREFGEN, IREFGEN);
+
+	}
+
+	ret &= check_phy_reg(display, phy, ICL_PORT_CL_DW5(phy),
+				 CL_POWER_DOWN_ENABLE, CL_POWER_DOWN_ENABLE);
+
+	return ret;
+}
+static void icl_set_procmon_ref_values(struct intel_display *display,
+					   enum phy phy)
+{
+	const struct icl_procmon *procmon;
+
+	procmon = icl_get_procmon_ref_values(display, phy);
+
+	NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW1(phy),
+			 (0xff << 16) | 0xff, procmon->dw1);
+
+	NBlue::callback->intel_de_write(display, ICL_PORT_COMP_DW9(phy), procmon->dw9);
+	NBlue::callback->intel_de_write(display, ICL_PORT_COMP_DW10(phy), procmon->dw10);
+}
+static void icl_combo_phys_init(struct intel_display *display)
+{
+	enum phy phy;
+
+	for_each_combo_phy(display, phy) {
+		const struct icl_procmon *procmon;
+		u32 val;
+
+		if (icl_combo_phy_verify_state(display, phy))
+			continue;
+
+		procmon = icl_get_procmon_ref_values(display, phy);
+
+		if (!has_phy_misc(display, phy))
+			goto skip_phy_misc;
+
+		val = NBlue::callback->intel_de_read(display, ICL_PHY_MISC(phy));
+
+		val &= ~ICL_PHY_MISC_DE_IO_COMP_PWR_DOWN;
+		NBlue::callback->intel_de_write(display, ICL_PHY_MISC(phy), val);
+
+skip_phy_misc:
+		if (DISPLAY_VER(display) >= 12) {
+			val = NBlue::callback->intel_de_read(display, ICL_PORT_TX_DW8_LN(0, phy));
+			val &= ~ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_MASK;
+			val |= ICL_PORT_TX_DW8_ODCC_CLK_SEL;
+			val |= ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_DIV2;
+			NBlue::callback->intel_de_write(display, ICL_PORT_TX_DW8_GRP(phy), val);
+
+			val = NBlue::callback->intel_de_read(display, ICL_PORT_PCS_DW1_LN(0, phy));
+			val &= ~DCC_MODE_SELECT_MASK;
+			val |= RUN_DCC_ONCE;
+			NBlue::callback->intel_de_write(display, ICL_PORT_PCS_DW1_GRP(phy), val);
+		}
+
+		icl_set_procmon_ref_values(display, phy);
+
+		if (phy_is_master(display, phy))
+			NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW8(phy),
+					 0, IREFGEN);
+
+		NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW0(phy), 0, COMP_INIT);
+		NBlue::callback->intel_de_rmw( ICL_PORT_CL_DW5(phy),
+				 0, CL_POWER_DOWN_ENABLE);
+	}
+}
+
+
+
+static void gen12_dbuf_slices_config(struct intel_display *display)
+{
+	enum dbuf_slice slice;
+
+	for_each_dbuf_slice(display, slice)
+	NBlue::callback->intel_de_rmw( DBUF_CTL_S(slice),
+				 DBUF_TRACKER_STATE_SERVICE_MASK,
+				 DBUF_TRACKER_STATE_SERVICE(8));
+}
+static void gen9_dbuf_slice_set(struct intel_display *display,
+				enum dbuf_slice slice, bool enable)
+{
+	u32 reg = DBUF_CTL_S(slice);
+	bool state;
+	
+	NBlue::callback->intel_de_rmw( reg, DBUF_POWER_REQUEST,
+								  enable ? DBUF_POWER_REQUEST : 0);
+	NBlue::callback->intel_de_posting_read(display, reg);
+	//udelay(10);
+	IODelay(10);
+	state = NBlue::callback->intel_de_read(display, reg) & DBUF_POWER_STATE;
+	
+}
+void gen9_dbuf_slices_update(struct intel_display *display,
+				 u8 req_slices)
+{
+	struct i915_power_domains *power_domains = &display->power.domains;
+	u8 slice_mask = DISPLAY_INFO(display)->dbuf.slice_mask;
+	enum dbuf_slice slice;
+
+	IOSimpleLockLock(power_domains->lock);
+	for_each_dbuf_slice(display, slice)
+		gen9_dbuf_slice_set(display, slice, req_slices & BIT(slice));
+
+	display->dbuf.enabled_slices = req_slices;
+	IOSimpleLockUnlock(power_domains->lock);
+}
+u8 intel_enabled_dbuf_slices_mask(struct intel_display *display)
+{
+	u8 enabled_slices = 0;
+	enum dbuf_slice slice;
+
+	for_each_dbuf_slice(display, slice) {
+		if (NBlue::callback->intel_de_read(display, DBUF_CTL_S(slice)) & DBUF_POWER_STATE)
+			enabled_slices |= BIT(slice);
+	}
+
+	return enabled_slices;
+}
+static void gen9_dbuf_enable(struct intel_display *display)
+{
+	u8 slices_mask;
+
+	display->dbuf.enabled_slices = intel_enabled_dbuf_slices_mask(display);
+
+	slices_mask = BIT(DBUF_S1) | display->dbuf.enabled_slices;
+
+	gen9_dbuf_slices_update(display, slices_mask);
+}
+
+static void icl_mbus_init(struct intel_display *display)
+{
+	unsigned long abox_regs = DISPLAY_INFO(display)->abox_mask;
+	u32 mask, val, i;
+
+	if (display->platform.alderlake_p || DISPLAY_VER(display) >= 14)
+		return;
+
+	mask = MBUS_ABOX_BT_CREDIT_POOL1_MASK |
+		MBUS_ABOX_BT_CREDIT_POOL2_MASK |
+		MBUS_ABOX_B_CREDIT_MASK |
+		MBUS_ABOX_BW_CREDIT_MASK;
+	val = MBUS_ABOX_BT_CREDIT_POOL1(16) |
+		MBUS_ABOX_BT_CREDIT_POOL2(16) |
+		MBUS_ABOX_B_CREDIT(1) |
+		MBUS_ABOX_BW_CREDIT(1);
+
+
+	if (DISPLAY_VER(display) == 12)
+		abox_regs |= BIT(0);
+
+	for_each_set_bit(i, &abox_regs, BITS_PER_TYPE(abox_regs))
+	NBlue::callback->intel_de_rmw( MBUS_ABOX_CTL(i), mask, val);
+}
+
+int snb_pcode_read( u32 mbox, u32 *val, u32 *val1)
+{
+	int err;
+
+	IOSimpleLock *myLock;
+	myLock = IOSimpleLockAlloc();
+		IOSimpleLockLock(myLock);
+		err = snb_pcode_rw( mbox, val, val1, 500, 20, true);
+		IOSimpleLockUnlock(myLock);
+
+	IOSimpleLockFree(myLock);
+
+	return err;
+}
+static int icl_pcode_read_mem_global_info(struct intel_display *display,
+					  struct dram_info *dram_info)
+{
+	u32 val = 0;
+	int ret;
+	
+	//ret = intel_parent_pcode_read(display, ICL_PCODE_MEM_SUBSYSYSTEM_INFO |
+	//				  ICL_PCODE_MEM_SS_READ_GLOBAL_INFO, &val, NULL);
+	
+	snb_pcode_read(ICL_PCODE_MEM_SUBSYSYSTEM_INFO | ICL_PCODE_MEM_SS_READ_GLOBAL_INFO, &val, NULL);
+	//if (ret)
+		//return ret;
+
+	if (DISPLAY_VER(display) >= 12) {
+		switch (val & 0xf) {
+		case 0:
+			dram_info->type = INTEL_DRAM_DDR4;
+			break;
+		case 1:
+			dram_info->type = INTEL_DRAM_DDR5;
+			break;
+		case 2:
+			dram_info->type = INTEL_DRAM_LPDDR5;
+			break;
+		case 3:
+			dram_info->type = INTEL_DRAM_LPDDR4;
+			break;
+		case 4:
+			dram_info->type = INTEL_DRAM_DDR3;
+			break;
+		case 5:
+			dram_info->type = INTEL_DRAM_LPDDR3;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else {
+		switch (val & 0xf) {
+		case 0:
+			dram_info->type = INTEL_DRAM_DDR4;
+			break;
+		case 1:
+			dram_info->type = INTEL_DRAM_DDR3;
+			break;
+		case 2:
+			dram_info->type = INTEL_DRAM_LPDDR3;
+			break;
+		case 3:
+			dram_info->type = INTEL_DRAM_LPDDR4;
+			break;
+		default:
+			return -EINVAL;
+		}
+	}
+
+	dram_info->num_channels = (val & 0xf0) >> 4;
+	dram_info->num_qgv_points = (val & 0xf00) >> 8;
+	dram_info->num_psf_gv_points = (val & 0x3000) >> 12;
+
+	return 0;
+}
+static int gen12_get_dram_info(struct intel_display *display, struct dram_info *dram_info)
+{
+	return icl_pcode_read_mem_global_info(display, dram_info);
+}
+
+static void tgl_bw_buddy_init(struct intel_display *display)
+{
+	struct dram_info dram_info0;// = intel_dram_info(display);
+	struct dram_info *dram_info=&dram_info0;
+	gen12_get_dram_info(display, dram_info);
+	const struct buddy_page_mask *table;
+	unsigned long abox_mask = DISPLAY_INFO(display)->abox_mask;
+	int config, i;
+
+	/* BW_BUDDY registers are not used on dgpu's beyond DG1 */
+	if (display->platform.dgfx && !display->platform.dg1)
+		return;
+
+	if (intel_display_wa(display, INTEL_DISPLAY_WA_1409767108))
+		/* Wa_1409767108 */
+		table = wa_1409767108_buddy_page_masks;
+	else
+		table = tgl_buddy_page_masks;
+
+	for (config = 0; table[config].page_mask != 0; config++)
+		if (table[config].num_channels == dram_info->num_channels &&
+			table[config].type == dram_info->type)
+			break;
+
+	if (table[config].page_mask == 0) {
+		for_each_set_bit(i, &abox_mask, BITS_PER_TYPE(abox_mask))
+		NBlue::callback->intel_de_write(display, BW_BUDDY_CTL(i),
+					   BW_BUDDY_DISABLE);
+	} else {
+		for_each_set_bit(i, &abox_mask, BITS_PER_TYPE(abox_mask)) {
+			NBlue::callback->intel_de_write(display, BW_BUDDY_PAGE_MASK(i),
+					   table[config].page_mask);
+
+			/* Wa_22010178259:tgl,dg1,rkl,adl-s */
+			if (intel_display_wa(display, INTEL_DISPLAY_WA_22010178259))
+				NBlue::callback->intel_de_rmw( BW_BUDDY_CTL(i),
+						 BW_BUDDY_TLB_REQ_TIMER_MASK,
+						 BW_BUDDY_TLB_REQ_TIMER(0x8));
+		}
+	}
+}
 
 
 void Gen11::hwInitializeCState(void *that)
@@ -1763,6 +2172,21 @@ void Gen11::hwInitializeCState(void *that)
 	if (DISPLAY_VER(display)== 12){
 		NBlue::callback->intel_de_rmw( CLKREQ_POLICY, CLKREQ_POLICY_MEM_UP_OVRD, 0);
 	}
+	
+	intel_pch_reset_handshake(display, !HAS_PCH_NOP(display));
+
+	icl_combo_phys_init(display);
+	
+	if (DISPLAY_VER(display) == 12 || display->platform.dg2)
+		gen12_dbuf_slices_config(display);
+
+	gen9_dbuf_enable(display);
+	
+	icl_mbus_init(display);
+	
+	if (DISPLAY_VER(display) >= 12)
+		tgl_bw_buddy_init(display);
+	
 	
 	struct intel_dmc *dmc=display->dmc.dmc;
 	
@@ -2943,49 +3367,354 @@ write_dsc_decompression_flag( u8 flag, bool set)
 	return Gen11::callback->writeAUX(linkp,DP_DSC_ENABLE,&val,1);
 }
 
-void intel_ddi_set_dp_msa()
+
+
+#define GEN8_DE_PIPE_ISR(pipe) _MMIO(0x44400 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IMR(pipe) _MMIO(0x44404 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IIR(pipe) _MMIO(0x44408 + (0x10 * (pipe)))
+#define GEN8_DE_PIPE_IER(pipe) _MMIO(0x4440c + (0x10 * (pipe)))
+#define  GEN8_PIPE_FIFO_UNDERRUN	REG_BIT(31)
+#define  GEN8_PIPE_CDCLK_CRC_ERROR	REG_BIT(29)
+#define  GEN8_PIPE_CDCLK_CRC_DONE	REG_BIT(28)
+#define  GEN12_PIPEDMC_INTERRUPT	REG_BIT(26) /* tgl+ */
+#define  GEN12_PIPEDMC_FAULT		REG_BIT(25) /* tgl-mtl */
+#define  MTL_PIPEDMC_ATS_FAULT		REG_BIT(24) /* mtl */
+#define  GEN12_PIPEDMC_FLIPQ_DONE	REG_BIT(24) /* tgl-adl */
+#define  GEN11_PIPE_PLANE7_FAULT	REG_BIT(22) /* icl/tgl */
+#define  GEN11_PIPE_PLANE6_FAULT	REG_BIT(21) /* icl/tgl */
+#define  GEN11_PIPE_PLANE5_FAULT	REG_BIT(20) /* icl+ */
+#define  GEN12_PIPE_VBLANK_UNMOD	REG_BIT(19) /* tgl+ */
+#define  MTL_PLANE_ATS_FAULT		REG_BIT(18) /* mtl+ */
+#define  GEN11_PIPE_PLANE7_FLIP_DONE	REG_BIT(18) /* icl/tgl */
+#define  MTL_PIPEDMC_FLIPQ_DONE		REG_BIT(17) /* mtl */
+#define  GEN11_PIPE_PLANE6_FLIP_DONE	REG_BIT(17) /* icl/tgl */
+#define  GEN11_PIPE_PLANE5_FLIP_DONE	REG_BIT(16) /* icl+ */
+#define  GEN12_DSB_2_INT		REG_BIT(15) /* tgl+ */
+#define  GEN12_DSB_1_INT		REG_BIT(14) /* tgl+ */
+#define  GEN12_DSB_0_INT		REG_BIT(13) /* tgl+ */
+#define  GEN12_DSB_INT(dsb_id)		REG_BIT(13 + (dsb_id))
+#define  GEN9_PIPE_CURSOR_FAULT		REG_BIT(11) /* skl+ */
+#define  GEN9_PIPE_PLANE4_FAULT		REG_BIT(10) /* skl+ */
+#define  GEN8_PIPE_CURSOR_FAULT		REG_BIT(10) /* bdw */
+#define  GEN9_PIPE_PLANE3_FAULT		REG_BIT(9) /* skl+ */
+#define  GEN8_PIPE_SPRITE_FAULT		REG_BIT(9) /* bdw */
+#define  GEN9_PIPE_PLANE2_FAULT		REG_BIT(8) /* skl+ */
+#define  GEN8_PIPE_PRIMARY_FAULT	REG_BIT(8) /* bdw */
+#define  GEN9_PIPE_PLANE1_FAULT		REG_BIT(7) /* skl+ */
+#define  GEN9_PIPE_PLANE4_FLIP_DONE	REG_BIT(6) /* skl+ */
+#define  GEN9_PIPE_PLANE3_FLIP_DONE	REG_BIT(5) /* skl+ */
+#define  GEN8_PIPE_SPRITE_FLIP_DONE	REG_BIT(5) /* bdw */
+#define  GEN9_PIPE_PLANE2_FLIP_DONE	REG_BIT(4) /* skl+ */
+#define  GEN8_PIPE_PRIMARY_FLIP_DONE	REG_BIT(4) /* bdw */
+#define  GEN9_PIPE_PLANE1_FLIP_DONE	REG_BIT(3) /* skl+ */
+#define  GEN9_PIPE_PLANE_FLIP_DONE(plane_id) \
+	REG_BIT(((plane_id) >= PLANE_5 ? 16 - PLANE_5 : 3 - PLANE_1) + (plane_id)) /* skl+ */
+#define  GEN8_PIPE_SCAN_LINE_EVENT	REG_BIT(2)
+#define  GEN8_PIPE_VSYNC		REG_BIT(1)
+#define  GEN8_PIPE_VBLANK		REG_BIT(0)
+
+#define GEN8_DE_PORT_ISR _MMIO(0x44440)
+#define GEN8_DE_PORT_IMR _MMIO(0x44444)
+#define GEN8_DE_PORT_IIR _MMIO(0x44448)
+#define GEN8_DE_PORT_IER _MMIO(0x4444c)
+#define  DSI1_NON_TE			(1 << 31)
+#define  DSI0_NON_TE			(1 << 30)
+#define  ICL_AUX_CHANNEL_E		(1 << 29)
+#define  ICL_AUX_CHANNEL_F		(1 << 28)
+#define  GEN9_AUX_CHANNEL_D		(1 << 27)
+#define  GEN9_AUX_CHANNEL_C		(1 << 26)
+#define  GEN9_AUX_CHANNEL_B		(1 << 25)
+#define  DSI1_TE			(1 << 24)
+#define  DSI0_TE			(1 << 23)
+#define  GEN8_DE_PORT_HOTPLUG(hpd_pin)	REG_BIT(3 + _HPD_PIN_DDI(hpd_pin))
+#define  BXT_DE_PORT_HOTPLUG_MASK	(GEN8_DE_PORT_HOTPLUG(HPD_PORT_A) | \
+					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_B) | \
+					 GEN8_DE_PORT_HOTPLUG(HPD_PORT_C))
+#define  BDW_DE_PORT_HOTPLUG_MASK	GEN8_DE_PORT_HOTPLUG(HPD_PORT_A)
+#define  BXT_DE_PORT_GMBUS		(1 << 1)
+#define  GEN8_AUX_CHANNEL_A		(1 << 0)
+#define  TGL_DE_PORT_AUX_USBC6		REG_BIT(13)
+#define  XELPD_DE_PORT_AUX_DDIE		REG_BIT(13)
+#define  TGL_DE_PORT_AUX_USBC5		REG_BIT(12)
+#define  XELPD_DE_PORT_AUX_DDID		REG_BIT(12)
+#define  TGL_DE_PORT_AUX_USBC4		REG_BIT(11)
+#define  TGL_DE_PORT_AUX_USBC3		REG_BIT(10)
+#define  TGL_DE_PORT_AUX_USBC2		REG_BIT(9)
+#define  TGL_DE_PORT_AUX_USBC1		REG_BIT(8)
+#define  TGL_DE_PORT_AUX_DDIC		REG_BIT(2)
+#define  TGL_DE_PORT_AUX_DDIB		REG_BIT(1)
+#define  TGL_DE_PORT_AUX_DDIA		REG_BIT(0)
+
+#define GEN8_DE_PORT_IRQ_REGS		I915_IRQ_REGS(GEN8_DE_PORT_IMR, \
+							  GEN8_DE_PORT_IER, \
+							  GEN8_DE_PORT_IIR)
+
+
+static u32 gen8_de_pipe_fault_mask(struct intel_display *display)
 {
-	struct intel_display *display = &NBlue::callback->display_base;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
-	u32 temp;
+	if (DISPLAY_VER(display) >= 20)
+		return MTL_PLANE_ATS_FAULT |
+			GEN9_PIPE_CURSOR_FAULT |
+			GEN11_PIPE_PLANE5_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else if (DISPLAY_VER(display) >= 14)
+		return MTL_PIPEDMC_ATS_FAULT |
+			MTL_PLANE_ATS_FAULT |
+			GEN12_PIPEDMC_FAULT |
+			GEN9_PIPE_CURSOR_FAULT |
+			GEN11_PIPE_PLANE5_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else if (DISPLAY_VER(display) >= 13 /*|| HAS_D12_PLANE_MINIMIZATION(display)*/)
+		return GEN12_PIPEDMC_FAULT |
+			GEN9_PIPE_CURSOR_FAULT |
+			GEN11_PIPE_PLANE5_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else if (DISPLAY_VER(display) == 12)
+		return GEN12_PIPEDMC_FAULT |
+			GEN9_PIPE_CURSOR_FAULT |
+			GEN11_PIPE_PLANE7_FAULT |
+			GEN11_PIPE_PLANE6_FAULT |
+			GEN11_PIPE_PLANE5_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else if (DISPLAY_VER(display) == 11)
+		return GEN9_PIPE_CURSOR_FAULT |
+			GEN11_PIPE_PLANE7_FAULT |
+			GEN11_PIPE_PLANE6_FAULT |
+			GEN11_PIPE_PLANE5_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else if (DISPLAY_VER(display) >= 9)
+		return GEN9_PIPE_CURSOR_FAULT |
+			GEN9_PIPE_PLANE4_FAULT |
+			GEN9_PIPE_PLANE3_FAULT |
+			GEN9_PIPE_PLANE2_FAULT |
+			GEN9_PIPE_PLANE1_FAULT;
+	else
+		return GEN8_PIPE_CURSOR_FAULT |
+			GEN8_PIPE_SPRITE_FAULT |
+			GEN8_PIPE_PRIMARY_FAULT;
+}
+static u32 gen8_de_port_aux_mask(struct intel_display *display)
+{
+	u32 mask;
 
+	if (DISPLAY_VER(display) >= 20)
+		return 0;
+	else if (DISPLAY_VER(display) >= 14)
+		return TGL_DE_PORT_AUX_DDIA |
+			TGL_DE_PORT_AUX_DDIB;
+	else if (DISPLAY_VER(display) >= 13)
+		return TGL_DE_PORT_AUX_DDIA |
+			TGL_DE_PORT_AUX_DDIB |
+			TGL_DE_PORT_AUX_DDIC |
+			XELPD_DE_PORT_AUX_DDID |
+			XELPD_DE_PORT_AUX_DDIE |
+			TGL_DE_PORT_AUX_USBC1 |
+			TGL_DE_PORT_AUX_USBC2 |
+			TGL_DE_PORT_AUX_USBC3 |
+			TGL_DE_PORT_AUX_USBC4;
+	else if (DISPLAY_VER(display) >= 12)
+		return TGL_DE_PORT_AUX_DDIA |
+			TGL_DE_PORT_AUX_DDIB |
+			TGL_DE_PORT_AUX_DDIC |
+			TGL_DE_PORT_AUX_USBC1 |
+			TGL_DE_PORT_AUX_USBC2 |
+			TGL_DE_PORT_AUX_USBC3 |
+			TGL_DE_PORT_AUX_USBC4 |
+			TGL_DE_PORT_AUX_USBC5 |
+			TGL_DE_PORT_AUX_USBC6;
 
+	mask = GEN8_AUX_CHANNEL_A;
+	if (DISPLAY_VER(display) >= 9)
+		mask |= GEN9_AUX_CHANNEL_B |
+			GEN9_AUX_CHANNEL_C |
+			GEN9_AUX_CHANNEL_D;
 
-	temp = DP_MSA_MISC_SYNC_CLOCK;
-
-	switch (display->panel.vbt.edp.bpp) {
-	case 18:
-		temp |= DP_MSA_MISC_6_BPC;
-		break;
-	case 24:
-		temp |= DP_MSA_MISC_8_BPC;
-		break;
-	case 30:
-		temp |= DP_MSA_MISC_10_BPC;
-		break;
-	case 36:
-		temp |= DP_MSA_MISC_12_BPC;
-		break;
-	default:
-		break;
+	if (DISPLAY_VER(display) == 11) {
+		mask |= ICL_AUX_CHANNEL_F;
+		mask |= ICL_AUX_CHANNEL_E;
 	}
 
-
-	//if (display->limited_color_range)
-	//	temp |= DP_MSA_MISC_COLOR_CEA_RGB;
-
-	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
-		temp |= DP_MSA_MISC_COLOR_YCBCR_444_BT709;
-
-
-	//if (intel_dp_needs_vsc_sdp(crtc_state, conn_state))
-	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
-
-	NBlue::callback->writeReg32( TRANS_MSA_MISC(display, cpu_transcoder),
-			   temp);
+	return mask;
 }
 
+static void intel_ddi_set_idle_link_train(struct intel_dp *intel_dp)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	enum port port = display->port0;
 
+	NBlue::callback->intel_de_rmw( dp_tp_ctl_reg(),
+			 DP_TP_CTL_LINK_TRAIN_MASK, DP_TP_CTL_LINK_TRAIN_IDLE);
+
+	if (port == PORT_A && DISPLAY_VER(display) < 12)
+		return;
+
+	IODelay(2);
+
+}
+
+static bool intel_dp_link_train_all_phys(struct intel_dp *intel_dp)
+{
+	bool ret = true;
+
+
+	if (ret)
+		ret = intel_dp_link_train_phy(intel_dp, DP_PHY_DPRX);
+
+	intel_dp_disable_dpcd_training_pattern(intel_dp, DP_PHY_DPRX);
+	intel_ddi_set_idle_link_train(intel_dp);
+
+	return ret;
+}
+
+int intel_dp_rate_index(int *rates, int len, int rate)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+		if (rate == rates[i])
+			return i;
+
+	return -1;
+}
+int intel_dp_rate_select(struct intel_dp *intel_dp, int rate)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	int i = intel_dp_rate_index(intel_dp->sink_rates,
+					intel_dp->num_sink_rates, rate);
+
+	if (i < 0)
+		i = 0;
+
+	return i;
+}
+void intel_dp_compute_rate(struct intel_dp *intel_dp, int port_clock,
+			   u8 *link_bw, u8 *rate_select)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+
+	/* FIXME g4x can't generate an exact 2.7GHz with the 96MHz non-SSC refclk */
+	if (display->platform.g4x && port_clock == 268800)
+		port_clock = 270000;
+
+	/* eDP 1.4 rate select method. */
+	if (0/*intel_dp->use_rate_select*/) {
+		*link_bw = 0;
+		*rate_select =
+			intel_dp_rate_select(intel_dp, port_clock);
+	} else {
+		*link_bw = drm_dp_link_rate_to_bw_code(port_clock);
+		*rate_select = 0;
+	}
+}
+static inline bool drm_dp_is_uhbr_rate(int link_rate)
+{
+	return link_rate >= 1000000;
+}
+void intel_dp_link_training_set_mode(struct intel_dp *intel_dp, int link_rate, bool is_vrr)
+{
+	u8 link_config[2];
+
+	link_config[0] = is_vrr ? DP_MSA_TIMING_PAR_IGNORE_EN : 0;
+	link_config[1] = drm_dp_is_uhbr_rate(link_rate) ?
+			 DP_SET_ANSI_128B132B : DP_SET_ANSI_8B10B;
+
+	Gen11::callback->writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config, 2);
+}
+static void intel_dp_update_downspread_ctrl(struct intel_dp *intel_dp)
+{
+	struct intel_display *display=&NBlue::callback->display_base;
+	intel_dp_link_training_set_mode(intel_dp,
+									display->port_clock, 0/*crtc_state->vrr.in_range*/);
+}
+void intel_dp_link_training_set_bw(struct intel_dp *intel_dp,
+				   int link_bw, int rate_select, int lane_count,
+				   bool enhanced_framing)
+{
+	if (enhanced_framing)
+		lane_count |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
+
+	if (link_bw) {
+		/* DP and eDP v1.3 and earlier link bw set method. */
+		u8 link_config[2];
+		link_config[0]=link_bw;
+		link_config[1]=lane_count;
+		
+		Gen11::callback->readAUX(linkp,DP_LINK_BW_SET,link_config,
+								 ARRAY_SIZE(link_config));
+
+	} else {
+
+		//drm_dp_dpcd_writeb(&intel_dp->aux, DP_LANE_COUNT_SET, lane_count);
+		//drm_dp_dpcd_writeb(&intel_dp->aux, DP_LINK_RATE_SET, rate_select);
+	}
+}
+static void intel_dp_update_link_bw_set(struct intel_dp *intel_dp,
+					u8 link_bw, u8 rate_select)
+{
+	struct intel_display *display=&NBlue::callback->display_base;
+	intel_dp_link_training_set_bw(intel_dp, link_bw, rate_select, display->panel.vbt.edp.lanes,
+					  true);
+}
+static bool
+intel_dp_prepare_link_train(struct intel_dp *intel_dp)
+{
+	u8 link_bw, rate_select;
+	struct intel_display *display=&NBlue::callback->display_base;
+	
+	intel_ddi_prepare_link_retrain(intel_dp);
+
+	intel_dp_compute_rate(intel_dp, display->port_clock,
+				  &link_bw, &rate_select);
+
+	if (!link_bw) {
+		u16 sink_rates[DP_MAX_SUPPORTED_RATES];
+
+		Gen11::callback->readAUX(linkp,DP_SUPPORTED_LINK_RATES,sink_rates, sizeof(sink_rates));
+
+	}
+
+	intel_dp_update_downspread_ctrl(intel_dp);
+	intel_dp_update_link_bw_set(intel_dp, link_bw,
+					rate_select);
+
+	return true;
+}
+
+void intel_dp_stop_link_train(struct intel_dp *intel_dp)
+{
+	struct intel_display *display = &NBlue::callback->display_base;;
+	int ret;
+
+	intel_dp->link.active = true;
+
+	intel_dp_program_link_training_pattern(intel_dp, DP_PHY_DPRX,
+						   DP_TRAINING_PATTERN_DISABLE);
+
+
+	//intel_hpd_unblock(encoder);
+
+	/*if (!display->hotplug.ignore_long_hpd &&
+		intel_dp->link.seq_train_failures < MAX_SEQ_TRAIN_FAILURES) {
+		int delay_ms = intel_dp->link.seq_train_failures ? 0 : 2000;
+
+		intel_encoder_link_check_queue_work(encoder, delay_ms);
+	}*/
+}
 
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
@@ -3011,53 +3740,6 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_dp_enable_port(intel_dp);
 	
-	
-	u32 pp;
-	u32 pp_stat_reg, pp_ctrl_reg;
-
-
-	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
-	pp |= EDP_FORCE_VDD;
-
-	pp_ctrl_reg = display->panel.regs.pp_ctrl;
-	pp_stat_reg = display->panel.regs.pp_stat;
-
-	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
-	NBlue::callback->readReg32( pp_ctrl_reg);
-	
-	
-	if (IS_DISPLAY_VER(display, 13, 14))
-		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
-				 0, PCH_DPLSUNIT_CLOCK_GATE_DISABLE);
-	
-	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
-	pp |= PANEL_POWER_ON;
-
-	pp_ctrl_reg = display->panel.regs.pp_ctrl;
-	pp_stat_reg = display->panel.regs.pp_stat;
-
-	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
-	NBlue::callback->readReg32( pp_ctrl_reg);
-	
-	IODelay(display->panel.pps.panel_power_up_delay);
-	
-	if (IS_DISPLAY_VER(display, 13, 14))
-		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
-				 PCH_DPLSUNIT_CLOCK_GATE_DISABLE, 0);
-	
-	
-	pp = NBlue::callback->readReg32(display->panel.regs.pp_ctrl);
-	pp &= ~EDP_FORCE_VDD;
-
-	pp_ctrl_reg = display->panel.regs.pp_ctrl;
-	pp_stat_reg = display->panel.regs.pp_stat;
-
-	NBlue::callback->writeReg32( pp_ctrl_reg, pp);
-	NBlue::callback->readReg32( pp_ctrl_reg);
-	
-	IODelay(display->panel.pps.panel_power_up_delay);
-	
-/*
 	if (!kexticl) enableVDDForAux(ccont2,that);
 	else enableVDDForAux2(ccont2,that);
 	
@@ -3065,9 +3747,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
-	*/
 	
 	
+	/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
@@ -3095,6 +3777,8 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	NBlue::callback->intel_de_rmw( ICL_PIPE_DSS_CTL1(display->pipe0),
 			 SPLITTER_ENABLE | SPLITTER_CONFIGURATION_MASK |
 			 OVERLAP_PIXELS_MASK, dss1);
+	
+	*/
 	
 	u8 oui[] = { 0x00, 0xaa, 0x01 };
 	u8 buf[3] = {};
@@ -3129,43 +3813,12 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 
 	//intel_hpd_block
 	
-	intel_ddi_prepare_link_retrain(intel_dp);
+	intel_dp_prepare_link_train(intel_dp);
 	
-	u8 link_config[2];
-	bool is_vrr=false;
+	bool ret=intel_dp_link_train_all_phys(intel_dp);
 	
-	//drm_dp_sink_can_do_video_without_timing_msa
-	link_config[0] = is_vrr ? DP_MSA_TIMING_PAR_IGNORE_EN : 0;
-	link_config[1] = DP_SET_ANSI_8B10B;
-	writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config,  ARRAY_SIZE(link_config));
+	intel_dp_stop_link_train(intel_dp);
 	
-	u8 link_bw;
-	link_bw = drm_dp_link_rate_to_bw_code(port_clock);
-	
-	readAUX(linkp,DP_EDP_DPCD_REV,intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd));
-	
-	
-	//DP and eDP v1.3 and earlier link bw set method.
-	link_config[0] = link_bw;
-	link_config[1] = lane_count;
-	link_config[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
-		
-	writeAUX(linkp,DP_LINK_BW_SET,link_config, ARRAY_SIZE(link_config));
-	
-	//u8 v=DP_ALTERNATE_SCRAMBLER_RESET_ENABLE;
-	//writeAUX(linkp,DP_EDP_CONFIGURATION_SET,&v, 1);
-	
-	bool ret= intel_dp_link_train_phy(intel_dp,DP_PHY_DPRX);
-	
-	intel_dp_disable_dpcd_training_pattern(intel_dp, DP_PHY_DPRX);
-	
-	NBlue::callback->intel_de_rmw( TGL_DP_TP_CTL(display, display->cpu_transcoder),
-			 DP_TP_CTL_LINK_TRAIN_MASK, DP_TP_CTL_LINK_TRAIN_IDLE);
-	IODelay(2);
-	
-	intel_ddi_set_dp_msa();
-	
-	//intel_hpd_unblock(encoder);
 	
 	return 0; // hack
 	

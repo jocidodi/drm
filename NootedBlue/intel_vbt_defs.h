@@ -4907,7 +4907,7 @@ struct intel_dp {
 	const int *source_rates;
 	/* sink rates as reported by DP_MAX_LINK_RATE/DP_SUPPORTED_LINK_RATES */
 	int num_sink_rates;
-	//int sink_rates[DP_MAX_SUPPORTED_RATES];
+	int sink_rates[8];
 	bool use_rate_select;
 	/* Max sink lane count as reported by DP_MAX_LANE_COUNT */
 	int max_sink_lane_count;
@@ -5119,6 +5119,17 @@ struct intel_display {
 		struct intel_dmc *dmc;
 		//struct ref_tracker *wakeref;
 	} dmc;
+	
+	struct {
+		IOSimpleLock *lock;
+		bool vlv_display_irqs_enabled;
+		u8 vblank_enabled;
+		int vblank_enable_count;
+		u32 vlv_imr_mask;
+		u32 ilk_de_imr_mask;
+		u32 de_pipe_imr_mask[I915_MAX_PIPES];
+		u32 pipestat_irq_mask[I915_MAX_PIPES];
+	} irq;
 	
 	struct intel_panel panel;
 	ConnectorInfo bconnectors[6];
@@ -5736,9 +5747,336 @@ bool __intel_display_wa(struct intel_display *display, enum intel_display_wa wa,
 # define DP_ALTERNATE_SCRAMBLER_RESET_ENABLE (1 << 0)
 # define DP_FRAMING_CHANGE_ENABLE	    (1 << 1)
 # define DP_PANEL_SELF_TEST_ENABLE	    (1 << 7)
+#define HSW_NDE_RSTWRN_OPT	_MMIO(0x46408)
+#define  MTL_RESET_PICA_HANDSHAKE_EN	REG_BIT(6)
+#define  RESET_PCH_HANDSHAKE_ENABLE	REG_BIT(4)
+#define  RESET_PCH_HANDSHAKE_ENABLE	REG_BIT(4)
+#define HAS_PCH_NOP(display)			(INTEL_PCH_TYPE(display) == PCH_NOP)
+
+bool intel_phy_is_combo(struct intel_display *display, enum phy phy)
+{
+	if (phy == PHY_NONE)
+		return false;
+	else if (display->platform.alderlake_s)
+		return phy <= PHY_E;
+	else if (display->platform.dg1 || display->platform.rocketlake)
+		return phy <= PHY_D;
+	else if (display->platform.jasperlake || display->platform.elkhartlake)
+		return phy <= PHY_C;
+	else if (display->platform.alderlake_p || IS_DISPLAY_VER(display, 11, 12))
+		return phy <= PHY_B;
+	else
+		return false;
+}
+
+#define for_each_if(condition) if (!(condition)) {} else
+
+#define for_each_combo_phy(__display, __phy) \
+	for ((__phy) = static_cast<decltype(__phy)>(PHY_A); \
+		 static_cast<int>(__phy) < static_cast<int>(I915_MAX_PHYS); \
+		 (__phy) = static_cast<decltype(__phy)>(static_cast<int>(__phy) + 1)) \
+		for_each_if(intel_phy_is_combo(__display, __phy))
+
+
+enum {
+	PROCMON_0_85V_DOT_0,
+	PROCMON_0_95V_DOT_0,
+	PROCMON_0_95V_DOT_1,
+	PROCMON_1_05V_DOT_0,
+	PROCMON_1_05V_DOT_1,
+};
+
+static const struct icl_procmon {
+	const char *name;
+	u32 dw1, dw9, dw10;
+} icl_procmon_values[] = {
+	[PROCMON_0_85V_DOT_0] = {
+		.name = "0.85V dot0 (low-voltage)",
+		.dw1 = 0x00000000, .dw9 = 0x62AB67BB, .dw10 = 0x51914F96,
+	},
+	[PROCMON_0_95V_DOT_0] = {
+		.name = "0.95V dot0",
+		.dw1 = 0x00000000, .dw9 = 0x86E172C7, .dw10 = 0x77CA5EAB,
+	},
+	[PROCMON_0_95V_DOT_1] = {
+		.name = "0.95V dot1",
+		.dw1 = 0x00000000, .dw9 = 0x93F87FE1, .dw10 = 0x8AE871C5,
+	},
+	[PROCMON_1_05V_DOT_0] = {
+		.name = "1.05V dot0",
+		.dw1 = 0x00000000, .dw9 = 0x98FA82DD, .dw10 = 0x89E46DC1,
+	},
+	[PROCMON_1_05V_DOT_1] = {
+		.name = "1.05V dot1",
+		.dw1 = 0x00440000, .dw9 = 0x9A00AB25, .dw10 = 0x8AE38FF1,
+	},
+};
+#define ICL_PORT_COMP_DW3(phy)			_MMIO(_ICL_PORT_COMP_DW(3, phy))
+#define   PROCESS_INFO_MASK			REG_GENMASK(28, 26)
+#define   PROCESS_INFO_DOT_0			REG_FIELD_PREP(PROCESS_INFO_MASK, 0)
+#define   PROCESS_INFO_DOT_1			REG_FIELD_PREP(PROCESS_INFO_MASK, 1)
+#define   PROCESS_INFO_DOT_4			REG_FIELD_PREP(PROCESS_INFO_MASK, 2)
+#define   VOLTAGE_INFO_MASK			REG_GENMASK(25, 24)
+#define   VOLTAGE_INFO_0_85V			REG_FIELD_PREP(VOLTAGE_INFO_MASK, 0)
+#define   VOLTAGE_INFO_0_95V			REG_FIELD_PREP(VOLTAGE_INFO_MASK, 1)
+#define   VOLTAGE_INFO_1_05V			REG_FIELD_PREP(VOLTAGE_INFO_MASK, 2)
+
+#define _ICL_PORT_COMP				0x100
+#define _ICL_PORT_COMP_DW(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 _ICL_PORT_COMP + 4 * (dw))
+#define ICL_PORT_COMP_DW0(phy)			_MMIO(_ICL_PORT_COMP_DW(0, phy))
+#define ICL_PORT_COMP_DW8(phy)			_MMIO(_ICL_PORT_COMP_DW(8, phy))
+#define   IREFGEN				REG_BIT(24)
+#define   CL_POWER_DOWN_ENABLE			REG_BIT(4)
+#define   DCC_MODE_SELECT_MASK			REG_GENMASK(21, 20)
+#define   RUN_DCC_ONCE				REG_FIELD_PREP(DCC_MODE_SELECT_MASK, 0)
+#define ICL_PORT_TX_DW8_AUX(phy)		_MMIO(_ICL_PORT_TX_DW_AUX(8, phy))
+#define ICL_PORT_TX_DW8_GRP(phy)		_MMIO(_ICL_PORT_TX_DW_GRP(8, phy))
+#define   COMP_INIT				REG_BIT(31)
+#define ICL_PORT_TX_DW8_AUX(phy)		_MMIO(_ICL_PORT_TX_DW_AUX(8, phy))
+#define ICL_PORT_TX_DW8_GRP(phy)		_MMIO(_ICL_PORT_TX_DW_GRP(8, phy))
+#define ICL_PORT_TX_DW8_LN(ln, phy)		_MMIO(_ICL_PORT_TX_DW_LN(8, ln, phy))
+#define   ICL_PORT_TX_DW8_ODCC_CLK_SEL		REG_BIT(31)
+#define   ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_MASK	REG_GENMASK(30, 29)
+#define   ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_DIV2	REG_FIELD_PREP(ICL_PORT_TX_DW8_ODCC_CLK_DIV_SEL_MASK, 0x1)
+#define _ICL_PHY_MISC_A		0x64C00
+#define _ICL_PHY_MISC_B		0x64C04
+#define _DG2_PHY_MISC_TC1	0x64C14 /* TC1="PHY E" but offset as if "PHY F" */
+#define ICL_PHY_MISC(port)	_MMIO_PORT(port, _ICL_PHY_MISC_A, _ICL_PHY_MISC_B)
+#define  ICL_PHY_MISC_DE_IO_COMP_PWR_DOWN	(1 << 23)
+#define _ICL_PORT_COMP				0x100
+#define _ICL_PORT_COMP_DW(dw, phy)		(_ICL_COMBOPHY(phy) + \
+						 _ICL_PORT_COMP + 4 * (dw))
+
+#define ICL_PORT_COMP_DW0(phy)			_MMIO(_ICL_PORT_COMP_DW(0, phy))
+#define   COMP_INIT				REG_BIT(31)
+
+#define ICL_PORT_COMP_DW1(phy)			_MMIO(_ICL_PORT_COMP_DW(1, phy))
+#define ICL_PORT_COMP_DW9(phy)			_MMIO(_ICL_PORT_COMP_DW(9, phy))
+
+#define ICL_PORT_COMP_DW10(phy)			_MMIO(_ICL_PORT_COMP_DW(10, phy))
+
+#define for_each_dbuf_slice(__dev_priv, __slice) \
+	for ((__slice) = static_cast<enum dbuf_slice>(DBUF_S1); \
+		 static_cast<int>(__slice) < static_cast<int>(I915_MAX_DBUF_SLICES); \
+		 (__slice) = static_cast<enum dbuf_slice>(static_cast<int>(__slice) + 1)) \
+		for_each_if(DISPLAY_INFO(__dev_priv)->dbuf.slice_mask & BIT(__slice))
+
+#define for_each_dbuf_slice_in_mask(__dev_priv, __slice, __mask) \
+	for_each_dbuf_slice((__dev_priv), (__slice)) \
+		for_each_if((__mask) & BIT(__slice))
+
+#define _DBUF_CTL_S0					0x45008
+#define _DBUF_CTL_S1					0x44FE8
+#define _DBUF_CTL_S2					0x44300
+#define _DBUF_CTL_S3					0x44304
+#define DBUF_CTL_S(slice)				_MMIO(_PICK(slice, \
+									_DBUF_CTL_S0, \
+									_DBUF_CTL_S1, \
+									_DBUF_CTL_S2, \
+									_DBUF_CTL_S3))
+
+#define  DBUF_POWER_REQUEST				REG_BIT(31)
+#define  DBUF_POWER_STATE				REG_BIT(30)
+#define  DBUF_TRACKER_STATE_SERVICE_MASK		REG_GENMASK(23, 19)
+#define  DBUF_TRACKER_STATE_SERVICE(x)			REG_FIELD_PREP(DBUF_TRACKER_STATE_SERVICE_MASK, x)
+#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+static inline unsigned int find_next_bit(const unsigned long *addr,
+										  unsigned int size,
+										  unsigned int offset)
+{
+	if (offset >= size)
+		return size;
+
+	for (unsigned int i = offset; i < size; i++) {
+		if (addr[BIT_WORD(i)] & (1UL << (i % BITS_PER_LONG)))
+			return i;
+	}
+	return size;
+}
+
+#define for_each_set_bit(bit, addr, size) \
+	for ((bit) = 0; \
+		 (bit) = static_cast<unsigned int>(find_next_bit((addr), \
+				  static_cast<unsigned int>(size), \
+				  static_cast<unsigned int>(bit))), \
+		 (bit) < (size); \
+		 (bit)++)
+
+#define _PICK_EVEN_2RANGES(__index, __c_index, __a, __b, __c, __d)		\
+	 ((__index) < (__c_index) ? _PICK_EVEN(__index, __a, __b) :		\
+				   _PICK_EVEN((__index) - (__c_index), __c, __d))
+
+
+#define _MBUS_ABOX0_CTL			0x45038
+#define _MBUS_ABOX1_CTL			0x45048
+#define _MBUS_ABOX2_CTL			0x4504C
+#define MBUS_ABOX_CTL(x)							\
+	_MMIO(_PICK_EVEN_2RANGES(x, 2,						\
+				 _MBUS_ABOX0_CTL, _MBUS_ABOX1_CTL,		\
+				 _MBUS_ABOX2_CTL, _MBUS_ABOX2_CTL))
+
+#define MBUS_ABOX_BW_CREDIT_MASK	(3 << 20)
+#define MBUS_ABOX_BW_CREDIT(x)		((x) << 20)
+#define MBUS_ABOX_B_CREDIT_MASK		(0xF << 16)
+#define MBUS_ABOX_B_CREDIT(x)		((x) << 16)
+#define MBUS_ABOX_BT_CREDIT_POOL2_MASK	(0x1F << 8)
+#define MBUS_ABOX_BT_CREDIT_POOL2(x)	((x) << 8)
+#define MBUS_ABOX_BT_CREDIT_POOL1_MASK	(0x1F << 0)
+#define MBUS_ABOX_BT_CREDIT_POOL1(x)	((x) << 0)
+
+
+#define _BW_BUDDY0_CTL			0x45130
+#define _BW_BUDDY1_CTL			0x45140
+#define BW_BUDDY_CTL(x)			_MMIO(_PICK_EVEN(x, \
+							 _BW_BUDDY0_CTL, \
+							 _BW_BUDDY1_CTL))
+#define   BW_BUDDY_DISABLE		REG_BIT(31)
+#define   BW_BUDDY_TLB_REQ_TIMER_MASK	REG_GENMASK(21, 16)
+#define   BW_BUDDY_TLB_REQ_TIMER(x)	REG_FIELD_PREP(BW_BUDDY_TLB_REQ_TIMER_MASK, x)
+
+#define _BW_BUDDY0_PAGE_MASK		0x45134
+#define _BW_BUDDY1_PAGE_MASK		0x45144
+#define BW_BUDDY_PAGE_MASK(x)		_MMIO(_PICK_EVEN(x, \
+							 _BW_BUDDY0_PAGE_MASK, \
+							 _BW_BUDDY1_PAGE_MASK))
+#define   ICL_PCODE_MEM_SUBSYSYSTEM_INFO	0xd
+#define     ICL_PCODE_MEM_SS_READ_GLOBAL_INFO	(0x0 << 8)
+
+struct buddy_page_mask {
+	u32 page_mask;
+	u8 type;
+	u8 num_channels;
+};
+enum intel_dram_type {
+	INTEL_DRAM_UNKNOWN,
+	INTEL_DRAM_DDR2,
+	INTEL_DRAM_DDR3,
+	INTEL_DRAM_DDR4,
+	INTEL_DRAM_LPDDR3,
+	INTEL_DRAM_LPDDR4,
+	INTEL_DRAM_DDR5,
+	INTEL_DRAM_LPDDR5,
+	INTEL_DRAM_GDDR,
+	INTEL_DRAM_GDDR_ECC,
+	__INTEL_DRAM_TYPE_MAX,
+};
+
+struct dram_info {
+	enum intel_dram_type type;
+	unsigned int fsb_freq;
+	unsigned int mem_freq;
+	u8 num_channels;
+	u8 num_qgv_points;
+	u8 num_psf_gv_points;
+	bool ecc_impacting_de_bw; /* Only valid from Xe3p_LPD onward. */
+	bool symmetric_memory;
+	bool has_16gb_dimms;
+};
+
+static const struct buddy_page_mask tgl_buddy_page_masks[] = {
+	{ .num_channels = 1, .type = INTEL_DRAM_DDR4,   .page_mask = 0xF },
+	{ .num_channels = 1, .type = INTEL_DRAM_DDR5,	.page_mask = 0xF },
+	{ .num_channels = 2, .type = INTEL_DRAM_LPDDR4, .page_mask = 0x1C },
+	{ .num_channels = 2, .type = INTEL_DRAM_LPDDR5, .page_mask = 0x1C },
+	{ .num_channels = 2, .type = INTEL_DRAM_DDR4,   .page_mask = 0x1F },
+	{ .num_channels = 2, .type = INTEL_DRAM_DDR5,   .page_mask = 0x1E },
+	{ .num_channels = 4, .type = INTEL_DRAM_LPDDR4, .page_mask = 0x38 },
+	{ .num_channels = 4, .type = INTEL_DRAM_LPDDR5, .page_mask = 0x38 },
+	{}
+};
+
+static const struct buddy_page_mask wa_1409767108_buddy_page_masks[] = {
+	{ .num_channels = 1, .type = INTEL_DRAM_LPDDR4, .page_mask = 0x1 },
+	{ .num_channels = 1, .type = INTEL_DRAM_DDR4,   .page_mask = 0x1 },
+	{ .num_channels = 1, .type = INTEL_DRAM_DDR5,   .page_mask = 0x1 },
+	{ .num_channels = 1, .type = INTEL_DRAM_LPDDR5, .page_mask = 0x1 },
+	{ .num_channels = 2, .type = INTEL_DRAM_LPDDR4, .page_mask = 0x3 },
+	{ .num_channels = 2, .type = INTEL_DRAM_DDR4,   .page_mask = 0x3 },
+	{ .num_channels = 2, .type = INTEL_DRAM_DDR5,   .page_mask = 0x3 },
+	{ .num_channels = 2, .type = INTEL_DRAM_LPDDR5, .page_mask = 0x3 },
+	{}
+};
+
+# define DP_SET_ANSI_128B132B               (1 << 1)
+struct i915_irq_regs {
+	u32 imr;
+	u32 ier;
+	u32 iir;
+};
+#define DP_SUPPORTED_LINK_RATES		    0x010
+# define DP_MAX_SUPPORTED_RATES		     8
+static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 iir)
+{
+	return { static_cast<u32>(imr), static_cast<u32>(ier), static_cast<u32>(iir) };
+}
+
+#define I915_IRQ_REGS(_imr, _ier, _iir) \
+	make_i915_irq_regs((_imr), (_ier), (_iir))
+
+#define GEN8_DE_PIPE_IRQ_REGS(pipe) \
+	I915_IRQ_REGS(GEN8_DE_PIPE_IMR(pipe), \
+			  GEN8_DE_PIPE_IER(pipe), \
+			  GEN8_DE_PIPE_IIR(pipe))
+
+
+#define GEN8_DE_MISC_ISR _MMIO(0x44460)
+#define GEN8_DE_MISC_IMR _MMIO(0x44464)
+#define GEN8_DE_MISC_IIR _MMIO(0x44468)
+#define GEN8_DE_MISC_IER _MMIO(0x4446c)
+#define  XELPDP_RM_TIMEOUT		REG_BIT(29)
+#define  XELPDP_PMDEMAND_RSPTOUT_ERR	REG_BIT(27)
+#define  GEN8_DE_MISC_GSE		REG_BIT(27)
+#define  GEN8_DE_EDP_PSR		REG_BIT(19)
+#define  XELPDP_PMDEMAND_RSP		REG_BIT(3)
+#define  XE2LPD_DBUF_OVERLAP_DETECTED	REG_BIT(1)
+
+#define GEN8_DE_MISC_IRQ_REGS		I915_IRQ_REGS(GEN8_DE_MISC_IMR, \
+						  GEN8_DE_MISC_IER, \
+						  GEN8_DE_MISC_IIR)
+#define GEN11_DISPLAY_INT_CTL		_MMIO(0x44200)
+#define  GEN11_DISPLAY_IRQ_ENABLE	(1 << 31)
+#define  GEN11_AUDIO_CODEC_IRQ		(1 << 24)
+#define  GEN11_DE_PCH_IRQ		(1 << 23)
+#define  GEN11_DE_MISC_IRQ		(1 << 22)
+#define  GEN11_DE_HPD_IRQ		(1 << 21)
+#define  GEN11_DE_PORT_IRQ		(1 << 20)
+#define  GEN11_DE_PIPE_C		(1 << 18)
+#define  GEN11_DE_PIPE_B		(1 << 17)
+#define  GEN11_DE_PIPE_A		(1 << 16)
 
 
 
+#define _HPD_PIN_DDI(hpd_pin)	((hpd_pin) - HPD_PORT_A)
+#define _HPD_PIN_TC(hpd_pin)	((hpd_pin) - HPD_PORT_TC1)
+
+#define GEN11_DE_HPD_ISR		_MMIO(0x44470)
+#define GEN11_DE_HPD_IMR		_MMIO(0x44474)
+#define GEN11_DE_HPD_IIR		_MMIO(0x44478)
+#define GEN11_DE_HPD_IER		_MMIO(0x4447c)
+#define  GEN11_TC_HOTPLUG(hpd_pin)		REG_BIT(16 + _HPD_PIN_TC(hpd_pin))
+#define  GEN11_DE_TC_HOTPLUG_MASK		(GEN11_TC_HOTPLUG(HPD_PORT_TC6) | \
+					 GEN11_TC_HOTPLUG(HPD_PORT_TC5) | \
+					 GEN11_TC_HOTPLUG(HPD_PORT_TC4) | \
+					 GEN11_TC_HOTPLUG(HPD_PORT_TC3) | \
+					 GEN11_TC_HOTPLUG(HPD_PORT_TC2) | \
+					 GEN11_TC_HOTPLUG(HPD_PORT_TC1))
+#define  GEN11_TBT_HOTPLUG(hpd_pin)		REG_BIT(_HPD_PIN_TC(hpd_pin))
+#define  GEN11_DE_TBT_HOTPLUG_MASK		(GEN11_TBT_HOTPLUG(HPD_PORT_TC6) | \
+					 GEN11_TBT_HOTPLUG(HPD_PORT_TC5) | \
+					 GEN11_TBT_HOTPLUG(HPD_PORT_TC4) | \
+					 GEN11_TBT_HOTPLUG(HPD_PORT_TC3) | \
+					 GEN11_TBT_HOTPLUG(HPD_PORT_TC2) | \
+					 GEN11_TBT_HOTPLUG(HPD_PORT_TC1))
+#define GEN11_DE_HPD_IRQ_REGS		I915_IRQ_REGS(GEN11_DE_HPD_IMR, \
+						  GEN11_DE_HPD_IER, \
+						  GEN11_DE_HPD_IIR)
+
+#define for_each_pipe(__dev_priv, __p) \
+	for ((__p) = static_cast<enum pipe>(0); \
+		 static_cast<int>(__p) < static_cast<int>(I915_MAX_PIPES); \
+		 (__p) = static_cast<enum pipe>(static_cast<int>(__p) + 1)) \
+		for_each_if(DISPLAY_RUNTIME_INFO(__dev_priv)->pipe_mask & BIT(__p))
 
 
 

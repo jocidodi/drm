@@ -1785,3 +1785,16 @@ uint32_t NBlue::intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
 	writeReg32( reg, val);
 	return old;
 }
+
+uint32_t NBlue::intel_de_read(struct intel_display *display, uint32_t reg)
+{
+	return readReg32(reg);
+}
+void NBlue::intel_de_write(struct intel_display *display, uint32_t reg, uint32_t val)
+{
+	writeReg32( reg, val);
+}
+void NBlue::intel_de_posting_read(struct intel_display *display, uint32_t reg)
+{
+	readReg32(reg);
+}

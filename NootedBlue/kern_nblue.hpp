@@ -60,7 +60,9 @@ class NBlue {
 	UInt32 readReg32(unsigned long reg);
 	void writeReg32(unsigned long reg, UInt32 val);
 	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set);
-	
+	uint32_t intel_de_read(struct intel_display *display, uint32_t reg);
+	void intel_de_write(struct intel_display *display, uint32_t reg, uint32_t val);
+	void intel_de_posting_read(struct intel_display *display, uint32_t reg);
 	
 	static uint16_t configRead16(IORegistryEntry *service, uint32_t space, uint8_t offset);
 	static uint32_t configRead32(IORegistryEntry *service, uint32_t space, uint8_t offset);
