@@ -467,7 +467,7 @@ struct PACKED CRTCParams
 	uint32_t TRANS_VBLANK;
 	uint32_t TRANS_VSYNC;
 	uint32_t PIPESRC;
-	uint32_t TRANS_CONF;
+	uint32_t TRANSCONF;
 	uint32_t PIPE_MISC;
 	uint32_t PS_PS_WIN_POS;
 	uint32_t PS_PS_WIN_SZ;

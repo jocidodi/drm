@@ -202,12 +202,13 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
-			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			{"__ZN26AppleIntelDSBAccessManager13isDSBRegisterEj", dozero},
 			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPath",setupPlane2, this->osetupPlane2},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
+			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route dp symbols");
@@ -2243,8 +2244,7 @@ void Gen11::hwInitializeCState(void *that)
 		dmc_load_program(display, static_cast<intel_dmc_id>(i));
 	}
 	
-
-		
+	
 	
 	if (intel_display_wa(display, INTEL_DISPLAY_WA_14011508470))
 			NBlue::callback->intel_de_rmw( GEN11_CHICKEN_DCPR_2, 0,
@@ -2343,6 +2343,93 @@ intel_ddi_transcoder_func_reg_val_get()
 	return temp;
 }
 
+static u32 intel_ddi_set_dp_msa(bool wr)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	u32 temp;
+
+
+	temp = DP_MSA_MISC_SYNC_CLOCK;
+
+	switch (display->panel.vbt.edp.bpp) {
+	case 18:
+		temp |= DP_MSA_MISC_6_BPC;
+		break;
+	case 24:
+		temp |= DP_MSA_MISC_8_BPC;
+		break;
+	case 30:
+		temp |= DP_MSA_MISC_10_BPC;
+		break;
+	case 36:
+		temp |= DP_MSA_MISC_12_BPC;
+		break;
+	default:
+		break;
+	}
+
+
+	//if (display->limited_color_range)
+	//	temp |= DP_MSA_MISC_COLOR_CEA_RGB;
+
+
+	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+		temp |= DP_MSA_MISC_COLOR_YCBCR_444_BT709;
+
+
+	//if (intel_dp_needs_vsc_sdp(crtc_state, conn_state))
+	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
+	
+	if (wr)
+	NBlue::callback->intel_de_write(display, TRANS_MSA_MISC(display, cpu_transcoder),
+			   temp);
+	return temp;
+}
+
+static u32 bdw_set_pipe_misc()
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	u32 val = 0;
+
+	switch (display->panel.vbt.edp.bpp) {
+	case 18:
+		val |= PIPE_MISC_BPC_6;
+		break;
+	case 24:
+		val |= PIPE_MISC_BPC_8;
+		break;
+	case 30:
+		val |= PIPE_MISC_BPC_10;
+		break;
+	case 36:
+		if (DISPLAY_VER(display) >= 13)
+			val |= PIPE_MISC_BPC_12_ADLP;
+		break;
+	default:
+		break;
+	}
+
+	if (display->panel.vbt.lvds_dither)
+		val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
+
+	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
+		display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+		val |= PIPE_MISC_OUTPUT_COLORSPACE_YUV;
+
+	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
+		val |= DISPLAY_VER(display) >= 30 ? PIPE_MISC_YUV420_ENABLE :
+			PIPE_MISC_YUV420_ENABLE | PIPE_MISC_YUV420_MODE_FULL_BLEND;
+
+	//if (DISPLAY_VER(display) >= 11 && is_hdr_mode(crtc_state))
+		val |= PIPE_MISC_HDR_MODE_PRECISION;
+
+	if (DISPLAY_VER(display) >= 12)
+		val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
+
+	
+	return val;
+}
 
 void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 {
@@ -2351,56 +2438,18 @@ void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 		setpc=0;
 		
 		enum port port=display->port0;
-		u32 val=0;
-		switch (display->panel.vbt.edp.bpp) {
-			case 18:
-				val |= PIPE_MISC_BPC_6;
-				break;
-			default:
-			case 24:
-				val |= PIPE_MISC_BPC_8;
-				break;
-			case 30:
-				val |= PIPE_MISC_BPC_10;
-				break;
-			case 36:
-				if (DISPLAY_VER(display) >= 13)
-					val |= PIPE_MISC_BPC_12_ADLP;
-				break;
-		}
-		
-
-		if (display->panel.vbt.lvds_dither)
-			val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
-		
-		if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
-			display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
-			val |= PIPE_MISC_OUTPUT_COLORSPACE_YUV;
-
-		if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
-			val |= DISPLAY_VER(display) >= 30 ? PIPE_MISC_YUV420_ENABLE :
-				PIPE_MISC_YUV420_ENABLE | PIPE_MISC_YUV420_MODE_FULL_BLEND;
-		
-		//if (DISPLAY_VER(display) >= 11 && is_hdr_mode(crtc_state))
-		val |= PIPE_MISC_HDR_MODE_PRECISION;
-		
-		
-		if (DISPLAY_VER(display) >= 12)
-			val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
-		
-		
-		
 		
 		
 		//param_3->TRANS_CLK_SEL=0x10000000;
 		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(port);
-		param_3->TRANS_MSA_MISC = 0x21;
+		param_3->TRANS_MSA_MISC =intel_ddi_set_dp_msa(false);
+		//param_3->TRANS_MSA_MISC = 0x21;
 		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
 		param_3->TRANS_DDI_FUNC_CTL= intel_ddi_transcoder_func_reg_val_get();
 		//param_3->PIPE_MISC= 0x1800010;
-		param_3->PIPE_MISC= val;
+		param_3->PIPE_MISC=bdw_set_pipe_misc();
 		//i9xx_set_pipeconf
-		param_3->TRANS_CONF= 0xc0000024;
+		param_3->TRANSCONF= 0xc0000024;
 		
 		int fScanoutHeight=getMember<int>(param_2, kexticl ? 0x2fc : 0xfc);
 		int fLinkScanoutWidth=getMember<int>(param_2, kexticl ? 0x2f8 : 0xf8);
@@ -3716,6 +3765,70 @@ void intel_dp_stop_link_train(struct intel_dp *intel_dp)
 	}*/
 }
 
+static void icl_set_pipe_chicken()
+{
+	struct intel_display *display =&NBlue::callback->display_base;
+	enum pipe pipe = display->pipe0;
+	u32 tmp;
+
+	tmp = NBlue::callback->intel_de_read(display, PIPE_CHICKEN(pipe));
+
+	tmp |= PER_PIXEL_ALPHA_BYPASS_EN;
+
+	tmp |= PIXEL_ROUNDING_TRUNC_FB_PASSTHRU;
+
+	if (display->platform.dg2)
+		tmp &= ~UNDERRUN_RECOVERY_ENABLE_DG2;
+	else if ((DISPLAY_VER(display) >= 13) && (DISPLAY_VER(display) < 30))
+		tmp |= UNDERRUN_RECOVERY_DISABLE_ADLP;
+
+	if (intel_display_wa(display, INTEL_DISPLAY_WA_14010547955))
+		tmp |= DG2_RENDER_CCSTAG_4_3_EN;
+
+	NBlue::callback->intel_de_write(display, PIPE_CHICKEN(pipe), tmp);
+}
+
+static void
+intel_dp_init_source_oui(struct intel_dp *intel_dp)
+{
+	u8 oui[] = { 0x00, 0xaa, 0x01 };
+	u8 buf[3] = {};
+
+	Gen11::callback->readAUX(linkp,DP_SOURCE_OUI,buf, sizeof(buf));
+	
+	if (memcmp(oui, buf, sizeof(oui)) == 0) {
+		return;
+	}
+
+	Gen11::callback->writeAUX(linkp,DP_SOURCE_OUI,oui,sizeof(oui));
+}
+
+void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
+{
+	int ret, i;
+
+
+	if (mode != DP_SET_POWER_D0) {
+		//if (downstream_hpd_needs_d0(intel_dp))
+			//return;
+
+		Gen11::callback->writeAUX(linkp,DP_SET_POWER,&mode,1);
+
+	} else {
+
+		intel_dp_init_source_oui(intel_dp);
+
+		for (i = 0; i < 3; i++) {
+			ret=Gen11::callback->writeAUX(linkp,DP_SET_POWER,&mode,1);
+			if (ret == 0)
+				break;
+			IODelay(1);
+		}
+
+	}
+
+}
+
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
 	//return FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
@@ -3727,8 +3840,6 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	enum phy phy=display->phy0;
 	enum port port=display->port0;
 	struct intel_dp *intel_dp=&display->intel_dp0;
-	//hsw_get_pipe_config
-	
 	
 	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp->link_rate = port_clock;
@@ -3748,8 +3859,8 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
 	
+	icl_set_pipe_chicken();
 	
-	/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
@@ -3778,27 +3889,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 			 SPLITTER_ENABLE | SPLITTER_CONFIGURATION_MASK |
 			 OVERLAP_PIXELS_MASK, dss1);
 	
-	*/
 	
-	u8 oui[] = { 0x00, 0xaa, 0x01 };
-	u8 buf[3] = {};
+	intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
 	
-	readAUX(linkp,DP_SOURCE_OUI,buf,sizeof(buf));
-
-	if (memcmp(oui, buf, sizeof(oui)) == 0) {
-
-	}
-	else
-		writeAUX(linkp,DP_SOURCE_OUI,oui,sizeof(oui));
-	
-	u8 mode = DP_SET_POWER_D0;
-	for (int i = 0; i < 3; i++) {
-		int ret = writeAUX(linkp,DP_SET_POWER,&mode,1);
-		if (ret == 0)
-			break;
-		IODelay(1);
-	}
-
 	intel_dp_configure_protocol_converter(intel_dp);
 	
 	u32 dss_ctl2;
@@ -3810,21 +3903,19 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	}
 
 	
-
-	//intel_hpd_block
-	
 	intel_dp_prepare_link_train(intel_dp);
 	
 	bool ret=intel_dp_link_train_all_phys(intel_dp);
 	
 	intel_dp_stop_link_train(intel_dp);
 	
+	intel_ddi_set_dp_msa(true);
 	
 	return 0; // hack
 	
 	if (ret) return 0;
 	panic("x");
-	return -1;//FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
+	return -1;
 }
 
 

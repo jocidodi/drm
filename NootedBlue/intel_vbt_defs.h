@@ -6078,6 +6078,40 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 		 (__p) = static_cast<enum pipe>(static_cast<int>(__p) + 1)) \
 		for_each_if(DISPLAY_RUNTIME_INFO(__dev_priv)->pipe_mask & BIT(__p))
 
+#define _PIPEA_CHICKEN				0x70038
+#define _PIPEB_CHICKEN				0x71038
+#define _PIPEC_CHICKEN				0x72038
+#define PIPE_CHICKEN(pipe)			_MMIO_PIPE(pipe, _PIPEA_CHICKEN,\
+							   _PIPEB_CHICKEN)
+#define   UNDERRUN_RECOVERY_DISABLE_ADLP	REG_BIT(30)
+#define   UNDERRUN_RECOVERY_ENABLE_DG2		REG_BIT(30)
+#define   PIXEL_ROUNDING_TRUNC_FB_PASSTHRU	REG_BIT(15)
+#define   DG2_RENDER_CCSTAG_4_3_EN		REG_BIT(12)
+#define   PER_PIXEL_ALPHA_BYPASS_EN		REG_BIT(7)
+
+#define DPFC_RECOMP_CTL			_MMIO(0x320c)
+#define ILK_DPFC_RECOMP_CTL(fbc_id)	_MMIO_PIPE((fbc_id), 0x4320c, 0x4324c)
+#define   DPFC_RECOMP_STALL_EN			REG_BIT(27)
+#define   DPFC_RECOMP_STALL_WM_MASK		REG_GENMASK(26, 16)
+#define   DPFC_RECOMP_TIMER_COUNT_MASK		REG_GENMASK(5, 0)
+#define DPFC_STATUS			_MMIO(0x3210)
+#define ILK_DPFC_STATUS(fbc_id)		_MMIO_PIPE((fbc_id), 0x43210, 0x43250)
+#define   DPFC_INVAL_SEG_MASK			REG_GENMASK(26, 16)
+#define   DPFC_COMP_SEG_MASK			REG_GENMASK(10, 0)
+#define DPFC_STATUS2			_MMIO(0x3214)
+#define ILK_DPFC_STATUS2(fbc_id)	_MMIO_PIPE((fbc_id), 0x43214, 0x43254)
+#define   DPFC_COMP_SEG_MASK_IVB		REG_GENMASK(11, 0)
+#define DPFC_FENCE_YOFF			_MMIO(0x3218)
+#define ILK_DPFC_FENCE_YOFF(fbc_id)	_MMIO_PIPE((fbc_id), 0x43218, 0x43258)
+#define DPFC_CHICKEN			_MMIO(0x3224)
+#define FBC_DEBUG_STATUS(fbc_id)	_MMIO_PIPE((fbc_id), 0x43220, 0x43260)
+#define   FBC_UNDERRUN_DECMPR			REG_BIT(27)
+#define ILK_DPFC_CHICKEN(fbc_id)	_MMIO_PIPE((fbc_id), 0x43224, 0x43264)
+#define   DPFC_HT_MODIFY			REG_BIT(31) /* pre-ivb */
+#define   DPFC_NUKE_ON_ANY_MODIFICATION		REG_BIT(23) /* bdw+ */
+#define   DPFC_CHICKEN_COMP_DUMMY_PIXEL		REG_BIT(14) /* glk+ */
+#define   DPFC_CHICKEN_FORCE_SLB_INVALIDATION	REG_BIT(13) /* icl+ */
+#define   DPFC_DISABLE_DUMMY0			REG_BIT(8) /* ivb+ */
 
 
 
