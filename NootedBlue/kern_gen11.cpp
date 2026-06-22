@@ -3275,13 +3275,13 @@ int intel_de_wait_for_clear_us(struct intel_display *display, u32 reg,
 int intel_de_wait_for_set_ms(struct intel_display *display, u32 reg,
 				 u32 mask, unsigned int timeout_ms)
 {
-	return intel_de_wait_ms(display, reg, mask, mask, timeout_ms*1000);
+	return intel_de_wait_ms(display, reg, mask, mask, timeout_ms);
 }
 
 int intel_de_wait_for_clear_ms(struct intel_display *display, u32 reg,
 				   u32 mask, unsigned int timeout_ms)
 {
-	return intel_de_wait_ms(display, reg, mask, 0, timeout_ms*1000);
+	return intel_de_wait_ms(display, reg, mask, 0, timeout_ms);
 }
 
 static u32 intel_ddi_buf_status_reg(struct intel_display *display, enum port port)
@@ -3872,8 +3872,10 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
-	/*
 	
+	
+	
+	/*
 	
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
@@ -3891,7 +3893,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	ctl &= ~TRANS_DDI_FUNC_ENABLE;
 	NBlue::callback->writeReg32( TRANS_DDI_FUNC_CTL(display, display->cpu_transcoder),
 			   ctl);
-	
+	*/
 	icl_combo_phy_set_signal_levels(display);
 	
 	intel_combo_phy_power_up_lanes(display, phy, false,
@@ -3902,7 +3904,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	NBlue::callback->intel_de_rmw( ICL_PIPE_DSS_CTL1(display->pipe0),
 			 SPLITTER_ENABLE | SPLITTER_CONFIGURATION_MASK |
 			 OVERLAP_PIXELS_MASK, dss1);
-	*/
+	
 	
 	intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
 	
