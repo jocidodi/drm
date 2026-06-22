@@ -6213,7 +6213,7 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 #define   DP_VOLTAGE_0_4		REG_FIELD_PREP(DP_VOLTAGE_MASK, 0)
 #define   DP_PRE_EMPHASIS_MASK		REG_GENMASK(24, 22)
 #define   DP_PRE_EMPHASIS_0		REG_FIELD_PREP(DP_PRE_EMPHASIS_MASK, 0)
-
+#define USLEEP_RANGE_UPPER_BOUND	20000
 
 
 #ifdef __cplusplus

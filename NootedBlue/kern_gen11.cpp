@@ -1686,7 +1686,7 @@ static int snb_pcode_rw( u32 mbox,
 	NBlue::callback->writeReg32( GEN6_PCODE_DATA1, val1 ? *val1 : 0);
 	NBlue::callback->writeReg32( GEN6_PCODE_MAILBOX, GEN6_PCODE_READY | mbox);
 
-	u32 iVar2 = -500;
+	u32 iVar2 = -20;
 	u32 iVar4=0;
 	do {
 		if (iVar2 == 0) return -ETIMEDOUT;
@@ -1736,7 +1736,7 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 		if (++tries == 3)
 			break;
 
-		IODelay(1);
+		IOSleep(1);
 	}
 	IOSimpleLockFree(myLock);
 }
@@ -2992,6 +2992,16 @@ intel_dp_update_link_train(struct intel_dp *intel_dp,
 	return ret == 0;//NBlue::callback->display_base.panel.vbt.edp.lanes;
 }
 
+static inline void fsleep(unsigned long usecs)
+{
+	if (usecs <= 10)
+		IODelay(usecs);
+	else if (usecs < USLEEP_RANGE_UPPER_BOUND)
+		IOPause((uint64_t)usecs * NSEC_PER_USEC);
+	else
+		IOSleep((usecs + 999) / 1000);
+}
+
 static bool
 intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy)
 {
@@ -3015,7 +3025,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 
 	voltage_tries = 1;
 	for (cr_tries = 0; cr_tries < max_cr_tries; ++cr_tries) {
-		IODelay(delay_us >> 2);
+		fsleep(delay_us);
 		
 		
 		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
@@ -3106,7 +3116,7 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	}
 
 	for (tries = 0; tries < 5; tries++) {
-		IODelay(delay_us >> 2);
+		fsleep(delay_us);
 
 		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
 		
@@ -3219,19 +3229,18 @@ static void intel_ddi_init_dp_buf_reg(struct intel_dp *intel_dp)
 
 
 
-int intel_de_wait_ms(struct intel_display *display, UInt32 reg, UInt32 mask,u32 value,
-										UInt32 timeoutUs)
+int intel_de_wait_ms(struct intel_display *display, UInt32 reg, UInt32 mask, u32 value,
+					 UInt32 timeoutUs)
 {
 	AbsoluteTime deadline;
-	int waitMax = 1000, wait = 10;
+	int waitMax = 10000, wait = 2;
 	UInt32 regValue;
-	int ret=1;
-	bool isAtomic=false;
+	bool isAtomic = false;
 	
-	nanoseconds_to_absolutetime((uint64_t)timeoutUs * NSEC_PER_USEC, &deadline);
+	nanoseconds_to_absolutetime((uint64_t)timeoutUs * 1000ULL, &deadline);
 	deadline += mach_absolute_time();
 
-	if (timeoutUs <= 10) {
+	if (timeoutUs / 1000 <= 10) {
 		isAtomic = true;
 		wait = 1;
 	}
@@ -3249,37 +3258,24 @@ int intel_de_wait_ms(struct intel_display *display, UInt32 reg, UInt32 mask,u32 
 
 		if (isAtomic || wait < 1000)
 			IODelay(wait);
+		else if (wait < 1000000)
+			IOPause((uint64_t)wait * 1000ULL);
 		else
-			IOSleep(wait / 1000 + 1);
+			IOSleep(wait / 1000);
 
 		if (wait < waitMax)
 			wait <<= 1;
 	}
-
-
-	return ret;
-}
-
-int intel_de_wait_for_set_us(struct intel_display *display, u32 reg,
-				 u32 mask, unsigned int timeout_us)
-{
-	return intel_de_wait_ms(display, reg, mask, mask, timeout_us);
-}
-
-int intel_de_wait_for_clear_us(struct intel_display *display, u32 reg,
-				   u32 mask, unsigned int timeout_us)
-{
-	return intel_de_wait_ms(display, reg, mask, 0, timeout_us);
 }
 
 int intel_de_wait_for_set_ms(struct intel_display *display, u32 reg,
-				 u32 mask, unsigned int timeout_ms)
+							 u32 mask, unsigned int timeout_ms)
 {
 	return intel_de_wait_ms(display, reg, mask, mask, timeout_ms);
 }
 
 int intel_de_wait_for_clear_ms(struct intel_display *display, u32 reg,
-				   u32 mask, unsigned int timeout_ms)
+							   u32 mask, unsigned int timeout_ms)
 {
 	return intel_de_wait_ms(display, reg, mask, 0, timeout_ms);
 }
@@ -3835,7 +3831,7 @@ void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
 			ret=Gen11::callback->writeAUX(linkp,DP_SET_POWER,&mode,1);
 			if (ret == 0)
 				break;
-			IODelay(1);
+			IOSleep(1);
 		}
 
 	}
