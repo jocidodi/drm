@@ -985,7 +985,6 @@ bdw_get_pipe_misc_output_format()
 	}
 }
 
-
 void
 parse_lfp_backlight(struct intel_display *display,
 			struct intel_panel *panel)

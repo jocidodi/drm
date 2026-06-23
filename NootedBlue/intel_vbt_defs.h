@@ -6215,6 +6215,16 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 #define   DP_PRE_EMPHASIS_MASK		REG_GENMASK(24, 22)
 #define   DP_PRE_EMPHASIS_0		REG_FIELD_PREP(DP_PRE_EMPHASIS_MASK, 0)
 #define USLEEP_RANGE_UPPER_BOUND	20000
+#define DP_DPCD_REV                         0x000
+# define DP_DPCD_REV_10                     0x10
+# define DP_DPCD_REV_11                     0x11
+# define DP_DPCD_REV_12                     0x12
+# define DP_DPCD_REV_13                     0x13
+# define DP_DPCD_REV_14                     0x14
+
+
+
+
 
 
 #ifdef __cplusplus
