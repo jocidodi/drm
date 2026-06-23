@@ -4892,6 +4892,7 @@ struct intel_dp {
 	bool needs_modeset_retry;
 	bool use_max_params;
 	
+	struct AGDCDPPortConfig_t *para;
 	struct intel_psr psr;
 	
 	u8 dpcd[0xf];

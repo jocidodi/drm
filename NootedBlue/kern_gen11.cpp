@@ -2563,7 +2563,7 @@ int intel_ddi_level(struct intel_display *display,
 static void icl_ddi_combo_vswing_program(struct intel_display *display)
 {
 	const struct intel_ddi_buf_trans *trans;
-	enum phy phy = PHY_A;
+	enum phy phy = display->phy0;
 	int n_entries, ln;
 	u32 val;
 
@@ -2913,13 +2913,14 @@ intel_dp_get_adjust_train(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy,
 	return changed;
 }
 
-static bool intel_dp_adjust_request_changed(const u8 old_link_status[DP_LINK_STATUS_SIZE],
+static bool intel_dp_adjust_request_changed(struct intel_dp *intel_dp, const u8 old_link_status[DP_LINK_STATUS_SIZE],
 						const u8 new_link_status[DP_LINK_STATUS_SIZE])
 {
 	int lane;
 
 	for (lane = 0; lane < NBlue::callback->display_base.panel.vbt.edp.lanes; lane++) {
 		u8 old, new2;
+		u8 n1, n2;
 
 		/*if (intel_dp_is_uhbr(crtc_state)) {
 			old = drm_dp_get_adjust_tx_ffe_preset(old_link_status, lane);
@@ -2927,9 +2928,17 @@ static bool intel_dp_adjust_request_changed(const u8 old_link_status[DP_LINK_STA
 		} else {*/
 			old = drm_dp_get_adjust_request_voltage(old_link_status, lane) |
 				drm_dp_get_adjust_request_pre_emphasis(old_link_status, lane);
-			new2 = drm_dp_get_adjust_request_voltage(new_link_status, lane) |
-				drm_dp_get_adjust_request_pre_emphasis(new_link_status, lane);
+		
+		n1 = drm_dp_get_adjust_request_voltage(new_link_status, lane);
+		n2=	drm_dp_get_adjust_request_pre_emphasis(new_link_status, lane);
+		
+			new2 = n1 | n2;
 		//}
+		
+		if (intel_dp->para != nullptr) {
+			intel_dp->para->voltageSwing = (u8)n1;
+			intel_dp->para->preEmphasis = (u8)n2;
+		}
 
 		if (old != new2)
 			return true;
@@ -3074,6 +3083,9 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 	
 	delay_us = drm_dp_read_clock_recovery_delay(nullptr, intel_dp->dpcd, DP_PHY_DPRX,false);
 
+	if (intel_dp->para != nullptr) {
+		intel_dp->para->CR = (u16)delay_us;
+	}
 	
 	if (!intel_dp_reset_link_train( intel_dp,dp_phy,
 					   DP_TRAINING_PATTERN_1 |
@@ -3089,7 +3101,6 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 	voltage_tries = 1;
 	for (cr_tries = 0; cr_tries < max_cr_tries; ++cr_tries) {
 		fsleep(delay_us);
-		
 		
 		int r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
 		if (r < 0) {
@@ -3115,7 +3126,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 			return false;
 		}
 
-		if (!intel_dp_adjust_request_changed(  old_link_status, link_status))
+		if (!intel_dp_adjust_request_changed(intel_dp,  old_link_status, link_status))
 			++voltage_tries;
 		else
 			voltage_tries = 1;
@@ -3166,6 +3177,10 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	
 	
 	delay_us = drm_dp_read_channel_eq_delay(nullptr, intel_dp->dpcd, DP_PHY_DPRX,false);;
+	
+	if (intel_dp->para != nullptr) {
+		intel_dp->para->EQ = (u16)delay_us;
+	}
 
 	training_pattern = DP_TRAINING_PATTERN_2;
 
@@ -3221,15 +3236,22 @@ intel_dp_link_train_phy(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy)
 	bool ret = false;
 
 	if (!intel_dp_link_training_clock_recovery( intel_dp,dp_phy))
+	{
+		//if (intel_dp->para != nullptr) 	intel_dp->para->status = 3;
 		goto out;
-
+	}
 	if (!intel_dp_link_training_channel_equalization( intel_dp,dp_phy))
+	{
+		//if (intel_dp->para != nullptr) 	intel_dp->para->status = 5;
 		goto out;
+		
+	}
 
 	ret = true;
 
 out:
-
+	
+	
 	return ret;
 }
 
@@ -3746,10 +3768,6 @@ void intel_dp_compute_rate(struct intel_dp *intel_dp, int port_clock,
 {
 	struct intel_display *display = &NBlue::callback->display_base;
 
-	/* FIXME g4x can't generate an exact 2.7GHz with the 96MHz non-SSC refclk */
-	if (display->platform.g4x && port_clock == 268800)
-		port_clock = 270000;
-
 	/* eDP 1.4 rate select method. */
 	if (0/*intel_dp->use_rate_select*/) {
 		*link_bw = 0;
@@ -3778,7 +3796,7 @@ static void intel_dp_update_downspread_ctrl(struct intel_dp *intel_dp)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	intel_dp_link_training_set_mode(intel_dp,
-									display->port_clock, 0/*crtc_state->vrr.in_range*/);
+									display->port_clock, false/*crtc_state->vrr.in_range*/);
 }
 void intel_dp_link_training_set_bw(struct intel_dp *intel_dp,
 				   int link_bw, int rate_select, int lane_count,
@@ -3793,7 +3811,7 @@ void intel_dp_link_training_set_bw(struct intel_dp *intel_dp,
 		link_config[0]=link_bw;
 		link_config[1]=lane_count;
 		
-		Gen11::callback->readAUX(linkp,DP_LINK_BW_SET,link_config,
+		Gen11::callback->writeAUX(linkp,DP_LINK_BW_SET,link_config,
 								 ARRAY_SIZE(link_config));
 
 	} else {
@@ -4071,6 +4089,27 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_dp->link_rate = port_clock;
 	intel_dp->lane_count = lane_count;
 	intel_dp->output_reg = DDI_BUF_CTL(port);
+	
+	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
+	if (intel_dp->para != nullptr) {
+		intel_dp->para->status = 0;
+		intel_dp->para->field1 = 0x200;
+		intel_dp->para->field2 = 0;
+		intel_dp->para->enableMST = (u8)getMember<u8>(that, 0x117);
+		intel_dp->para->BitRate = (u8)getMember<u8>(that, 0x128);
+		intel_dp->para->NumberOfLanes = (u8)lane_count;
+		intel_dp->para->EnhancedFraming = (u8)getMember<u8>(that, 0x11a);;
+		intel_dp->para->ASR = 0;//(u8)getMember<u8>(that, 0x118);
+		intel_dp->para->Downspread = (u8)getMember<u8>(that, 0x119);
+		intel_dp->para->voltageSwing = (u8)0;
+		intel_dp->para->preEmphasis = (u8)0;
+		intel_dp->para->BitRate2 = intel_dp->para->BitRate;
+		intel_dp->para->NumberOfLanes2 = (u8)lane_count;
+		intel_dp->para->CR =0;
+		intel_dp->para->EQ =0;
+		intel_dp->para->voltageSwing = 0;
+		intel_dp->para->preEmphasis = 0;
+	}
 	
 	icl_set_pipe_chicken();//???
 	
