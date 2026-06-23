@@ -5105,6 +5105,7 @@ struct intel_display {
 
 	struct {
 		u32 mmio_base;
+		IOSimpleLock *mutex;
 	} pps;
 	
 	struct {

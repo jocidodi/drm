@@ -73,8 +73,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController23initPlatformWorkaroundsEv",initPlatformWorkarounds, this->oinitPlatformWorkarounds},
 			{"__ZN31AppleIntelFramebufferController16getOSInformationEv",getOSInformation2, this->ogetOSInformation2},
 			{"__ZN31AppleIntelFramebufferController19getTranscoderOffsetEP14AppleIntelPortj",getTranscoderOffset, this->ogetTranscoderOffset},
-			{"__ZN31AppleIntelFramebufferController14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
-			{"__ZN31AppleIntelFramebufferController15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
+			//{"__ZN31AppleIntelFramebufferController14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
+			//{"__ZN31AppleIntelFramebufferController15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
 			{"__ZN31AppleIntelFramebufferController13FBMemMgr_InitEv", FBMemMgr_Init,this->oFBMemMgr_Init},
@@ -198,16 +198,18 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		RouteRequestPlus requests[] = {
 			{"__ZN16AppleIntelScaler4initE10IGScalerID", AppleIntelScalerinit,this->oAppleIntelScalerinit},
 			{"__ZN15AppleIntelPlane4initE9IGPlaneID", AppleIntelPlaneinit,this->oAppleIntelPlaneinit},
-			{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
-			{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
+			//{"__ZN31AppleIntelRegisterAccessManager14ReadRegister32Em",raReadRegister32, this->oraReadRegister32},
+			//{"__ZN31AppleIntelRegisterAccessManager15WriteRegister32Emj",raWriteRegister32, this->oraWriteRegister32},
 			{"__ZN21AppleIntelFramebuffer25setAttributeForConnectionEijm",wrapSetAttributeForConnection, this->owrapSetAttributeForConnection},
 			{"__ZN21AppleIntelFramebuffer25getAttributeForConnectionEijPm",getAttributeForConnection, this->ogetAttributeForConnection},
 			{"__ZN26AppleIntelDSBAccessManager13isDSBRegisterEj", dozero},
+			{"__ZN31AppleIntelRegisterAccessManager18isConflictRegisterEj", isConflictRegister},
 			{"__ZN15AppleIntelPlane10setupPlaneEP21AppleIntelDisplayPath",setupPlane2, this->osetupPlane2},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			
 			
 			
 		};
@@ -647,7 +649,8 @@ void Gen11::FBMemMgr_Init(void *that)
 	
 	FunctionCast(FBMemMgr_Init, callback->oFBMemMgr_Init)(that);
 	ccont2=that;
-	
+	callback->rmmioPtr=(getMember<volatile UInt32 *>(that, kexticl ? 0x9b8 : 0x9b0));
+	callback->rmmioLen = getMember<uint32_t>(that, 0xC78);
 	if (kexticl) ccont=that;
 	else
 	ccont = getMember<void *>(that, 0xc40);
@@ -3469,11 +3472,25 @@ static void intel_dp_enable_port(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
 	intel_dp_program_link_training_pattern(intel_dp,
-						   DP_PHY_DPRX, DP_TRAINING_PATTERN_1);
-
+										   DP_PHY_DPRX, DP_TRAINING_PATTERN_1);
+	
 	intel_dp->DP |= DP_PORT_EN;
 	NBlue::callback->writeReg32( intel_dp->output_reg, intel_dp->DP);
-	NBlue::callback->readReg32( intel_dp->output_reg);
+	//NBlue::callback->readReg32( intel_dp->output_reg);
+	
+	int iVar6 = 100;
+	do {
+		int cVar2 = NBlue::callback->readReg32( intel_dp->output_reg);
+	  if (-1 < cVar2) {
+		  iVar6=1;
+		  break;
+	  }
+	  IODelay(5);
+	  iVar6 = iVar6 + -1;
+	} while (iVar6 != 0);
+	
+	//if (!iVar6) panic("X");
+	
 }
 
 static int
@@ -3859,6 +3876,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_ddi_init_dp_buf_reg(intel_dp);
 	
+	//with_intel_pps_lock(intel_dp) {
 	intel_dp_enable_port(intel_dp);
 	
 	if (!kexticl) enableVDDForAux(ccont2,that);
@@ -3871,7 +3889,6 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	
 	
-	/*
 	
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
@@ -3889,7 +3906,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	ctl &= ~TRANS_DDI_FUNC_ENABLE;
 	NBlue::callback->writeReg32( TRANS_DDI_FUNC_CTL(display, display->cpu_transcoder),
 			   ctl);
-	*/
+	
 	icl_combo_phy_set_signal_levels(display);
 	
 	intel_combo_phy_power_up_lanes(display, phy, false,
@@ -3955,4 +3972,9 @@ int Gen11::readAUX(void *that,uint param_1,void *param_2,uint param_3)
 {
 	auto ret=FunctionCast(readAUX, callback->oreadAUX)(that ,param_1,param_2,param_3);
 	return ret;
+}
+
+int Gen11::isConflictRegister(void *that,uint param_1)
+{
+	return -1;
 }

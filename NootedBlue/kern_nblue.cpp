@@ -97,7 +97,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		this->iGPU->setProperty("hda-gfx", const_cast<char *>("onboard-1"), 10);
 		this->iGPU->setProperty("model", const_cast<char *>("Intel Iris Xe Graphics"), 23);
 			
-
+		nlock=IOSimpleLockAlloc();
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
 
@@ -118,7 +118,7 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 	PANIC_COND(!patcher.routeMultipleLong(KernelPatcher::KernelID, &request, 1), "DriverInjector",
 			   "Failed to route addDrivers");
 	
-
+	
 	
 }
 
@@ -250,9 +250,9 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 
 void NBlue::setRMMIOIfNecessary() {
 	if (UNLIKELY(!this->rmmio || !this->rmmio->getLength())) {
-		this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
+		/*this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
 		this->rmmioPtr = reinterpret_cast<volatile uint32_t *>(this->rmmio->getVirtualAddress());
-		this->rmmioLen=this->rmmio->getLength();
+		this->rmmioLen=this->rmmio->getLength();*/
 	}
 }
 
@@ -1737,6 +1737,7 @@ int NBlue::intel_opregion_setup()
 				intel_display_device_probe(display);
 
 				display->pps.mmio_base = PCH_PPS_BASE;
+				display->pps.mutex=IOSimpleLockAlloc();
 				display->panel.pps.mmio_base = PCH_PPS_BASE;
 				display->vbt.version = bdb->version;
 				display->bdb=bdb;
@@ -1758,23 +1759,50 @@ void NBlue::parse_backlight()
 }
 
 UInt32 NBlue::readReg32(unsigned long reg) {
-	if (Gen11::callback)
-	return Gen11::callback->raReadRegister32(nullptr,reg);
+	
+	//IOSimpleLockLock(nlock);
+	
+	if (Gen11::callback) {
+		//auto ret= Gen11::callback->raReadRegister32(nullptr,reg);
+		//IOSimpleLockUnlock(nlock);
+		//return ret;
+		if (rmmioPtr==nullptr) {
+			rmmioPtr= Gen11::callback->rmmioPtr;
+			rmmioLen= Gen11::callback->rmmioLen;
+		}
+	}
 	
 	if (reg < rmmioLen-4) {
-		return this->rmmioPtr[reg];
+		//auto ret=  rmmioPtr[reg];
+		auto ret= *(uint *)((long)rmmioPtr + reg);
+		//IOSimpleLockUnlock(nlock);
+		return ret;
 	} else {
-		return 0;
+		auto ret=  0;
+		//IOSimpleLockUnlock(nlock);
+		return ret;
 	}
 }
 
 void NBlue::writeReg32(unsigned long reg, UInt32 val) {
-	if (Gen11::callback)
-	return Gen11::callback->raWriteRegister32(nullptr,reg,val);
+	
+	//IOSimpleLockLock(nlock);
+	
+	if (Gen11::callback) {
+		//Gen11::callback->raWriteRegister32(nullptr,reg,val);
+		//IOSimpleLockUnlock(nlock);
+		//return ;
+		if (rmmioPtr==nullptr) {
+			rmmioPtr= Gen11::callback->rmmioPtr;
+			rmmioLen= Gen11::callback->rmmioLen;
+		}
+	}
 	
 	if (reg < rmmioLen-4) {
-		this->rmmioPtr[reg] = val;
+		//rmmioPtr[reg] = val;
+		*(uint *)((long)rmmioPtr + reg) = val;
 	}
+	//IOSimpleLockUnlock(nlock);
 }
 
 uint32_t NBlue::intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)

@@ -635,6 +635,8 @@ public:
 	static uint64_t disableVDDForAux2(void *that,void *param_1);
 	mach_vm_address_t odisableVDDForAux2 {};
 	
+	static int isConflictRegister(void *that,uint param_1);
+	
 	
 	
 public:
@@ -646,6 +648,8 @@ public:
 	static bool dotrue();
 	static bool dofalse();
 	static int dozero();
+	volatile UInt32 *rmmioPtr {nullptr};
+	uint32_t rmmioLen;
 	
 };
 

@@ -55,6 +55,8 @@ class NBlue {
     bool processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
 	void setRMMIOIfNecessary();
 	
+	IOSimpleLock *nlock;
+	
 	void parse_backlight();
 	int intel_opregion_setup();
 	UInt32 readReg32(unsigned long reg);
