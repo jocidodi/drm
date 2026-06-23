@@ -476,7 +476,7 @@ void  Gen11::initPlatformWorkarounds(void *that)
 	{
 		//PlatformWorkarounds
 		getMember<volatile uint32_t>(that, 0xc1c)=
-	 /*FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE|*/
+	 /*FB_FLAG_ENABLE_SLICE_FEATURES|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_LIMIT_4K_SOURCE_SIZE|
 		/*FB_FLAG_DISABLE_FEATURE_IPS|FB_FLAG_ALTERNATE_PWM_INCREMENT2|
 		FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_DISABLE_HIGH_BITRATE_MODE2|*/
 		/*FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|*/FB_FLAG_AVOID_FAST_LINK_TRAINING;
@@ -490,7 +490,7 @@ void  Gen11::initPlatformWorkarounds(void *that)
 		//PlatformWorkarounds
 		getMember<volatile uint32_t>(that, 0xc5c)=
 		/*FB_FLAG_ALTERNATE_PWM_INCREMENT1|FB_FLAG_ENABLE_SLICE_FEATURES|*/
-		/*FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|*/FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|FB_FLAG_LIMIT_4K_SOURCE_SIZE*/;
+		/*FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED|*/FB_FLAG_AVOID_FAST_LINK_TRAINING/*| FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/|FB_FLAG_LIMIT_4K_SOURCE_SIZE;
 		
 		//ig boot flags
 		getMember<volatile uint32_t>(that, 0xc58)=/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT;
@@ -743,7 +743,7 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 
 void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 {
-	
+	struct intel_display *display=&NBlue::callback->display_base;
 	if (bk==2){
 		NBlue::callback->parse_backlight();
 		bk=1;
@@ -792,7 +792,7 @@ void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 				   REG_FIELD_PREP(PANEL_POWER_CYCLE_DELAY_MASK,
 						  DIV_ROUND_UP(p.power_cycle, 1000) + 1));
 	else
-		NBlue::callback->intel_de_rmw( regs.pp_ctrl, BXT_POWER_CYCLE_DELAY_MASK,
+		NBlue::callback->intel_de_rmw(display, regs.pp_ctrl, BXT_POWER_CYCLE_DELAY_MASK,
 				 REG_FIELD_PREP(BXT_POWER_CYCLE_DELAY_MASK,
 						DIV_ROUND_UP(p.power_cycle, 1000) + 1));
 	
@@ -1707,27 +1707,38 @@ static int snb_pcode_rw( u32 mbox,
 
 }
 
+int snb_pcode_read( u32 mbox, u32 *val, u32 *val1)
+{
+	int err;
+
+	IOSimpleLock *myLock;
+	myLock = IOSimpleLockAlloc();
+		IOSimpleLockLock(myLock);
+		err = snb_pcode_rw( mbox, val, val1, 500, 20, true);
+		IOSimpleLockUnlock(myLock);
+
+	IOSimpleLockFree(myLock);
+
+	return err;
+}
+
 static void
 tgl_tc_cold_request(struct intel_display *display, bool block)
 {
 	u8 tries = 0;
 	int ret;
 	
-	IOSimpleLock *myLock;
-	myLock = IOSimpleLockAlloc();
-
 	while (1) {
 		u32 low_val;
 		u32 high_val = 0;
-
+		
 		if (block)
 			low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_BLOCK_REQ;
 		else
 			low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_UNBLOCK_REQ;
-
-		IOSimpleLockLock(myLock);
-		ret = snb_pcode_rw( TGL_PCODE_TCCOLD, &low_val, &high_val, 500, 20, true);
-		IOSimpleLockUnlock(myLock);
+		
+		snb_pcode_read( TGL_PCODE_TCCOLD, &low_val, &high_val);
+		
 		if (ret == 0) {
 			if (block &&
 				(low_val & TGL_PCODE_EXIT_TCCOLD_DATA_L_EXIT_FAILED))
@@ -1735,13 +1746,13 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 			else
 				break;
 		}
-
+		
 		if (++tries == 3)
 			break;
-
+		
 		IOSleep(1);
 	}
-	IOSimpleLockFree(myLock);
+	
 }
 
 
@@ -1765,7 +1776,7 @@ static void intel_pch_reset_handshake(struct intel_display *display,
 	//if (DISPLAY_VER(display) >= 14)
 	//	reset_bits |= MTL_RESET_PICA_HANDSHAKE_EN;
 
-	NBlue::callback->intel_de_rmw( reg, reset_bits, enable ? reset_bits : 0);
+	NBlue::callback->intel_de_rmw(display, reg, reset_bits, enable ? reset_bits : 0);
 }
 
 
@@ -1894,7 +1905,7 @@ static void icl_set_procmon_ref_values(struct intel_display *display,
 
 	procmon = icl_get_procmon_ref_values(display, phy);
 
-	NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW1(phy),
+	NBlue::callback->intel_de_rmw(display, ICL_PORT_COMP_DW1(phy),
 			 (0xff << 16) | 0xff, procmon->dw1);
 
 	NBlue::callback->intel_de_write(display, ICL_PORT_COMP_DW9(phy), procmon->dw9);
@@ -1938,11 +1949,11 @@ skip_phy_misc:
 		icl_set_procmon_ref_values(display, phy);
 
 		if (phy_is_master(display, phy))
-			NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW8(phy),
+			NBlue::callback->intel_de_rmw(display, ICL_PORT_COMP_DW8(phy),
 					 0, IREFGEN);
 
-		NBlue::callback->intel_de_rmw( ICL_PORT_COMP_DW0(phy), 0, COMP_INIT);
-		NBlue::callback->intel_de_rmw( ICL_PORT_CL_DW5(phy),
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_COMP_DW0(phy), 0, COMP_INIT);
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_CL_DW5(phy),
 				 0, CL_POWER_DOWN_ENABLE);
 	}
 }
@@ -1954,7 +1965,7 @@ static void gen12_dbuf_slices_config(struct intel_display *display)
 	enum dbuf_slice slice;
 
 	for_each_dbuf_slice(display, slice)
-	NBlue::callback->intel_de_rmw( DBUF_CTL_S(slice),
+	NBlue::callback->intel_de_rmw(display, DBUF_CTL_S(slice),
 				 DBUF_TRACKER_STATE_SERVICE_MASK,
 				 DBUF_TRACKER_STATE_SERVICE(8));
 }
@@ -1964,7 +1975,7 @@ static void gen9_dbuf_slice_set(struct intel_display *display,
 	u32 reg = DBUF_CTL_S(slice);
 	bool state;
 	
-	NBlue::callback->intel_de_rmw( reg, DBUF_POWER_REQUEST,
+	NBlue::callback->intel_de_rmw(display, reg, DBUF_POWER_REQUEST,
 								  enable ? DBUF_POWER_REQUEST : 0);
 	NBlue::callback->intel_de_posting_read(display, reg);
 	//udelay(10);
@@ -2031,23 +2042,10 @@ static void icl_mbus_init(struct intel_display *display)
 		abox_regs |= BIT(0);
 
 	for_each_set_bit(i, &abox_regs, BITS_PER_TYPE(abox_regs))
-	NBlue::callback->intel_de_rmw( MBUS_ABOX_CTL(i), mask, val);
+	NBlue::callback->intel_de_rmw(display, MBUS_ABOX_CTL(i), mask, val);
 }
 
-int snb_pcode_read( u32 mbox, u32 *val, u32 *val1)
-{
-	int err;
 
-	IOSimpleLock *myLock;
-	myLock = IOSimpleLockAlloc();
-		IOSimpleLockLock(myLock);
-		err = snb_pcode_rw( mbox, val, val1, 500, 20, true);
-		IOSimpleLockUnlock(myLock);
-
-	IOSimpleLockFree(myLock);
-
-	return err;
-}
 static int icl_pcode_read_mem_global_info(struct intel_display *display,
 					  struct dram_info *dram_info)
 {
@@ -2149,7 +2147,7 @@ static void tgl_bw_buddy_init(struct intel_display *display)
 
 			/* Wa_22010178259:tgl,dg1,rkl,adl-s */
 			if (intel_display_wa(display, INTEL_DISPLAY_WA_22010178259))
-				NBlue::callback->intel_de_rmw( BW_BUDDY_CTL(i),
+				NBlue::callback->intel_de_rmw(display, BW_BUDDY_CTL(i),
 						 BW_BUDDY_TLB_REQ_TIMER_MASK,
 						 BW_BUDDY_TLB_REQ_TIMER(0x8));
 		}
@@ -2170,11 +2168,11 @@ void Gen11::hwInitializeCState(void *that)
 		tgl_tc_cold_request(&NBlue::callback->display_base,false);
 
 	if (intel_display_wa(display, INTEL_DISPLAY_WA_14011294188))
-		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D, 0,
+		NBlue::callback->intel_de_rmw(display, SOUTH_DSPCLK_GATE_D, 0,
 				 PCH_DPMGUNIT_CLOCK_GATE_DISABLE);
 	
 	if (DISPLAY_VER(display)== 12){
-		NBlue::callback->intel_de_rmw( CLKREQ_POLICY, CLKREQ_POLICY_MEM_UP_OVRD, 0);
+		NBlue::callback->intel_de_rmw(display, CLKREQ_POLICY, CLKREQ_POLICY_MEM_UP_OVRD, 0);
 	}
 	
 	intel_pch_reset_handshake(display, !HAS_PCH_NOP(display));
@@ -2250,15 +2248,15 @@ void Gen11::hwInitializeCState(void *that)
 	
 	
 	if (intel_display_wa(display, INTEL_DISPLAY_WA_14011508470))
-			NBlue::callback->intel_de_rmw( GEN11_CHICKEN_DCPR_2, 0,
+			NBlue::callback->intel_de_rmw(display, GEN11_CHICKEN_DCPR_2, 0,
 					 DCPR_CLEAR_MEMSTAT_DIS | DCPR_SEND_RESP_IMM |
 					 DCPR_MASK_LPMODE | DCPR_MASK_MAXLATENCY_MEMUP_CLR);
 	
-	NBlue::callback->intel_de_rmw( DC_STATE_DEBUG, 0,
+	NBlue::callback->intel_de_rmw(display, DC_STATE_DEBUG, 0,
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
 	NBlue::callback->readReg32(DC_STATE_DEBUG);
 	
-	NBlue::callback->intel_de_rmw( PIPEDMC_CONTROL(PIPE_A), 0, PIPEDMC_ENABLE);
+	NBlue::callback->intel_de_rmw(display, PIPEDMC_CONTROL(PIPE_A), 0, PIPEDMC_ENABLE);
 
 	hwConfigureCustomAUX(that, true);
 	
@@ -2577,7 +2575,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 
 		val = EDP4K2K_MODE_OVRD_EN | EDP4K2K_MODE_OVRD_OPTIMIZED;
 		intel_dp->hobl_active = is_hobl_buf_trans(trans);
-		NBlue::callback->intel_de_rmw( ICL_PORT_CL_DW10(phy), val,
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_CL_DW10(phy), val,
 				 intel_dp->hobl_active ? val : 0);
 	}*/
 
@@ -2595,7 +2593,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 	for (ln = 0; ln < 4; ln++) {
 		int level = intel_ddi_level(display, ln);
 
-		NBlue::callback->intel_de_rmw( ICL_PORT_TX_DW2_LN(ln, phy),
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_TX_DW2_LN(ln, phy),
 				 SWING_SEL_UPPER_MASK | SWING_SEL_LOWER_MASK | RCOMP_SCALAR_MASK,
 				 SWING_SEL_UPPER(trans->entries[level].icl.dw2_swing_sel) |
 				 SWING_SEL_LOWER(trans->entries[level].icl.dw2_swing_sel) |
@@ -2606,7 +2604,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 	for (ln = 0; ln < 4; ln++) {
 		int level = intel_ddi_level(display, ln);
 
-		NBlue::callback->intel_de_rmw( ICL_PORT_TX_DW4_LN(ln, phy),
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_TX_DW4_LN(ln, phy),
 				 POST_CURSOR_1_MASK | POST_CURSOR_2_MASK | CURSOR_COEFF_MASK,
 				 POST_CURSOR_1(trans->entries[level].icl.dw4_post_cursor_1) |
 				 POST_CURSOR_2(trans->entries[level].icl.dw4_post_cursor_2) |
@@ -2616,7 +2614,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 	for (ln = 0; ln < 4; ln++) {
 		int level = intel_ddi_level(display, ln);
 
-		NBlue::callback->intel_de_rmw( ICL_PORT_TX_DW7_LN(ln, phy),
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_TX_DW7_LN(ln, phy),
 				 N_SCALAR_MASK,
 				 N_SCALAR(trans->entries[level].icl.dw7_n_scalar));
 	}
@@ -2639,12 +2637,12 @@ static void icl_combo_phy_set_signal_levels(struct intel_display *display)
 
 
 	for (ln = 0; ln < 4; ln++) {
-		NBlue::callback->intel_de_rmw( ICL_PORT_TX_DW4_LN(ln, phy),
+		NBlue::callback->intel_de_rmw(display, ICL_PORT_TX_DW4_LN(ln, phy),
 				 LOADGEN_SELECT,
 				 icl_combo_phy_loadgen_select(ln));
 	}
 
-	NBlue::callback->intel_de_rmw( ICL_PORT_CL_DW5(phy),
+	NBlue::callback->intel_de_rmw(display, ICL_PORT_CL_DW5(phy),
 			 0, SUS_CLOCK_CONFIG);
 
 	val = NBlue::callback->readReg32( ICL_PORT_TX_DW5_LN(0, phy));
@@ -3349,8 +3347,8 @@ static void _icl_ddi_enable_clock(struct intel_display *display, u32 reg,
 	myLock = IOSimpleLockAlloc();
 	IOSimpleLockLock(myLock);
 
-	NBlue::callback->intel_de_rmw( reg, clk_sel_mask, clk_sel);
-	NBlue::callback->intel_de_rmw( reg, clk_off, 0);
+	NBlue::callback->intel_de_rmw(display, reg, clk_sel_mask, clk_sel);
+	NBlue::callback->intel_de_rmw(display, reg, clk_off, 0);
 
 	IOSimpleLockUnlock(myLock);
 	IOSimpleLockFree(myLock);
@@ -3396,7 +3394,7 @@ void intel_combo_phy_power_up_lanes(struct intel_display *display,
 		}
 	}
 
-	NBlue::callback->intel_de_rmw( ICL_PORT_CL_DW10(phy),
+	NBlue::callback->intel_de_rmw(display, ICL_PORT_CL_DW10(phy),
 			 PWR_DOWN_LN_MASK, lane_mask);
 }
 
@@ -3631,7 +3629,7 @@ static void intel_ddi_set_idle_link_train(struct intel_dp *intel_dp)
 	struct intel_display *display = &NBlue::callback->display_base;
 	enum port port = display->port0;
 
-	NBlue::callback->intel_de_rmw( dp_tp_ctl_reg(),
+	NBlue::callback->intel_de_rmw(display, dp_tp_ctl_reg(),
 			 DP_TP_CTL_LINK_TRAIN_MASK, DP_TP_CTL_LINK_TRAIN_IDLE);
 
 	if (port == PORT_A && DISPLAY_VER(display) < 12)
@@ -3914,7 +3912,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 
 	
 	u32 dss1 = 0;
-	NBlue::callback->intel_de_rmw( ICL_PIPE_DSS_CTL1(display->pipe0),
+	NBlue::callback->intel_de_rmw(display, ICL_PIPE_DSS_CTL1(display->pipe0),
 			 SPLITTER_ENABLE | SPLITTER_CONFIGURATION_MASK |
 			 OVERLAP_PIXELS_MASK, dss1);
 	
@@ -3950,14 +3948,15 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 
 uint64_t Gen11::hwSetPanelPower(void *that,uint param_1)
 {
+	struct intel_display *display=&NBlue::callback->display_base;
 	if (IS_DISPLAY_VER(&NBlue::callback->display_base, 13, 14))
-		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
+		NBlue::callback->intel_de_rmw(display, SOUTH_DSPCLK_GATE_D,
 				 0, PCH_DPLSUNIT_CLOCK_GATE_DISABLE);
 	
 	auto ret= FunctionCast(hwSetPanelPower, callback->ohwSetPanelPower)(that,param_1);
 	
 	if (IS_DISPLAY_VER(&NBlue::callback->display_base, 13, 14))
-		NBlue::callback->intel_de_rmw( SOUTH_DSPCLK_GATE_D,
+		NBlue::callback->intel_de_rmw(display, SOUTH_DSPCLK_GATE_D,
 				 PCH_DPLSUNIT_CLOCK_GATE_DISABLE, 0);
 	
 	return ret;

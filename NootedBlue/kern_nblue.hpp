@@ -61,7 +61,7 @@ class NBlue {
 	int intel_opregion_setup();
 	UInt32 readReg32(unsigned long reg);
 	void writeReg32(unsigned long reg, UInt32 val);
-	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set);
+	uint32_t intel_de_rmw(struct intel_display *display, uint32_t reg, uint32_t clear, uint32_t set);
 	uint32_t intel_de_read(struct intel_display *display, uint32_t reg);
 	void intel_de_write(struct intel_display *display, uint32_t reg, uint32_t val);
 	void intel_de_posting_read(struct intel_display *display, uint32_t reg);

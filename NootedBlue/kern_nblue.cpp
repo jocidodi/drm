@@ -1805,7 +1805,7 @@ void NBlue::writeReg32(unsigned long reg, UInt32 val) {
 	//IOSimpleLockUnlock(nlock);
 }
 
-uint32_t NBlue::intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set)
+uint32_t NBlue::intel_de_rmw(struct intel_display *display, uint32_t reg, uint32_t clear, uint32_t set)
 {
 	uint32_t old, val;
 	old = readReg32( reg);
