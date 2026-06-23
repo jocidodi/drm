@@ -6221,7 +6221,24 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 # define DP_DPCD_REV_12                     0x12
 # define DP_DPCD_REV_13                     0x13
 # define DP_DPCD_REV_14                     0x14
+#define DP_RECEIVER_CAP_SIZE		0xf
+#define USEC_PER_MSEC	1000L
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER1		    0xf0010 /* 1.3 */
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER(dp_phy) \
+	DP_LTTPR_REG(dp_phy, DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
 
+#define DP_TRAINING_LANE0_SET_PHY_REPEATER1		    0xf0011 /* 1.3 */
+#define DP_TRAINING_LANE0_SET_PHY_REPEATER(dp_phy) \
+	DP_LTTPR_REG(dp_phy, DP_TRAINING_LANE0_SET_PHY_REPEATER1)
+
+#define DP_TRAINING_LANE1_SET_PHY_REPEATER1		    0xf0012 /* 1.3 */
+#define DP_TRAINING_LANE2_SET_PHY_REPEATER1		    0xf0013 /* 1.3 */
+#define DP_TRAINING_LANE3_SET_PHY_REPEATER1		    0xf0014 /* 1.3 */
+#define DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1	    0xf0020 /* 1.4a */
+#define DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER(dp_phy)	\
+	DP_LTTPR_REG(dp_phy, DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1)
+#define DP_TRAINING_AUX_RD_INTERVAL             0x00e   /* XXX 1.2? */
+# define DP_TRAINING_AUX_RD_MASK                0x7F    /* DP 1.3 */
 
 
 

@@ -3003,6 +3003,65 @@ static inline void fsleep(unsigned long usecs)
 		IOSleep((usecs + 999) / 1000);
 }
 
+
+
+static int __8b10b_clock_recovery_delay_us(u8 rd_interval)
+{
+	if (rd_interval == 0)
+		return 100;
+	return rd_interval * 4 * USEC_PER_MSEC;
+}
+static int __8b10b_channel_eq_delay_us(u8 rd_interval)
+{
+	if (rd_interval == 0)
+		return 400;
+	return rd_interval * 4 * USEC_PER_MSEC;
+}
+static int __read_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+			enum drm_dp_phy dp_phy, bool uhbr, bool cr)
+{
+	unsigned int offset;
+	u8 rd_interval, mask;
+	
+	if (dp_phy == DP_PHY_DPRX) {
+		if (0) {
+		} else {
+			if (cr && dpcd[DP_DPCD_REV] >= DP_DPCD_REV_14)
+				return 100;
+
+			offset = DP_TRAINING_AUX_RD_INTERVAL;
+			mask = DP_TRAINING_AUX_RD_MASK;
+
+		}
+	}
+
+	if (offset < DP_RECEIVER_CAP_SIZE) {
+		rd_interval = dpcd[offset];
+	} else {
+		
+		if (Gen11::callback->readAUX(linkp,offset,&rd_interval,1) < 0) {
+			return 400;
+		}
+	}
+	
+	if (cr)
+		return __8b10b_clock_recovery_delay_us( rd_interval & mask);
+	else
+		return __8b10b_channel_eq_delay_us( rd_interval & mask);
+
+}
+int drm_dp_read_clock_recovery_delay(struct drm_dp_aux *aux, const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+					 enum drm_dp_phy dp_phy, bool uhbr)
+{
+	return __read_delay( dpcd, dp_phy, uhbr, true);
+}
+
+int drm_dp_read_channel_eq_delay(struct drm_dp_aux *aux, const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+				 enum drm_dp_phy dp_phy, bool uhbr)
+{
+	return __read_delay( dpcd, dp_phy, uhbr, false);
+}
+
 static bool
 intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy)
 {
@@ -3013,7 +3072,7 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 	int delay_us;
 	struct intel_display *display = &NBlue::callback->display_base;
 	
-	delay_us = 100;
+	delay_us = drm_dp_read_clock_recovery_delay(nullptr, intel_dp->dpcd, DP_PHY_DPRX,false);
 
 	
 	if (!intel_dp_reset_link_train( intel_dp,dp_phy,
@@ -3106,7 +3165,7 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	struct intel_display *display = &NBlue::callback->display_base;
 	
 	
-	delay_us = 400;
+	delay_us = drm_dp_read_channel_eq_delay(nullptr, intel_dp->dpcd, DP_PHY_DPRX,false);;
 
 	training_pattern = DP_TRAINING_PATTERN_2;
 
@@ -4034,7 +4093,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	//drm_dp_read_dpcd_caps
 	intel_dp->dpcd[DP_DPCD_REV] = vv[0];
 	intel_dp->edp_dpcd[0]=intel_dp->dpcd[DP_DPCD_REV];
-	
+/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
@@ -4043,7 +4102,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_ddi_enable_transcoder_clock();
 
 	intel_ddi_config_transcoder_func();
-	
+*/
 	icl_combo_phy_set_signal_levels(display);
 	
 	intel_combo_phy_power_up_lanes(display, phy, false, lane_count, display->child0->lane_reversal);
