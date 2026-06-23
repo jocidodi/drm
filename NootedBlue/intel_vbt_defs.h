@@ -6240,7 +6240,9 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 	DP_LTTPR_REG(dp_phy, DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1)
 #define DP_TRAINING_AUX_RD_INTERVAL             0x00e   /* XXX 1.2? */
 # define DP_TRAINING_AUX_RD_MASK                0x7F    /* DP 1.3 */
-
+# define DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT	(1 << 7) /* DP 1.3 */
+#define DP_DP13_DPCD_REV                    0x2200
+#define EDP_DISPLAY_CTL_CAP_SIZE	5
 
 
 

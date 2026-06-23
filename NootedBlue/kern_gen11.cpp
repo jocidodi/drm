@@ -3792,12 +3792,14 @@ void intel_dp_link_training_set_mode(struct intel_dp *intel_dp, int link_rate, b
 
 	Gen11::callback->writeAUX(linkp,DP_DOWNSPREAD_CTRL,link_config, 2);
 }
+
 static void intel_dp_update_downspread_ctrl(struct intel_dp *intel_dp)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	intel_dp_link_training_set_mode(intel_dp,
 									display->port_clock, false/*crtc_state->vrr.in_range*/);
 }
+
 void intel_dp_link_training_set_bw(struct intel_dp *intel_dp,
 				   int link_bw, int rate_select, int lane_count,
 				   bool enhanced_framing)
@@ -3806,20 +3808,18 @@ void intel_dp_link_training_set_bw(struct intel_dp *intel_dp,
 		lane_count |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
 
 	if (link_bw) {
-		/* DP and eDP v1.3 and earlier link bw set method. */
 		u8 link_config[2];
 		link_config[0]=link_bw;
 		link_config[1]=lane_count;
 		
-		Gen11::callback->writeAUX(linkp,DP_LINK_BW_SET,link_config,
-								 ARRAY_SIZE(link_config));
+		Gen11::callback->writeAUX(linkp,DP_LINK_BW_SET,link_config, ARRAY_SIZE(link_config));
 
 	} else {
-
 		//drm_dp_dpcd_writeb(&intel_dp->aux, DP_LANE_COUNT_SET, lane_count);
 		//drm_dp_dpcd_writeb(&intel_dp->aux, DP_LINK_RATE_SET, rate_select);
 	}
 }
+
 static void intel_dp_update_link_bw_set(struct intel_dp *intel_dp,
 					u8 link_bw, u8 rate_select)
 {
@@ -3827,6 +3827,7 @@ static void intel_dp_update_link_bw_set(struct intel_dp *intel_dp,
 	intel_dp_link_training_set_bw(intel_dp, link_bw, rate_select, display->panel.vbt.edp.lanes,
 					  true);
 }
+
 static bool
 intel_dp_prepare_link_train(struct intel_dp *intel_dp)
 {
@@ -3834,15 +3835,11 @@ intel_dp_prepare_link_train(struct intel_dp *intel_dp)
 	struct intel_display *display=&NBlue::callback->display_base;
 	
 	intel_ddi_prepare_link_retrain(intel_dp);
-
-	intel_dp_compute_rate(intel_dp, display->port_clock,
-				  &link_bw, &rate_select);
+	intel_dp_compute_rate(intel_dp, display->port_clock,&link_bw, &rate_select);
 
 	if (!link_bw) {
 		u16 sink_rates[DP_MAX_SUPPORTED_RATES];
-
 		Gen11::callback->readAUX(linkp,DP_SUPPORTED_LINK_RATES,sink_rates, sizeof(sink_rates));
-
 	}
 
 	intel_dp_update_downspread_ctrl(intel_dp);
@@ -4126,13 +4123,30 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	if (!kexticl) disableVDDForAux(ccont2);
 	else disableVDDForAux2(ccont2,that);
 	
-	u8 vv[0x10];
-	Gen11::callback->readAUX(linkp,0,&vv, 0x10);
+	Gen11::callback->readAUX(linkp,0,&intel_dp->dpcd, DP_RECEIVER_CAP_SIZE);
 	
-	//drm_dp_read_dpcd_caps
-	intel_dp->dpcd[DP_DPCD_REV] = vv[0];
-	intel_dp->edp_dpcd[0]=intel_dp->dpcd[DP_DPCD_REV];
-/*
+	if ((intel_dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
+		  DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT))
+		{
+			u8 dpcd_ext[DP_RECEIVER_CAP_SIZE];
+			int r=Gen11::callback->readAUX(linkp,DP_DP13_DPCD_REV,&dpcd_ext, DP_RECEIVER_CAP_SIZE);
+			if (r >= 0)
+			{
+				int ok=1;
+				if (intel_dp->dpcd[DP_DPCD_REV] > dpcd_ext[DP_DPCD_REV]) ok=0;
+
+				if (ok)
+				if (!memcmp(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext))) ok=0;
+
+				if (ok)
+				memcpy(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext));
+			}
+		}
+	
+	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);
+	
+
+	/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
 				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
