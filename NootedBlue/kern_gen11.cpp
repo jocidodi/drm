@@ -2727,7 +2727,7 @@ intel_dp_set_link_train(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy,
 	memcpy(buf + 1, intel_dp->train_set, display->panel.vbt.edp.lanes);
 	len = display->panel.vbt.edp.lanes+ 1;
 
-	return Gen11::callback->writeAUX(linkp,reg,buf, len)==0;
+	return Gen11::callback->writeAUX(linkp,reg,buf, len)>=0;
 }
 
 static bool
@@ -2990,7 +2990,7 @@ intel_dp_update_link_train(struct intel_dp *intel_dp,
 	ret=Gen11::callback->writeAUX(linkp,reg,intel_dp->train_set, NBlue::callback->display_base.panel.vbt.edp.lanes);
 	
 
-	return ret == 0;//NBlue::callback->display_base.panel.vbt.edp.lanes;
+	return ret >= 0;//NBlue::callback->display_base.panel.vbt.edp.lanes;
 }
 
 static inline void fsleep(unsigned long usecs)
@@ -3029,8 +3029,8 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,enum drm_dp_phy 
 		fsleep(delay_us);
 		
 		
-		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
-		if (r != 0) {
+		int r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
+		if (r < 0) {
 			return false;
 		}
 
@@ -3119,9 +3119,9 @@ intel_dp_link_training_channel_equalization(struct intel_dp *intel_dp,enum drm_d
 	for (tries = 0; tries < 5; tries++) {
 		fsleep(delay_us);
 
-		bool r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
+		int r=Gen11::callback->readAUX(linkp,DP_LANE0_1_STATUS,link_status,DP_LINK_STATUS_SIZE);
 		
-		if (r != 0) {
+		if (r < 0) {
 			break;
 		}
 
@@ -3179,7 +3179,7 @@ static bool intel_dp_disable_dpcd_training_pattern(struct intel_dp *intel_dp,
 
 	auto ret=Gen11::callback->writeAUX(linkp,reg,&val, 1);
 	
-	return ret == 0;
+	return ret >= 0;
 }
 
 u8 drm_dp_link_rate_to_bw_code(int link_rate)
@@ -3404,7 +3404,7 @@ int drm_dp_pcon_convert_rgb_to_ycbcr(u8 color_spc)
 	u8 buf;
 
 	ret = Gen11::callback->readAUX(linkp,DP_PROTOCOL_CONVERTER_CONTROL_2,&buf,1);
-	if (ret != 0)
+	if (ret < 0)
 		return ret;
 
 	if (color_spc & DP_CONVERSION_RGB_YCBCR_MASK)
@@ -3498,7 +3498,7 @@ write_dsc_decompression_flag( u8 flag, bool set)
 	u8 val;
 
 	err = Gen11::callback->readAUX(linkp,DP_DSC_ENABLE,&val,1);
-	if (err != 0)
+	if (err < 0)
 		return err;
 
 	if (set)
@@ -3818,7 +3818,7 @@ intel_dp_init_source_oui(struct intel_dp *intel_dp)
 	u8 buf[3] = {};
 
 	int r=Gen11::callback->readAUX(linkp,DP_SOURCE_OUI,buf, sizeof(buf));
-	if (r!=0) return;
+	if (r<0) return;
 	
 	if (memcmp(oui, buf, sizeof(oui)) == 0) {
 		return;
@@ -3844,7 +3844,7 @@ void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
 
 		for (i = 0; i < 3; i++) {
 			ret=Gen11::callback->writeAUX(linkp,DP_SET_POWER,&mode,1);
-			if (ret == 0)
+			if (ret == 1)
 				break;
 			IOSleep(1);
 		}
