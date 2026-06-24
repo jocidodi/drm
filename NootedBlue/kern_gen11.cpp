@@ -143,8 +143,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
 		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
-		
-		
+
 		
 		LookupPatchPlus const patches[] = {
 			{&kextG11FB, f7, r7, arrsize(f7),    1},
@@ -157,7 +156,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
 			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
-			
 			
 		};
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "nblue", "kextG11FB Failed to apply patches!");
@@ -3237,12 +3235,12 @@ intel_dp_link_train_phy(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy)
 
 	if (!intel_dp_link_training_clock_recovery( intel_dp,dp_phy))
 	{
-		//if (intel_dp->para != nullptr) 	intel_dp->para->status = 3;
+		if (intel_dp->para != nullptr) 	intel_dp->para->status = 3;
 		goto out;
 	}
 	if (!intel_dp_link_training_channel_equalization( intel_dp,dp_phy))
 	{
-		//if (intel_dp->para != nullptr) 	intel_dp->para->status = 5;
+		if (intel_dp->para != nullptr) 	intel_dp->para->status = 5;
 		goto out;
 		
 	}
@@ -4087,17 +4085,18 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_dp->lane_count = lane_count;
 	intel_dp->output_reg = DDI_BUF_CTL(port);
 	
+	
 	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
 	if (intel_dp->para != nullptr) {
 		intel_dp->para->status = 0;
 		intel_dp->para->field1 = 0x200;
 		intel_dp->para->field2 = 0;
-		intel_dp->para->enableMST = (u8)getMember<u8>(that, 0x117);
-		intel_dp->para->BitRate = (u8)getMember<u8>(that, 0x128);
+		intel_dp->para->enableMST = (u8)getMember<u8>(that, kexticl ? 0xf : 0x117);
+		intel_dp->para->BitRate = (u8)getMember<u8>(that, kexticl ? 0x24 : 0x128);
 		intel_dp->para->NumberOfLanes = (u8)lane_count;
-		intel_dp->para->EnhancedFraming = (u8)getMember<u8>(that, 0x11a);;
+		intel_dp->para->EnhancedFraming = (u8)getMember<u8>(that, kexticl ? 0x12 : 0x11a);
 		intel_dp->para->ASR = 0;//(u8)getMember<u8>(that, 0x118);
-		intel_dp->para->Downspread = (u8)getMember<u8>(that, 0x119);
+		intel_dp->para->Downspread = (u8)getMember<u8>(that, kexticl ? 0x11 : 0x119);
 		intel_dp->para->voltageSwing = (u8)0;
 		intel_dp->para->preEmphasis = (u8)0;
 		intel_dp->para->BitRate2 = intel_dp->para->BitRate;
