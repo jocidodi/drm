@@ -78,6 +78,24 @@ struct AGDCFBOnline_t {
 	uint32_t                state;
 };
 
+typedef enum portconfig_cflags {
+	CNAlterAppertureRequirements=1,
+	CNFlagSecondary=2,
+	CNFlagForceEDID=4,
+	CNConnectorAlwaysConnected=8,
+	CNSupport32BPP=16,
+	CNFlagLegacy=32,
+	CNDisableBlitTranslationTable=64,
+	CNUseMiscIoPowerWell=128,
+	CNUsePowerWell2=256,
+	CNFlagHDMI=512,
+	CNFlagDP=1024,
+	CNIncreaseLaneCount=2048,
+	CNFlagDualLink=4096,
+	CNFlagInternalOverride=8192,
+	CNFlagEncoderSpecific=16384,
+	CNFlagNoHPD=32768
+} portconfig_cflags;
 
 union ConnectorFlags {
 	struct PACKED ConnectorFlagBits {

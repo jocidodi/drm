@@ -738,35 +738,6 @@ uint32_t scale(uint32_t source_val,
 
 
 
-int cnp_rawclk()
-{
-	int divider, fraction;
-	u32 rawclk;
-
-	if (NBlue::callback->readReg32( SFUSE_STRAP) & SFUSE_STRAP_RAW_FREQUENCY) {
-		/* 24 MHz */
-		divider = 24000;
-		fraction = 0;
-	} else {
-		/* 19.2 MHz */
-		divider = 19000;
-		fraction = 200;
-	}
-
-	rawclk = CNP_RAWCLK_DIV(divider / 1000);
-	if (fraction) {
-		int numerator = 1;
-
-		rawclk |= CNP_RAWCLK_DEN(DIV_ROUND_CLOSEST(numerator * 1000,
-							   fraction) - 1);
-		//if (INTEL_PCH_TYPE(display) >= PCH_ICP)
-			rawclk |= ICP_RAWCLK_NUM(numerator);
-	}
-	
-	NBlue::callback->writeReg32( PCH_RAWCLK_FREQ, rawclk);
-	return divider + fraction;
-}
-
 bool cnp_backlight_controller_is_valid( int controller)
 {
 	if (controller < 0 || controller >= 2)
@@ -970,11 +941,11 @@ int msecs_to_pps_units(int msecs)
 
 
 static enum intel_output_format
-bdw_get_pipe_misc_output_format()
+bdw_get_pipe_misc_output_format(struct intel_display *display)
 {
 	u32 tmp;
 
-	tmp = NBlue::callback->readReg32( PIPE_MISC(PIPE_A));
+	tmp = NBlue::callback->readReg32( PIPE_MISC(display->pipe0));
 
 	if (tmp & PIPE_MISC_YUV420_ENABLE) {
 		return INTEL_OUTPUT_FORMAT_YCBCR420;
@@ -985,17 +956,19 @@ bdw_get_pipe_misc_output_format()
 	}
 }
 
+
+
 void
-parse_lfp_backlight(struct intel_display *display,
-			struct intel_panel *panel)
+parse_lfp_backlight(struct intel_display *display)
 {
+	struct intel_panel *panel=&display->panel;
 	const struct bdb_header *bdb=display->bdb;
 	const struct bdb_lfp_backlight *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
 	int panel_type = vbt_get_panel_type(bdb, panel);
 	u16 level;
 	
-	display->output_format = bdw_get_pipe_misc_output_format();
+	display->output_format = bdw_get_pipe_misc_output_format(display);
 	display->sink_format = display->output_format;
 	if ((NBlue::callback->readReg32( DP_A) & EDP_PLL_FREQ_MASK) == EDP_PLL_FREQ_162MHZ)
 		display->port_clock = 162000;
@@ -1079,7 +1052,7 @@ parse_lfp_backlight(struct intel_display *display,
 	}
 	
 	
-	panel->rawclk_freq= cnp_rawclk();
+	//panel->rawclk_freq= cnp_rawclk();
 	
 	u32 pwm_ctl = NBlue::callback->readReg32(BXT_BLC_PWM_CTL(panel->backlight.controller));
 	panel->backlight.active_low_pwm = pwm_ctl & BXT_BLC_PWM_POLARITY;
@@ -1329,10 +1302,10 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 			if (is_edp) type=ConnectorLVDS;
 			if (is_hdmi) type=ConnectorHDMI;
 			
-			u32 flags=0;
-			if (is_dp) flags=0x1+0x400;
-			if (is_edp) flags=0x1+0x0+0x10;
-			if (is_hdmi) flags=0x1+0x200;
+			u32 flags=CNAlterAppertureRequirements;
+			if (is_dp) flags+=CNFlagDP;
+			if (is_edp) flags+=CNConnectorAlwaysConnected;
+			if (is_hdmi) flags+=CNFlagHDMI;
 			
 			if (type>ConnectorDummy) {
 				display->bconnectors[ii].busId=child->ddc_pin;
@@ -1754,7 +1727,7 @@ err_out:
 
 void NBlue::parse_backlight()
 {
-	parse_lfp_backlight(&display_base,&display_base.panel);
+	parse_lfp_backlight(&display_base);
 }
 
 UInt32 NBlue::readReg32(unsigned long reg) {

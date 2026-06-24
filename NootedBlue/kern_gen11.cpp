@@ -109,7 +109,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
 		
 		
-		//pipe 0 fix
+		//cache + boot
 		static const uint8_t f7[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0x32, 0x01, 0x00, 0x00};
 		static const uint8_t r7[]= {0x83, 0x78, 0x08, 0x00, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
 		
@@ -123,9 +123,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
 		static const uint8_t r9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
 		
-		//getHPDState register
-		static const uint8_t f19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
-		static const uint8_t r19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
+		static const uint8_t f9c[]= {0x41, 0x83, 0xbe, 0xdc, 0x01, 0x00, 0x00, 0x00, 0x0f, 0x85, 0xb8, 0x02, 0x00, 0x00};
+		static const uint8_t r9c[]= {0x41, 0x83, 0xbe, 0xdc, 0x01, 0x00, 0x00, 0x00, 0x48, 0xe9, 0xb8, 0x02, 0x00, 0x00};
+		
+		static const uint8_t f9d[]= {0xf6, 0x40, 0x14, 0x08, 0x0f, 0x84, 0x77, 0xff, 0xff, 0xff};
+		static const uint8_t r9d[]= {0xf6, 0x40, 0x14, 0x08, 0x48, 0xe9, 0x77, 0xff, 0xff, 0xff};
+		
+		static const uint8_t f9e[]= {0x80, 0xb8, 0x45, 0x1b, 0x00, 0x00, 0x00, 0x74, 0x13};
+		static const uint8_t r9e[]= {0x80, 0xb8, 0x45, 0x1b, 0x00, 0x00, 0x00, 0xeb, 0x13};
+		
 		
 		//register adresses
 		static const uint8_t f24b[]= {0xbe, 0x40, 0xf8, 0x06, 0x00};
@@ -150,7 +156,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			{&kextG11FB, f9b, r9b, arrsize(f9b),    1},
-			{&kextG11FB, f19, r19, arrsize(f19),    5},
+			{&kextG11FB, f9c, r9c, arrsize(f9c),    1},
+			{&kextG11FB, f9d, r9d, arrsize(f9d),    1},
+			{&kextG11FB, f9e, r9e, arrsize(f9e),    1},
 			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
 			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
@@ -300,6 +308,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f15[]= {0x74, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		static const uint8_t r15[]= {0xeb, 0x36, 0x48, 0xff, 0x05, 0x7e, 0x51, 0x08, 0x00, 0x44, 0x89, 0x3c, 0x24, 0x48, 0x8d, 0x15, 0x4d, 0x88, 0x03, 0x00, 0x4c, 0x8d, 0x05, 0x28, 0x8a, 0x03, 0x00};
 		
+		//getHPDState register
+		static const uint8_t f19[]= {0xbe, 0x70, 0x44, 0x04, 0x00};
+		static const uint8_t r19[]= {0xbe, 0xa0, 0x38, 0x16, 0x00};
+		
+		
 		//savenvram
 		static const uint8_t f20[]= {0xff, 0x90, 0xf8, 0x09, 0x00, 0x00, 0x41, 0x89, 0xc6, 0x48, 0x85, 0xdb, 0x74, 0x17};
 		static const uint8_t r20[]= {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x48, 0x85, 0xdb, 0x74, 0x17};
@@ -341,6 +354,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f9p, r9p, arrsize(f9p),	1},
 				{&kextG11FBT, f13p, r13p, arrsize(f13p),	1},
 				{&kextG11FBT, f13pb, r13pb, arrsize(f13pb),	1},
+				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20p, r20p, arrsize(f20p),	1},
 				{&kextG11FBT, f24bp, r24bp, arrsize(f24bp),	14},
 				{&kextG11FBT, f24cp, r24cp, arrsize(f24cp),	1},
@@ -358,6 +372,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{&kextG11FBT, f13, r13, arrsize(f13),	1},
 				{&kextG11FBT, f13b, r13b, arrsize(f13b),	1},
 				{&kextG11FBT, f15, r15, arrsize(f15),	1},
+				{&kextG11FBT, f19, r19, arrsize(f19),	1},
 				{&kextG11FBT, f20, r20, arrsize(f20),	1},
 				{&kextG11FBT, f24b, r24b, arrsize(f24b),	11},
 				{&kextG11FBT, f24c, r24c, arrsize(f24c),	1},
@@ -498,14 +513,18 @@ void  Gen11::initPlatformWorkarounds(void *that)
 uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
+	if (bk==2){
+		NBlue::callback->parse_backlight();
+		bk=1;
+	}
 	
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x6;
 	
 	pinfo[p].flags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE|/*FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION|/*FB_FLAG_ALLOW_CONNECTOR_RECOVER|FB_FLAG_ENABLE_DITHERING|
 	FB_FLAG_LIMIT_4K_SOURCE_SIZE|FB_FLAG_BOOST_PIXEL_FREQUENCY_LIMIT|*/
-	/*FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_AVOID_FAST_LINK_TRAINING;
+	/*FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL|*/FB_FLAG_AVOID_FAST_LINK_TRAINING;
 	
 	
 		pinfo[p].camelliaVersion=0;
@@ -531,7 +550,10 @@ uint64_t  Gen11::getOSInformation2(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_base.bconnectors[i].flags;
 	}
 	
-	pinfo[p].connectors[0].pipe=1; // bad hack
+	pinfo[p].connectors[1].type=ConnectorDummy;
+	
+	//pinfo[p].connectors[0].flags-=8;
+	//pinfo[p].connectors[0].pipe=1; // bad hack
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -556,12 +578,16 @@ uint64_t  Gen11::getOSInformation(void *that)
 {
 	
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
+	if (bk==2){
+		NBlue::callback->parse_backlight();
+		bk=1;
+	}
 	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
 	int p=1;
 	pinfo[p].fInfoFlags=
-	FB_FLAG_DISABLE_PIPE_SCRAMBLE/*|FB_FLAG_FRAMEBUFFER_COMPRESSION|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/
+	FB_FLAG_DISABLE_PIPE_SCRAMBLE|FB_FLAG_FRAMEBUFFER_COMPRESSION/*|FB_FLAG_ENABLE_BACKLIGHT_REG_CONTROL*/
 	/*|FB_FLAG_FORCE_POWER_ALWAYS_CONNECTED*/|FB_FLAG_AVOID_FAST_LINK_TRAINING/*|FB_FLAG_ALLOW_CONNECTOR_RECOVER
 	|FB_FLAG_USE_VIDEO_TURBO|FB_FLAG_ALTERNATE_PWM_INCREMENT2*/;
 	
@@ -591,8 +617,9 @@ uint64_t  Gen11::getOSInformation(void *that)
 		pinfo[p].connectors[i].flags=NBlue::callback->display_base.bconnectors[i].flags;
 	}
 	
-	pinfo[p].connectors[0].flags=0x1+0x8+0x10; // bad hack
+	pinfo[p].connectors[1].type=ConnectorDummy;
 	
+		
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
 		OSDictionary *connectorDict = OSDictionary::withCapacity(10);
@@ -689,10 +716,10 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 {
 	FunctionCast(hwGetCRTC, callback->ohwGetCRTC)(that,param_1,param_2 );
 	
-	if (bk==2){
+	/*if (bk==2){
 		NBlue::callback->parse_backlight();
 		bk=1;
-	}
+	}*/
 	
 	if (bk==1){
 		
@@ -742,10 +769,10 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
-	if (bk==2){
+	/*if (bk==2){
 		NBlue::callback->parse_backlight();
 		bk=1;
-	}
+	}*/
 	
 	if (kexticl) getMember<uint32_t>(that, 0xd00)= param_1;
 	else getMember<uint32_t>(that, 0xd48)= param_1;
@@ -2152,6 +2179,28 @@ static void tgl_bw_buddy_init(struct intel_display *display)
 	}
 }
 
+static void icl_set_pipe_chicken()
+{
+	struct intel_display *display =&NBlue::callback->display_base;
+	enum pipe pipe = display->pipe0;
+	u32 tmp;
+
+	tmp = NBlue::callback->intel_de_read(display, PIPE_CHICKEN(pipe));
+
+	tmp |= PER_PIXEL_ALPHA_BYPASS_EN;
+
+	tmp |= PIXEL_ROUNDING_TRUNC_FB_PASSTHRU;
+
+	if (display->platform.dg2)
+		tmp &= ~UNDERRUN_RECOVERY_ENABLE_DG2;
+	else if ((DISPLAY_VER(display) >= 13) && (DISPLAY_VER(display) < 30))
+		tmp |= UNDERRUN_RECOVERY_DISABLE_ADLP;
+
+	if (intel_display_wa(display, INTEL_DISPLAY_WA_14010547955))
+		tmp |= DG2_RENDER_CCSTAG_4_3_EN;
+
+	NBlue::callback->intel_de_write(display, PIPE_CHICKEN(pipe), tmp);
+}
 
 void Gen11::hwInitializeCState(void *that)
 {
@@ -2255,6 +2304,8 @@ void Gen11::hwInitializeCState(void *that)
 	NBlue::callback->readReg32(DC_STATE_DEBUG);
 	
 	NBlue::callback->intel_de_rmw(display, PIPEDMC_CONTROL(PIPE_A), 0, PIPEDMC_ENABLE);
+	
+	icl_set_pipe_chicken();
 
 	hwConfigureCustomAUX(that, true);
 	
@@ -2342,6 +2393,7 @@ intel_ddi_transcoder_func_reg_val_get()
 	return temp;
 }
 
+
 static u32 intel_ddi_set_dp_msa(bool wr)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -2377,8 +2429,8 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 		temp |= DP_MSA_MISC_COLOR_YCBCR_444_BT709;
 
 
-	//if (intel_dp_needs_vsc_sdp(crtc_state, conn_state))
-	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
+	//if (intel_dp_needs_vsc_sdp())
+		temp |= DP_MSA_MISC_COLOR_VSC_SDP;
 	
 	if (wr)
 	NBlue::callback->intel_de_write(display, TRANS_MSA_MISC(display, cpu_transcoder),
@@ -2421,7 +2473,7 @@ static u32 bdw_set_pipe_misc()
 			PIPE_MISC_YUV420_ENABLE | PIPE_MISC_YUV420_MODE_FULL_BLEND;
 
 	//if (DISPLAY_VER(display) >= 11 && is_hdr_mode(crtc_state))
-		val |= PIPE_MISC_HDR_MODE_PRECISION;
+	//	val |= PIPE_MISC_HDR_MODE_PRECISION;
 
 	if (DISPLAY_VER(display) >= 12)
 		val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
@@ -2476,8 +2528,6 @@ static const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans_dp(struct intel_display *display,
 			   int *n_entries)
 {
-	
-//[drm:intel_crtc_state_dump [i915]] port clock: 270000
 	
 	if (display->port_clock > 270000) {
 		if (display->platform.tigerlake_uy) {
@@ -2677,8 +2727,8 @@ static void intel_ddi_set_link_train(struct intel_dp *intel_dp,u8 dp_train_pat)
 	struct intel_display *display = &NBlue::callback->display_base;
 	u32 temp;
 
-	temp = NBlue::callback->readReg32( dp_tp_ctl_reg());
-
+	temp = NBlue::callback->intel_de_read(display, dp_tp_ctl_reg());
+	
 	temp &= ~DP_TP_CTL_LINK_TRAIN_MASK;
 	switch (intel_dp_training_pattern_symbol(dp_train_pat)) {
 	case DP_TRAINING_PATTERN_DISABLE:
@@ -2733,7 +2783,6 @@ intel_dp_reset_link_train(struct intel_dp *intel_dp,enum drm_dp_phy dp_phy,
 			  u8 dp_train_pat)
 {
 	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
-	//intel_dp_set_signal_levels(intel_dp, crtc_state, dp_phy);
 	icl_combo_phy_set_signal_levels(&NBlue::callback->display_base);
 	return intel_dp_set_link_train( intel_dp,dp_phy, dp_train_pat);
 }
@@ -2934,8 +2983,8 @@ static bool intel_dp_adjust_request_changed(struct intel_dp *intel_dp, const u8 
 		//}
 		
 		if (intel_dp->para != nullptr) {
-			intel_dp->para->voltageSwing = (u8)n1;
-			intel_dp->para->preEmphasis = (u8)n2;
+			intel_dp->para->voltageSwing = n1;
+			intel_dp->para->preEmphasis = n2;
 		}
 
 		if (old != new2)
@@ -2991,13 +3040,12 @@ intel_dp_update_link_train(struct intel_dp *intel_dp,
 				DP_TRAINING_LANE0_SET_PHY_REPEATER(dp_phy);
 	int ret;
 
-	//intel_dp_set_signal_levels(intel_dp, dp_phy);
 	icl_combo_phy_set_signal_levels(&NBlue::callback->display_base);
 	
 	ret=Gen11::callback->writeAUX(linkp,reg,intel_dp->train_set, NBlue::callback->display_base.panel.vbt.edp.lanes);
 	
 
-	return ret >= 0;//NBlue::callback->display_base.panel.vbt.edp.lanes;
+	return ret >= 0;
 }
 
 static inline void fsleep(unsigned long usecs)
@@ -3385,8 +3433,8 @@ static void intel_ddi_buf_enable( u32 buf_ctl)
 	struct intel_display *display = &NBlue::callback->display_base;
 	enum port port = display->port0;
 
-	NBlue::callback->writeReg32( DDI_BUF_CTL(port), buf_ctl | DDI_BUF_CTL_ENABLE);
-	NBlue::callback->readReg32( DDI_BUF_CTL(port));
+		NBlue::callback->intel_de_write(display, DDI_BUF_CTL(port), buf_ctl | DDI_BUF_CTL_ENABLE);
+	NBlue::callback->intel_de_posting_read(display, DDI_BUF_CTL(port));
 
 	intel_wait_ddi_buf_active();
 }
@@ -3396,10 +3444,10 @@ static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 	struct intel_display *display = &NBlue::callback->display_base;
 	u32 dp_tp_ctl;
 
-	dp_tp_ctl = NBlue::callback->readReg32( dp_tp_ctl_reg());
-
+	dp_tp_ctl = NBlue::callback->intel_de_read(display, dp_tp_ctl_reg());
 
 	bool enhanced_framing =	dp_tp_ctl &	DP_TP_CTL_ENHANCED_FRAME_ENABLE;
+	intel_dp->enhanced_framing=enhanced_framing;
 	
 	dp_tp_ctl = DP_TP_CTL_ENABLE | DP_TP_CTL_LINK_TRAIN_PAT1;
 	/*if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||
@@ -3410,8 +3458,9 @@ static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 		if (enhanced_framing)
 			dp_tp_ctl |= DP_TP_CTL_ENHANCED_FRAME_ENABLE;
 	//}
-	NBlue::callback->writeReg32( dp_tp_ctl_reg(), dp_tp_ctl);
-	NBlue::callback->readReg32( dp_tp_ctl_reg());
+
+	NBlue::callback->intel_de_write(display, dp_tp_ctl_reg(), dp_tp_ctl);
+	NBlue::callback->intel_de_posting_read(display, dp_tp_ctl_reg());
 
 	/*if (display->platform.alderlake_p &&
 		(intel_tc_port_in_dp_alt_mode(dig_port) || intel_tc_port_in_legacy_mode(dig_port)))
@@ -3558,24 +3607,10 @@ static void intel_dp_enable_port(struct intel_dp *intel_dp)
 										   DP_PHY_DPRX, DP_TRAINING_PATTERN_1);
 	
 	intel_dp->DP |= DP_PORT_EN;
-	NBlue::callback->writeReg32( intel_dp->output_reg, intel_dp->DP);
-	//NBlue::callback->readReg32( intel_dp->output_reg);
 	
-	int iVar6 = 100;
-	do {
-		int cVar2 = NBlue::callback->readReg32( intel_dp->output_reg);
-	  if (-1 < cVar2) {
-		  iVar6=1;
-		  break;
-	  }
-	  IODelay(5);
-	  iVar6 = iVar6 + -1;
-	} while (iVar6 != 0);
-	
-	//if (!iVar6) panic("X");
-	
-	
-	
+	NBlue::callback->intel_de_write(display, intel_dp->output_reg, intel_dp->DP);
+	NBlue::callback->intel_de_posting_read(display, intel_dp->output_reg);
+
 }
 
 static int
@@ -3823,7 +3858,7 @@ static void intel_dp_update_link_bw_set(struct intel_dp *intel_dp,
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	intel_dp_link_training_set_bw(intel_dp, link_bw, rate_select, display->panel.vbt.edp.lanes,
-					  true);
+								  intel_dp->enhanced_framing);
 }
 
 static bool
@@ -3868,28 +3903,7 @@ void intel_dp_stop_link_train(struct intel_dp *intel_dp)
 	}*/
 }
 
-static void icl_set_pipe_chicken()
-{
-	struct intel_display *display =&NBlue::callback->display_base;
-	enum pipe pipe = display->pipe0;
-	u32 tmp;
 
-	tmp = NBlue::callback->intel_de_read(display, PIPE_CHICKEN(pipe));
-
-	tmp |= PER_PIXEL_ALPHA_BYPASS_EN;
-
-	tmp |= PIXEL_ROUNDING_TRUNC_FB_PASSTHRU;
-
-	if (display->platform.dg2)
-		tmp &= ~UNDERRUN_RECOVERY_ENABLE_DG2;
-	else if ((DISPLAY_VER(display) >= 13) && (DISPLAY_VER(display) < 30))
-		tmp |= UNDERRUN_RECOVERY_DISABLE_ADLP;
-
-	if (intel_display_wa(display, INTEL_DISPLAY_WA_14010547955))
-		tmp |= DG2_RENDER_CCSTAG_4_3_EN;
-
-	NBlue::callback->intel_de_write(display, PIPE_CHICKEN(pipe), tmp);
-}
 
 static void
 intel_dp_init_source_oui(struct intel_dp *intel_dp)
@@ -3984,6 +3998,7 @@ static void intel_ddi_mso_configure()
 	if (intel_dp->edp_dpcd[0] < DP_EDP_14)
 		return;
 	
+	
 	/*if (crtc_state->splitter.enable) {
 		dss1 |= SPLITTER_ENABLE;
 		dss1 |= OVERLAP_PIXELS(crtc_state->splitter.pixel_overlap);
@@ -4003,10 +4018,10 @@ void intel_dp_sink_enable_decompression()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
 
-	/*if (!new_crtc_state->dsc.compression_enable)
+	//if (!new_crtc_state->dsc.compression_enable)
 		return;
 
-	if (drm_WARN_ON(display->drm,
+	/*if (drm_WARN_ON(display->drm,
 			!connector->dp.dsc_decompression_aux ||
 			connector->dp.dsc_decompression_enabled))
 		return;
@@ -4068,6 +4083,7 @@ bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 }
 
 
+
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
 	//return FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
@@ -4097,8 +4113,6 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->EnhancedFraming = (u8)getMember<u8>(that, kexticl ? 0x12 : 0x11a);
 		intel_dp->para->ASR = 0;//(u8)getMember<u8>(that, 0x118);
 		intel_dp->para->Downspread = (u8)getMember<u8>(that, kexticl ? 0x11 : 0x119);
-		intel_dp->para->voltageSwing = (u8)0;
-		intel_dp->para->preEmphasis = (u8)0;
 		intel_dp->para->BitRate2 = intel_dp->para->BitRate;
 		intel_dp->para->NumberOfLanes2 = (u8)lane_count;
 		intel_dp->para->CR =0;
@@ -4107,20 +4121,20 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->preEmphasis = 0;
 	}
 	
-	icl_set_pipe_chicken();//???
+
 	
 	intel_ddi_init_dp_buf_reg(intel_dp);
 	
 	//with_intel_pps_lock(intel_dp) {
-	intel_dp_enable_port(intel_dp);
+		intel_dp_enable_port(intel_dp);
 	
-	if (!kexticl) enableVDDForAux(ccont2,that);
-	else enableVDDForAux2(ccont2,that);
+		//if (!kexticl) enableVDDForAux(ccont2,that);
+		//else enableVDDForAux2(ccont2,that);
 	
-	hwSetPanelPower(ccont2,2);
+		hwSetPanelPower(ccont2,2);
 	
-	if (!kexticl) disableVDDForAux(ccont2);
-	else disableVDDForAux2(ccont2,that);
+		//if (!kexticl) disableVDDForAux(ccont2);
+		//else disableVDDForAux2(ccont2,that);
 	
 	Gen11::callback->readAUX(linkp,0,&intel_dp->dpcd, DP_RECEIVER_CAP_SIZE);
 	
@@ -4142,8 +4156,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 			}
 		}
 	
-	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);
+	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);//????
 	
+	//intel_ddi_get_config
 
 	/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
