@@ -6688,7 +6688,58 @@ enum drm_colorspace {
 	DRM_MODE_COLORIMETRY_COUNT
 };
 # define DP_ENHANCED_FRAME_CAP		    (1 << 7)
+#define  SPLITTER_CONFIGURATION_MASK		REG_GENMASK(26, 25)
+#define  SPLITTER_CONFIGURATION_2_SEGMENT	REG_FIELD_PREP(SPLITTER_CONFIGURATION_MASK, 0)
+#define  SPLITTER_CONFIGURATION_4_SEGMENT	REG_FIELD_PREP(SPLITTER_CONFIGURATION_MASK, 1)
+#define  OVERLAP_PIXELS_MASK			(0xf << 16)
+#define  OVERLAP_PIXELS(pixels)			((pixels) << 16)
+enum intel_output_type {
+	INTEL_OUTPUT_UNUSED = 0,
+	INTEL_OUTPUT_ANALOG = 1,
+	INTEL_OUTPUT_DVO = 2,
+	INTEL_OUTPUT_SDVO = 3,
+	INTEL_OUTPUT_LVDS = 4,
+	INTEL_OUTPUT_TVOUT = 5,
+	INTEL_OUTPUT_HDMI = 6,
+	INTEL_OUTPUT_DP = 7,
+	INTEL_OUTPUT_EDP = 8,
+	INTEL_OUTPUT_DSI = 9,
+	INTEL_OUTPUT_DDI = 10,
+	INTEL_OUTPUT_DP_MST = 11,
+};
+#define _TRANS_DDI_FUNC_CTL2_A		0x60404
+#define _TRANS_DDI_FUNC_CTL2_B		0x61404
+#define _TRANS_DDI_FUNC_CTL2_C		0x62404
+#define _TRANS_DDI_FUNC_CTL2_EDP	0x6f404
+#define _TRANS_DDI_FUNC_CTL2_DSI0	0x6b404
+#define _TRANS_DDI_FUNC_CTL2_DSI1	0x6bc04
+#define TRANS_DDI_FUNC_CTL2(dev_priv, tran)	_MMIO_TRANS2(dev_priv, tran, _TRANS_DDI_FUNC_CTL2_A)
+#define  PORT_SYNC_MODE_ENABLE			REG_BIT(4)
+#define  CMTG_SECONDARY_MODE			REG_BIT(3)
+#define  PORT_SYNC_MODE_MASTER_SELECT_MASK	REG_GENMASK(2, 0)
+#define  PORT_SYNC_MODE_MASTER_SELECT(x)	REG_FIELD_PREP(PORT_SYNC_MODE_MASTER_SELECT_MASK, (x))
+#define HAS_GMCH(__display)		(DISPLAY_INFO(__display)->has_gmch)
 
+#define INTEL_DISPLAY_DEVICE_PIPE_OFFSET(display, pipe) \
+	(DISPLAY_INFO((display))->pipe_offsets[(pipe)] - \
+	 DISPLAY_INFO((display))->pipe_offsets[PIPE_A] + \
+	 DISPLAY_MMIO_BASE((display)))
+
+u32 intel_display_device_pipe_offset(struct intel_display *display, enum pipe pipe)
+{
+	return INTEL_DISPLAY_DEVICE_PIPE_OFFSET(display, pipe);
+}
+
+#define INTEL_DISPLAY_DEVICE_PIPE_OFFSET(display, idx) \
+	intel_display_device_pipe_offset((display), (enum pipe)(idx))
+#define _MMIO_PIPE2(display, pipe, reg)		_MMIO(INTEL_DISPLAY_DEVICE_PIPE_OFFSET((display), (pipe)) + (reg))
+
+#define _PIPE_ARB_CTL_A			0x70028 /* icl+ */
+#define PIPE_ARB_CTL(dev_priv, pipe)		_MMIO_PIPE2(dev_priv, pipe, _PIPE_ARB_CTL_A)
+#define   PIPE_ARB_USE_PROG_SLOTS	REG_BIT(13)
+#define   TRANSCONF_ENABLE			REG_BIT(31)
+#define _TRANSACONF		0x70008
+#define TRANSCONF(dev_priv, trans)	_MMIO_PIPE2(dev_priv, (trans), _TRANSACONF)
 
 
 
