@@ -1745,7 +1745,7 @@ tgl_tc_cold_request(struct intel_display *display, bool block)
 		else
 			low_val = TGL_PCODE_EXIT_TCCOLD_DATA_L_UNBLOCK_REQ;
 		
-		snb_pcode_read( TGL_PCODE_TCCOLD, &low_val, &high_val);
+		ret=snb_pcode_read( TGL_PCODE_TCCOLD, &low_val, &high_val);
 		
 		if (ret == 0) {
 			if (block &&
@@ -1774,12 +1774,10 @@ static void intel_pch_reset_handshake(struct intel_display *display,
 	if (DISPLAY_VER(display) >= 35)
 		return;
 
-	if (display->platform.ivybridge) {
 
-	} else {
 		reg = HSW_NDE_RSTWRN_OPT;
 		reset_bits = RESET_PCH_HANDSHAKE_ENABLE;
-	}
+	
 
 	//if (DISPLAY_VER(display) >= 14)
 	//	reset_bits |= MTL_RESET_PICA_HANDSHAKE_EN;
@@ -2334,7 +2332,8 @@ intel_ddi_transcoder_func_reg_val_get()
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	enum pipe pipe = display->pipe0;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	enum port port = display->port0;
 	u32 temp;
 
@@ -2379,7 +2378,8 @@ intel_ddi_transcoder_func_reg_val_get()
 static u32 intel_ddi_set_dp_msa(bool wr)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	u32 temp;
 
 
@@ -2403,16 +2403,16 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 	}
 
 
-	//if (display->limited_color_range)
-	//	temp |= DP_MSA_MISC_COLOR_CEA_RGB;
+	if (crtc_state->limited_color_range)
+		temp |= DP_MSA_MISC_COLOR_CEA_RGB;
 
 
-	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
 		temp |= DP_MSA_MISC_COLOR_YCBCR_444_BT709;
 
 
 	//if (intel_dp_needs_vsc_sdp())
-		temp |= DP_MSA_MISC_COLOR_VSC_SDP;
+	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
 	
 	if (wr)
 	NBlue::callback->intel_de_write(display, TRANS_MSA_MISC(display, cpu_transcoder),
@@ -2423,6 +2423,8 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 static u32 bdw_set_pipe_misc()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	
 	u32 val = 0;
 
 	switch (display->panel.vbt.edp.bpp) {
@@ -2446,11 +2448,11 @@ static u32 bdw_set_pipe_misc()
 	if (display->panel.vbt.lvds_dither)
 		val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
 
-	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
-		display->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
+	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
+		crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
 		val |= PIPE_MISC_OUTPUT_COLORSPACE_YUV;
 
-	if (display->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
+	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
 		val |= DISPLAY_VER(display) >= 30 ? PIPE_MISC_YUV420_ENABLE :
 			PIPE_MISC_YUV420_ENABLE | PIPE_MISC_YUV420_MODE_FULL_BLEND;
 
@@ -2702,7 +2704,8 @@ static inline u8 intel_dp_training_pattern_symbol(u8 pattern)
 u32 dp_tp_ctl_reg()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
-	return TGL_DP_TP_CTL(display, display->cpu_transcoder);
+	struct intel_crtc_state *crtc_state = &display->crtc_state0;
+	return TGL_DP_TP_CTL(display, crtc_state->cpu_transcoder);
 }
 static void intel_ddi_set_link_train(struct intel_dp *intel_dp,u8 dp_train_pat)
 {
@@ -3529,6 +3532,8 @@ int drm_dp_pcon_convert_rgb_to_ycbcr(u8 color_spc)
 void intel_dp_configure_protocol_converter(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	
 	bool ycbcr444_to_420 = false;
 	bool rgb_to_ycbcr = false;
 	u8 tmp;
@@ -3542,8 +3547,8 @@ void intel_dp_configure_protocol_converter(struct intel_dp *intel_dp)
 	Gen11::callback->writeAUX(linkp,DP_PROTOCOL_CONVERTER_CONTROL_0, &tmp,1);
 
 
-	if (display->sink_format == INTEL_OUTPUT_FORMAT_YCBCR420) {
-		switch (display->output_format) {
+	if (crtc_state->sink_format == INTEL_OUTPUT_FORMAT_YCBCR420) {
+		switch (crtc_state->output_format) {
 		case INTEL_OUTPUT_FORMAT_YCBCR420:
 			break;
 		case INTEL_OUTPUT_FORMAT_YCBCR444:
@@ -3556,8 +3561,8 @@ void intel_dp_configure_protocol_converter(struct intel_dp *intel_dp)
 		default:
 			break;
 		}
-	} else if (display->sink_format == INTEL_OUTPUT_FORMAT_YCBCR444) {
-		switch (display->output_format) {
+	} else if (crtc_state->sink_format == INTEL_OUTPUT_FORMAT_YCBCR444) {
+		switch (crtc_state->output_format) {
 		case INTEL_OUTPUT_FORMAT_YCBCR444:
 			break;
 		case INTEL_OUTPUT_FORMAT_RGB:
@@ -3612,115 +3617,15 @@ write_dsc_decompression_flag( u8 flag, bool set)
 }
 
 
-static u32 gen8_de_pipe_fault_mask(struct intel_display *display)
-{
-	if (DISPLAY_VER(display) >= 20)
-		return MTL_PLANE_ATS_FAULT |
-			GEN9_PIPE_CURSOR_FAULT |
-			GEN11_PIPE_PLANE5_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else if (DISPLAY_VER(display) >= 14)
-		return MTL_PIPEDMC_ATS_FAULT |
-			MTL_PLANE_ATS_FAULT |
-			GEN12_PIPEDMC_FAULT |
-			GEN9_PIPE_CURSOR_FAULT |
-			GEN11_PIPE_PLANE5_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else if (DISPLAY_VER(display) >= 13 /*|| HAS_D12_PLANE_MINIMIZATION(display)*/)
-		return GEN12_PIPEDMC_FAULT |
-			GEN9_PIPE_CURSOR_FAULT |
-			GEN11_PIPE_PLANE5_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else if (DISPLAY_VER(display) == 12)
-		return GEN12_PIPEDMC_FAULT |
-			GEN9_PIPE_CURSOR_FAULT |
-			GEN11_PIPE_PLANE7_FAULT |
-			GEN11_PIPE_PLANE6_FAULT |
-			GEN11_PIPE_PLANE5_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else if (DISPLAY_VER(display) == 11)
-		return GEN9_PIPE_CURSOR_FAULT |
-			GEN11_PIPE_PLANE7_FAULT |
-			GEN11_PIPE_PLANE6_FAULT |
-			GEN11_PIPE_PLANE5_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else if (DISPLAY_VER(display) >= 9)
-		return GEN9_PIPE_CURSOR_FAULT |
-			GEN9_PIPE_PLANE4_FAULT |
-			GEN9_PIPE_PLANE3_FAULT |
-			GEN9_PIPE_PLANE2_FAULT |
-			GEN9_PIPE_PLANE1_FAULT;
-	else
-		return GEN8_PIPE_CURSOR_FAULT |
-			GEN8_PIPE_SPRITE_FAULT |
-			GEN8_PIPE_PRIMARY_FAULT;
-}
-static u32 gen8_de_port_aux_mask(struct intel_display *display)
-{
-	u32 mask;
-
-	if (DISPLAY_VER(display) >= 20)
-		return 0;
-	else if (DISPLAY_VER(display) >= 14)
-		return TGL_DE_PORT_AUX_DDIA |
-			TGL_DE_PORT_AUX_DDIB;
-	else if (DISPLAY_VER(display) >= 13)
-		return TGL_DE_PORT_AUX_DDIA |
-			TGL_DE_PORT_AUX_DDIB |
-			TGL_DE_PORT_AUX_DDIC |
-			XELPD_DE_PORT_AUX_DDID |
-			XELPD_DE_PORT_AUX_DDIE |
-			TGL_DE_PORT_AUX_USBC1 |
-			TGL_DE_PORT_AUX_USBC2 |
-			TGL_DE_PORT_AUX_USBC3 |
-			TGL_DE_PORT_AUX_USBC4;
-	else if (DISPLAY_VER(display) >= 12)
-		return TGL_DE_PORT_AUX_DDIA |
-			TGL_DE_PORT_AUX_DDIB |
-			TGL_DE_PORT_AUX_DDIC |
-			TGL_DE_PORT_AUX_USBC1 |
-			TGL_DE_PORT_AUX_USBC2 |
-			TGL_DE_PORT_AUX_USBC3 |
-			TGL_DE_PORT_AUX_USBC4 |
-			TGL_DE_PORT_AUX_USBC5 |
-			TGL_DE_PORT_AUX_USBC6;
-
-	mask = GEN8_AUX_CHANNEL_A;
-	if (DISPLAY_VER(display) >= 9)
-		mask |= GEN9_AUX_CHANNEL_B |
-			GEN9_AUX_CHANNEL_C |
-			GEN9_AUX_CHANNEL_D;
-
-	if (DISPLAY_VER(display) == 11) {
-		mask |= ICL_AUX_CHANNEL_F;
-		mask |= ICL_AUX_CHANNEL_E;
-	}
-
-	return mask;
-}
 
 static u32 dp_tp_status_reg()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
-
+	struct intel_crtc_state *crtc_state = &display->crtc_state0;
+	
 	if (DISPLAY_VER(display) >= 12)
 		return TGL_DP_TP_STATUS(display,
-								display->cpu_transcoder);
+								crtc_state->cpu_transcoder);
 	else
 		return DP_TP_STATUS(display->port0);
 }
@@ -3934,7 +3839,8 @@ void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
 void intel_ddi_enable_transcoder_clock()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	enum phy phy = display->phy0;
 	u32 val;
 
@@ -3957,7 +3863,8 @@ void
 intel_ddi_config_transcoder_func()
 {
 	struct intel_display *display = &NBlue::callback->display_base;
-	enum transcoder cpu_transcoder = display->cpu_transcoder;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	u32 ctl;
 
 	//intel_ddi_config_transcoder_dp2(crtc_state, true);
@@ -4022,8 +3929,6 @@ void intel_dp_sink_enable_decompression()
 
 int drm_dp_read_dpcd_caps(struct intel_dp *intel_dp)
 {
-	int ret;
-
 	
 	Gen11::callback->readAUX(linkp,0,&intel_dp->dpcd, DP_RECEIVER_CAP_SIZE);
 	
@@ -4048,7 +3953,7 @@ int drm_dp_read_dpcd_caps(struct intel_dp *intel_dp)
 	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);//????
 
 
-	return ret;
+	return 0;
 }
 
 bool intel_dp_start_link_train(struct intel_dp *intel_dp)
@@ -4119,6 +4024,8 @@ bool tgl_ddi_pre_enable_dp(struct intel_crtc_state *crtc_state)
 
 
 	intel_ddi_init_dp_buf_reg( intel_dp);
+	
+	intel_dp_enable_port(intel_dp);
 
 
 	if (!kexticl) Gen11::callback->enableVDDForAux(ccont2,linkp);
@@ -4360,7 +4267,7 @@ static void intel_ddi_read_func_ctl(struct intel_crtc_state *pipe_config)
 	} else if (ddi_mode == TRANS_DDI_MODE_SELECT_FDI_OR_128B132B && HAS_DP20(display)) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);*/
 		
-		pipe_config->output_types |= BIT(INTEL_OUTPUT_DP);
+		pipe_config->output_types |= BIT(INTEL_OUTPUT_EDP);
 		if (DISPLAY_VER(display) >= 12 &&
 			(ddi_func_ctl & TRANS_DDI_MODE_SELECT_MASK) == TRANS_DDI_MODE_SELECT_FDI_OR_128B132B)
 			pipe_config->mst_master_transcoder = static_cast<enum transcoder>(
@@ -4576,6 +4483,12 @@ static void intel_ddi_enable(struct intel_crtc_state *crtc_state)
 
 }
 
+static void icl_ddi_combo_get_config(struct intel_crtc_state *crtc_state)
+{
+	//intel_ddi_get_clock( crtc_state, icl_ddi_combo_get_pll(encoder));
+	intel_ddi_get_config( crtc_state);
+}
+
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
 	//return FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
@@ -4595,7 +4508,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	intel_dp->output_reg = DDI_BUF_CTL(port);
 	crtc_state->lane_count = lane_count;
 	crtc_state->port_clock=port_clock;
-	crtc_state->cpu_transcoder=display->cpu_transcoder;
+	crtc_state->cpu_transcoder=(enum transcoder) display->pipe0;
+	crtc_state->dither=display->panel.vbt.lvds_dither;
+	crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
 	
 	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
 	if (intel_dp->para != nullptr) {
@@ -4620,7 +4535,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	//intel_ddi_init
 	intel_dp_compute_config(crtc_state);
-	intel_ddi_get_config(crtc_state);
+	icl_ddi_combo_get_config(crtc_state);
 	
 	//intel_ddi_pre_enable_dp
 	auto ret=tgl_ddi_pre_enable_dp(crtc_state);

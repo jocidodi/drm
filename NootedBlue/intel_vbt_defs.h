@@ -5503,9 +5503,7 @@ struct intel_display {
 	
 	enum intel_pch pch_type;
 	
-	enum intel_output_format output_format;
-	enum intel_output_format sink_format;
-	enum transcoder cpu_transcoder;
+
 	
 	struct intel_hotplug hotplug;
 	
@@ -6725,13 +6723,7 @@ enum intel_output_type {
 	 DISPLAY_INFO((display))->pipe_offsets[PIPE_A] + \
 	 DISPLAY_MMIO_BASE((display)))
 
-u32 intel_display_device_pipe_offset(struct intel_display *display, enum pipe pipe)
-{
-	return INTEL_DISPLAY_DEVICE_PIPE_OFFSET(display, pipe);
-}
 
-#define INTEL_DISPLAY_DEVICE_PIPE_OFFSET(display, idx) \
-	intel_display_device_pipe_offset((display), (enum pipe)(idx))
 #define _MMIO_PIPE2(display, pipe, reg)		_MMIO(INTEL_DISPLAY_DEVICE_PIPE_OFFSET((display), (pipe)) + (reg))
 
 #define _PIPE_ARB_CTL_A			0x70028 /* icl+ */

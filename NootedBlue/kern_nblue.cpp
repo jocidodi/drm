@@ -940,21 +940,6 @@ int msecs_to_pps_units(int msecs)
 
 
 
-static enum intel_output_format
-bdw_get_pipe_misc_output_format(struct intel_display *display)
-{
-	u32 tmp;
-
-	tmp = NBlue::callback->readReg32( PIPE_MISC(display->pipe0));
-
-	if (tmp & PIPE_MISC_YUV420_ENABLE) {
-		return INTEL_OUTPUT_FORMAT_YCBCR420;
-	} else if (tmp & PIPE_MISC_OUTPUT_COLORSPACE_YUV) {
-		return INTEL_OUTPUT_FORMAT_YCBCR444;
-	} else {
-		return INTEL_OUTPUT_FORMAT_RGB;
-	}
-}
 
 
 
@@ -968,8 +953,6 @@ parse_lfp_backlight(struct intel_display *display)
 	int panel_type = vbt_get_panel_type(bdb, panel);
 	u16 level;
 	
-	display->output_format = bdw_get_pipe_misc_output_format(display);
-	display->sink_format = display->output_format;
 	if ((NBlue::callback->readReg32( DP_A) & EDP_PLL_FREQ_MASK) == EDP_PLL_FREQ_162MHZ)
 		display->port_clock = 162000;
 	else
@@ -1274,7 +1257,6 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 				display->phy0=phy;
 				display->aux_ch0=aux_ch;
 				display->pipe0=PIPE_A;
-				display->cpu_transcoder = (enum transcoder) PIPE_A;
 			}
 			
 			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
