@@ -1675,7 +1675,13 @@ struct bdb_prd_table_new {
 	struct prd_entry_new list[];				/* 217+ */
 } __packed;
 
+struct intel_bios_encoder_data {
+	struct intel_display *display;
 
+	struct child_device_config child;
+	struct dsc_compression_parameters_entry *dsc;
+	struct list_head node;
+};
 
 
 
@@ -4882,6 +4888,420 @@ struct intel_psr {
 	const char *no_psr_reason;
 };
 
+struct drm_rect {
+	int x1, y1, x2, y2;
+};
+struct dpll {
+	/* given values */
+	int n;
+	int m1, m2;
+	int p1, p2;
+	/* derived values */
+	int	dot;
+	int	vco;
+	int	m;
+	int	p;
+};
+struct intel_link_m_n {
+	u32 tu;
+	u32 data_m;
+	u32 data_n;
+	u32 link_m;
+	u32 link_n;
+};
+enum intel_panel_replay_dsc_support {
+	INTEL_DP_PANEL_REPLAY_DSC_NOT_SUPPORTED,
+	INTEL_DP_PANEL_REPLAY_DSC_FULL_FRAME_ONLY,
+	INTEL_DP_PANEL_REPLAY_DSC_SELECTIVE_UPDATE,
+};
+struct intel_scaler {
+	u32 mode;
+	bool in_use;
+	int hscale;
+	int vscale;
+};
+
+struct intel_crtc_scaler_state {
+#define SKL_NUM_SCALERS 2
+	struct intel_scaler scalers[SKL_NUM_SCALERS];
+
+#define SKL_CRTC_INDEX 31
+	unsigned scaler_users;
+
+	/* scaler used by crtc for panel fitting purpose */
+	int scaler_id;
+};
+
+enum intel_output_format {
+	INTEL_OUTPUT_FORMAT_RGB,
+	INTEL_OUTPUT_FORMAT_YCBCR420,
+	INTEL_OUTPUT_FORMAT_YCBCR444,
+};
+
+struct intel_crtc_state {
+
+
+#define PIPE_CONFIG_QUIRK_MODE_SYNC_FLAGS	(1<<0) /* unreliable sync mode.flags */
+	unsigned long quirks;
+
+	unsigned fb_bits; /* framebuffers to flip */
+	bool update_pipe; /* can a fast modeset be performed? */
+	bool update_m_n; /* update M/N seamlessly during fastset? */
+	bool update_lrr; /* update TRANS_VTOTAL/etc. during fastset? */
+	bool disable_cxsr;
+	bool update_wm_pre, update_wm_post; /* watermarks are updated */
+	bool fifo_changed; /* FIFO split is changed */
+	bool preload_luts;
+	bool inherited; /* state inherited from BIOS? */
+
+	/* Ask the hardware to actually async flip? */
+	bool do_async_flip;
+
+	/* Pipe source size (ie. panel fitter input size)
+	 * All planes will be positioned inside this space,
+	 * and get clipped at the edges. */
+	struct drm_rect pipe_src;
+
+	/*
+	 * Pipe pixel rate, adjusted for
+	 * panel fitter/pipe scaler downscaling.
+	 */
+	unsigned int pixel_rate;
+
+	/* Whether to set up the PCH/FDI. Note that we never allow sharing
+	 * between pch encoders and cpu encoders. */
+	bool has_pch_encoder;
+
+	/* Are we sending infoframes on the attached port */
+	bool has_infoframe;
+
+	/* CPU Transcoder for the pipe. Currently this can only differ from the
+	 * pipe on Haswell and later (where we have a special eDP transcoder)
+	 * and Broxton (where we have special DSI transcoders). */
+	enum transcoder cpu_transcoder;
+
+	/*
+	 * Use reduced/limited/broadcast rbg range, compressing from the full
+	 * range fed into the crtcs.
+	 */
+	bool limited_color_range;
+
+	/* Bitmask of encoder types (enum intel_output_type)
+	 * driven by the pipe.
+	 */
+	unsigned int output_types;
+
+	/* Whether we should send NULL infoframes. Required for audio. */
+	bool has_hdmi_sink;
+
+	/* Audio enabled on this pipe. Only valid if either has_hdmi_sink or
+	 * has_dp_encoder is set. */
+	bool has_audio;
+
+	/*
+	 * Enable dithering, used when the selected pipe bpp doesn't match the
+	 * plane bpp.
+	 */
+	bool dither;
+
+	/*
+	 * Dither gets enabled for 18bpp which causes CRC mismatch errors for
+	 * compliance video pattern tests.
+	 * Disable dither only if it is a compliance test request for
+	 * 18bpp.
+	 */
+	bool dither_force_disable;
+
+	/* Controls for the clock computation, to override various stages. */
+	bool clock_set;
+
+	/* SDVO TV has a bunch of special case. To make multifunction encoders
+	 * work correctly, we need to track this at runtime.*/
+	bool sdvo_tv_clock;
+
+	/*
+	 * crtc bandwidth limit, don't increase pipe bpp or clock if not really
+	 * required. This is set in the 2nd loop of calling encoder's
+	 * ->compute_config if the first pick doesn't work out.
+	 */
+	bool bw_constrained;
+
+	/* Settings for the intel dpll used on pretty much everything but
+	 * haswell. */
+	struct dpll dpll;
+
+
+	/* DSI PLL registers */
+	struct {
+		u32 ctrl, div;
+	} dsi_pll;
+
+	int max_link_bpp_x16;	/* in 1/16 bpp units */
+	int max_pipe_bpp;	/* in 1 bpp units */
+	int pipe_bpp;		/* in 1 bpp units */
+	int min_hblank;
+	struct intel_link_m_n dp_m_n;
+
+	/* m2_n2 for eDP downclock */
+	struct intel_link_m_n dp_m2_n2;
+	bool has_drrs;
+
+	/* PSR is supported but might not be enabled due the lack of enabled planes */
+	bool has_psr;
+	bool has_sel_update;
+	bool enable_psr2_sel_fetch;
+	bool enable_psr2_su_region_et;
+	bool req_psr2_sdp_prior_scanline;
+	bool has_panel_replay;
+	bool link_off_after_as_sdp_when_pr_active;
+	bool disable_as_sdp_when_pr_active;
+	bool wm_level_disabled;
+	bool pkg_c_latency_used;
+	/* Only used for state verification. */
+	enum intel_panel_replay_dsc_support panel_replay_dsc_support;
+	u32 dc3co_exitline;
+	u16 su_y_granularity;
+	u8 active_non_psr_pipes;
+	u8 entry_setup_frames;
+	const char *no_psr_reason;
+
+	/*
+	 * Frequency the dpll for the port should run at. Differs from the
+	 * adjusted dotclock e.g. for DP or 10/12bpc hdmi mode. This is also
+	 * already multiplied by pixel_multiplier.
+	 */
+	int port_clock;
+
+	/* Used by SDVO (and if we ever fix it, HDMI). */
+	unsigned pixel_multiplier;
+
+	/* I915_MODE_FLAG_* */
+	u8 mode_flags;
+
+	u8 lane_count;
+
+	/*
+	 * Used by platforms having DP/HDMI PHY with programmable lane
+	 * latency optimization.
+	 */
+	u8 lane_lat_optim_mask;
+
+	/* minimum acceptable voltage level */
+	u8 min_voltage_level;
+
+	/* Panel fitter controls for gen2-gen4 + VLV */
+	struct {
+		u32 control;
+		u32 pgm_ratios;
+		u32 lvds_border_bits;
+	} gmch_pfit;
+
+	/* Panel fitter placement and size for Ironlake+ */
+	struct {
+		struct drm_rect dst;
+		bool enabled;
+		bool force_thru;
+	} pch_pfit;
+
+	/* FDI configuration, only valid if has_pch_encoder is set. */
+	int fdi_lanes;
+	struct intel_link_m_n fdi_m_n;
+
+	bool ips_enabled;
+
+	bool crc_enabled;
+
+	bool double_wide;
+
+	struct intel_crtc_scaler_state scaler_state;
+
+	/* w/a for waiting 2 vblanks during crtc enable */
+	enum pipe hsw_workaround_pipe;
+
+
+	int min_cdclk;
+
+	int plane_min_cdclk[3];
+
+	/* for packed/planar CbCr */
+	u32 data_rate[3];
+	/* for planar Y */
+	u32 data_rate_y[3];
+
+	/* FIXME unify with data_rate[]? */
+	u64 rel_data_rate[3];
+	u64 rel_data_rate_y[3];
+
+	/* Gamma mode programmed on the pipe */
+	u32 gamma_mode;
+
+	union {
+		/* CSC mode programmed on the pipe */
+		u32 csc_mode;
+
+		/* CHV CGM mode */
+		u32 cgm_mode;
+	};
+
+	/* bitmask of logically enabled planes (enum plane_id) */
+	u8 enabled_planes;
+
+	/* bitmask of actually visible planes (enum plane_id) */
+	u8 active_planes;
+	u8 scaled_planes;
+	u8 nv12_planes;
+	u8 c8_planes;
+
+	/* bitmask of planes that will be updated during the commit */
+	u8 update_planes;
+
+	/* bitmask of planes with async flip active */
+	u8 async_flip_planes;
+
+	u8 framestart_delay; /* 1-4 */
+	u8 msa_timing_delay; /* 0-3 */
+
+	struct {
+		u32 enable;
+		u32 gcp;
+
+	} infoframes;
+
+	u8 eld[128];
+
+	/* HDMI scrambling status */
+	bool hdmi_scrambling;
+
+	/* HDMI High TMDS char rate ratio */
+	bool hdmi_high_tmds_clock_ratio;
+
+	/*
+	 * Output format RGB/YCBCR etc., that is coming out
+	 * at the end of the pipe.
+	 */
+	enum intel_output_format output_format;
+
+	/*
+	 * Sink output format RGB/YCBCR etc., that is going
+	 * into the sink.
+	 */
+	enum intel_output_format sink_format;
+
+	/* enable pipe gamma? */
+	bool gamma_enable;
+
+	/* enable pipe csc? */
+	bool csc_enable;
+
+	/* enable vlv/chv wgc csc? */
+	bool wgc_enable;
+
+	/* joiner pipe bitmask */
+	u8 joiner_pipes;
+
+	/* Display Stream compression state */
+	struct {
+		/* Only used for state computation, not read out from the HW. */
+		bool compression_enabled_on_link;
+		bool compression_enable;
+		struct intel_dsc_slice_config {
+			int pipes_per_line;
+			int streams_per_pipe;
+			int slices_per_stream;
+		} slice_config;
+		/* Compressed Bpp in U6.4 format (first 4 bits for fractional part) */
+		u16 compressed_bpp_x16;
+		//struct drm_dsc_config config;
+	} dsc;
+
+	/* DP tunnel used for BW allocation. */
+
+	/* HSW+ linetime watermarks */
+	u16 linetime;
+	u16 ips_linetime;
+
+	bool enhanced_framing;
+
+	/*
+	 * Forward Error Correction.
+	 *
+	 * Note: This will be false for 128b/132b, which will always have FEC
+	 * enabled automatically.
+	 */
+	bool fec_enable;
+
+	bool sdp_split_enable;
+
+	/* Pointer to master transcoder in case of tiled displays */
+	enum transcoder master_transcoder;
+
+	/* Bitmask to indicate slaves attached */
+	u8 sync_mode_slaves_mask;
+
+	/* Only valid on TGL+ */
+	enum transcoder mst_master_transcoder;
+
+	/* For DSB based pipe updates */
+	bool use_dsb;
+	bool use_flipq;
+
+	u32 psr2_man_track_ctl;
+
+	u32 pipe_srcsz_early_tpt;
+
+	struct drm_rect psr2_su_area;
+
+	/* Variable Refresh Rate state */
+	struct {
+		bool enable, in_range;
+		u8 pipeline_full;
+		u16 flipline, vmin, vmax, guardband;
+		u32 vsync_end, vsync_start;
+		struct {
+			bool enable;
+			u16 vmin, vmax;
+			u16 guardband, slope;
+			u16 max_increase, max_decrease;
+			u16 vblank_target;
+		} dc_balance;
+	} vrr;
+
+	/* Content Match Refresh Rate state */
+	struct {
+		bool enable;
+		u64 cmrr_n, cmrr_m;
+	} cmrr;
+
+	/* Stream Splitter for eDP MSO */
+	struct {
+		bool enable;
+		u8 link_count;
+		u8 pixel_overlap;
+	} splitter;
+
+	/* for loading single buffered registers during vblank */
+
+	/* LOBF flag */
+	bool has_lobf;
+
+	/* W2 window or 'set context latency' lines */
+	u16 set_context_latency;
+
+	struct {
+		u8 io_wake_lines;
+		u8 fast_wake_lines;
+
+		/* LNL and beyond */
+		u8 check_entry_lines;
+		u8 aux_less_wake_lines;
+		u8 silence_period_sym_clocks;
+		u8 lfps_half_cycle_num_of_syms;
+	} alpm_state;
+
+	/* to track changes in plane color blocks */
+	bool plane_color_changed;
+};
+
 struct intel_dp {
 	u32 output_reg;
 	u32 DP;
@@ -4892,7 +5312,6 @@ struct intel_dp {
 	bool needs_modeset_retry;
 	bool use_max_params;
 	
-	bool enhanced_framing;
 	
 	struct AGDCDPPortConfig_t *para;
 	struct intel_psr psr;
@@ -5073,16 +5492,14 @@ struct intel_hotplug {
 	bool ignore_long_hpd;
 };
 
-enum intel_output_format {
-	INTEL_OUTPUT_FORMAT_RGB,
-	INTEL_OUTPUT_FORMAT_YCBCR420,
-	INTEL_OUTPUT_FORMAT_YCBCR444,
-};
+
 
 
 struct intel_display {
 	
 	struct intel_display_platforms platform;
+	struct intel_crtc_state crtc_state0;
+	struct intel_dp intel_dp0;
 	
 	enum intel_pch pch_type;
 	
@@ -5141,7 +5558,7 @@ struct intel_display {
 	struct intel_vbt_data vbt;
 	struct intel_opregion opregion;
 	
-	struct intel_dp intel_dp0;
+	
 	const struct child_device_config *child0;
 	enum port port0;
 	enum phy phy0;
@@ -6270,7 +6687,7 @@ enum drm_colorspace {
 	DRM_MODE_COLORIMETRY_BT601_YCC		= 15,
 	DRM_MODE_COLORIMETRY_COUNT
 };
-
+# define DP_ENHANCED_FRAME_CAP		    (1 << 7)
 
 
 

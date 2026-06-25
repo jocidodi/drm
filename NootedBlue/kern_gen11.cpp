@@ -3424,12 +3424,9 @@ static void intel_ddi_buf_enable( u32 buf_ctl)
 static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
+	struct intel_crtc_state *crtc_state = &display->crtc_state0;
 	u32 dp_tp_ctl;
 
-	dp_tp_ctl = NBlue::callback->intel_de_read(display, dp_tp_ctl_reg());
-
-	bool enhanced_framing =	dp_tp_ctl &	DP_TP_CTL_ENHANCED_FRAME_ENABLE;
-	intel_dp->enhanced_framing=enhanced_framing;
 	
 	dp_tp_ctl = DP_TP_CTL_ENABLE | DP_TP_CTL_LINK_TRAIN_PAT1;
 	/*if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||
@@ -3437,7 +3434,8 @@ static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 		dp_tp_ctl |= DP_TP_CTL_MODE_MST;
 	} else {*/
 		dp_tp_ctl |= DP_TP_CTL_MODE_SST;
-		if (enhanced_framing)
+	
+		if (crtc_state->enhanced_framing)
 			dp_tp_ctl |= DP_TP_CTL_ENHANCED_FRAME_ENABLE;
 	//}
 
@@ -3839,8 +3837,10 @@ static void intel_dp_update_link_bw_set(struct intel_dp *intel_dp,
 					u8 link_bw, u8 rate_select)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	
 	intel_dp_link_training_set_bw(intel_dp, link_bw, rate_select, display->panel.vbt.edp.lanes,
-								  intel_dp->enhanced_framing);
+								  crtc_state->enhanced_framing);
 }
 
 static bool
@@ -4020,6 +4020,37 @@ void intel_dp_sink_enable_decompression()
 	}
 }
 
+int drm_dp_read_dpcd_caps(struct intel_dp *intel_dp)
+{
+	int ret;
+
+	
+	Gen11::callback->readAUX(linkp,0,&intel_dp->dpcd, DP_RECEIVER_CAP_SIZE);
+	
+	if ((intel_dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
+		  DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT))
+		{
+			u8 dpcd_ext[DP_RECEIVER_CAP_SIZE];
+			int r=Gen11::callback->readAUX(linkp,DP_DP13_DPCD_REV,&dpcd_ext, DP_RECEIVER_CAP_SIZE);
+			if (r >= 0)
+			{
+				int ok=1;
+				if (intel_dp->dpcd[DP_DPCD_REV] > dpcd_ext[DP_DPCD_REV]) ok=0;
+
+				if (ok)
+				if (!memcmp(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext))) ok=0;
+
+				if (ok)
+				memcpy(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext));
+			}
+		}
+	
+	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);//????
+
+
+	return ret;
+}
+
 bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -4031,11 +4062,12 @@ bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 
 	//intel_hpd_block(encoder);
 
+	drm_dp_read_dpcd_caps(intel_dp);
 	/*lttpr_count = intel_dp_init_lttpr_and_dprx_caps(intel_dp);
 
 	if (lttpr_count < 0)
-		lttpr_count = 0;
-*/
+		lttpr_count = 0;*/
+
 	intel_dp_prepare_link_train(intel_dp);
 
 	/*if (intel_dp_is_uhbr(crtc_state))
@@ -4064,6 +4096,179 @@ bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 	return passed;
 }
 
+void intel_dp_set_link_params(struct intel_dp *intel_dp,
+				  int link_rate, int lane_count)
+{
+	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
+	intel_dp->link.active = false;
+	intel_dp->needs_modeset_retry = false;
+	intel_dp->link_rate = link_rate;
+	intel_dp->lane_count = lane_count;
+}
+
+static bool tgl_ddi_pre_enable_dp(struct intel_crtc_state *crtc_state)
+{
+	struct intel_display *display =&NBlue::callback->display_base;
+	struct intel_dp *intel_dp = &display->intel_dp0;
+	bool is_mst = false;//intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST);
+	int ret;
+
+	intel_dp_set_link_params(intel_dp,
+				 crtc_state->port_clock,
+				 crtc_state->lane_count);
+
+
+	intel_ddi_init_dp_buf_reg( intel_dp);
+
+
+	//if (!kexticl) enableVDDForAux(ccont2,that);
+	//else enableVDDForAux2(ccont2,that);
+
+	Gen11::callback->hwSetPanelPower(ccont2,2);
+
+	//if (!kexticl) disableVDDForAux(ccont2);
+	//else disableVDDForAux2(ccont2,that);
+
+	/*_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
+				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
+				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
+				  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(phy));*/
+
+	intel_ddi_enable_transcoder_clock();
+
+
+	intel_ddi_config_transcoder_func();
+
+	icl_combo_phy_set_signal_levels(display);
+	
+	intel_combo_phy_power_up_lanes(display, display->phy0, false,
+					   crtc_state->lane_count,
+								   display->child0->lane_reversal);
+	
+
+	intel_ddi_mso_configure();
+
+	if (!is_mst)
+		intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
+
+	intel_dp_configure_protocol_converter(intel_dp);
+	if (!is_mst)
+		intel_dp_sink_enable_decompression();
+
+	//intel_dp_sink_set_fec_ready(intel_dp, crtc_state, true);
+
+	//intel_dp_check_frl_training(intel_dp);
+	//intel_dp_pcon_dsc_configure(intel_dp, crtc_state);
+
+
+	ret=intel_dp_start_link_train( intel_dp);
+
+	//if (!is_trans_port_sync_mode(crtc_state))
+		intel_dp_stop_link_train(intel_dp);
+
+	//intel_ddi_enable_fec(encoder, crtc_state);
+	return ret;
+}
+
+static int tgl_ddi_min_voltage_level(const struct intel_crtc_state *crtc_state)
+{
+	if (crtc_state->port_clock > 594000)
+		return 2;
+	else
+		return 0;
+}
+static inline bool
+drm_dp_enhanced_frame_cap(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	return dpcd[DP_DPCD_REV] >= 0x11 &&
+		(dpcd[9] & DP_ENHANCED_FRAME_CAP);
+}
+
+int
+intel_dp_compute_config(struct intel_crtc_state *pipe_config)
+{
+	struct intel_display *display=&NBlue::callback->display_base;
+	struct intel_dp *intel_dp=&display->intel_dp0;
+	
+	int ret = 0, link_bpp_x16;
+
+
+	pipe_config->sink_format =INTEL_OUTPUT_FORMAT_RGB;
+	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
+	
+	/*ret = intel_dp_compute_output_format(encoder, pipe_config, conn_state, true);
+	if (ret)
+		ret = intel_dp_compute_output_format(encoder, pipe_config, conn_state, false);
+	if (ret)
+		return ret;
+*/
+
+	pipe_config->limited_color_range = false;
+		//intel_dp_limited_color_range(pipe_config, conn_state);
+
+
+		pipe_config->enhanced_framing =
+			drm_dp_enhanced_frame_cap(intel_dp->dpcd);
+	
+
+	/*if (pipe_config->dsc.compression_enable)
+		link_bpp_x16 = pipe_config->dsc.compressed_bpp_x16;
+	else
+		link_bpp_x16 = intel_dp_output_format_link_bpp_x16(pipe_config->output_format,
+								   pipe_config->pipe_bpp);*/
+
+	/*if (intel_dp->mso_link_count) {
+		int n = intel_dp->mso_link_count;
+		int overlap = intel_dp->mso_pixel_overlap;
+
+		pipe_config->splitter.enable = true;
+		pipe_config->splitter.link_count = n;
+		pipe_config->splitter.pixel_overlap = overlap;
+
+		adjusted_mode->crtc_hdisplay = adjusted_mode->crtc_hdisplay / n + overlap;
+		adjusted_mode->crtc_hblank_start = adjusted_mode->crtc_hblank_start / n + overlap;
+		adjusted_mode->crtc_hblank_end = adjusted_mode->crtc_hblank_end / n + overlap;
+		adjusted_mode->crtc_hsync_start = adjusted_mode->crtc_hsync_start / n + overlap;
+		adjusted_mode->crtc_hsync_end = adjusted_mode->crtc_hsync_end / n + overlap;
+		adjusted_mode->crtc_htotal = adjusted_mode->crtc_htotal / n + overlap;
+		adjusted_mode->crtc_clock /= n;
+	}*/
+
+	//intel_dp_audio_compute_config(encoder, pipe_config, conn_state);
+
+	/*if (!intel_dp_is_uhbr(pipe_config)) {
+		intel_link_compute_m_n(link_bpp_x16,
+					   pipe_config->lane_count,
+					   adjusted_mode->crtc_clock,
+					   pipe_config->port_clock,
+					   intel_dp_bw_fec_overhead(pipe_config->fec_enable),
+					   &pipe_config->dp_m_n);
+	}
+
+	ret = intel_dp_compute_min_hblank(pipe_config, conn_state);
+	if (ret)
+		return ret;
+
+	if (pipe_config->splitter.enable)
+		pipe_config->dp_m_n.data_m *= pipe_config->splitter.link_count;*/
+
+	//intel_vrr_compute_config(pipe_config, conn_state);
+	//intel_dp_compute_as_sdp(intel_dp, pipe_config);
+	
+	//intel_psr_compute_config(intel_dp, pipe_config, conn_state);
+	pipe_config->panel_replay_dsc_support = INTEL_DP_PANEL_REPLAY_DSC_NOT_SUPPORTED;
+	pipe_config->has_panel_replay = false;
+	pipe_config->has_psr = pipe_config->has_panel_replay ? true : false;
+	
+	//intel_alpm_lobf_compute_config(intel_dp, pipe_config, conn_state);
+	//intel_dp_drrs_compute_config(connector, pipe_config, link_bpp_x16);
+	//intel_dp_compute_vsc_sdp(intel_dp, pipe_config, conn_state);
+	//intel_dp_compute_hdr_metadata_infoframe_sdp(intel_dp, pipe_config, conn_state);
+
+	return 0;
+}
+
+
 
 
 uint64_t  Gen11::linkTraining(void *that,void *param_1)
@@ -4077,11 +4282,14 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	enum phy phy=display->phy0;
 	enum port port=display->port0;
 	struct intel_dp *intel_dp=&display->intel_dp0;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 	
 	memset(intel_dp->train_set, 0, sizeof(intel_dp->train_set));
 	intel_dp->link_rate = port_clock;
 	intel_dp->lane_count = lane_count;
 	intel_dp->output_reg = DDI_BUF_CTL(port);
+	crtc_state->lane_count = lane_count;
+	crtc_state->port_clock=port_clock;
 	
 	
 	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
@@ -4104,72 +4312,12 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->preEmphasis = 0;
 	}
 	
+	
+	//intel_ddi_init
+	intel_dp_compute_config(crtc_state);
 
 	
-	intel_ddi_init_dp_buf_reg(intel_dp);
-	
-	//with_intel_pps_lock(intel_dp) {
-		intel_dp_enable_port(intel_dp);
-	
-		//if (!kexticl) enableVDDForAux(ccont2,that);
-		//else enableVDDForAux2(ccont2,that);
-	
-		hwSetPanelPower(ccont2,2);
-	
-		//if (!kexticl) disableVDDForAux(ccont2);
-		//else disableVDDForAux2(ccont2,that);
-	
-	Gen11::callback->readAUX(linkp,0,&intel_dp->dpcd, DP_RECEIVER_CAP_SIZE);
-	
-	if ((intel_dp->dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
-		  DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT))
-		{
-			u8 dpcd_ext[DP_RECEIVER_CAP_SIZE];
-			int r=Gen11::callback->readAUX(linkp,DP_DP13_DPCD_REV,&dpcd_ext, DP_RECEIVER_CAP_SIZE);
-			if (r >= 0)
-			{
-				int ok=1;
-				if (intel_dp->dpcd[DP_DPCD_REV] > dpcd_ext[DP_DPCD_REV]) ok=0;
-
-				if (ok)
-				if (!memcmp(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext))) ok=0;
-
-				if (ok)
-				memcpy(intel_dp->dpcd, dpcd_ext, sizeof(dpcd_ext));
-			}
-		}
-	
-	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);//????
-	
-
-	/*
-	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(phy),
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, phy),
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(phy));
-
-	intel_ddi_enable_transcoder_clock();
-
-	intel_ddi_config_transcoder_func();
-*/
-	icl_combo_phy_set_signal_levels(display);
-	
-	intel_combo_phy_power_up_lanes(display, phy, false, lane_count, display->child0->lane_reversal);
-
-	intel_ddi_mso_configure();
-	
-	intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
-	
-	intel_dp_configure_protocol_converter(intel_dp);
-	
-	intel_dp_sink_enable_decompression();
-
-	
-	bool ret=intel_dp_start_link_train(intel_dp);
-	
-	intel_dp_stop_link_train(intel_dp);
-	
-	//intel_dsc_dp_pps_write
+	auto ret=tgl_ddi_pre_enable_dp(crtc_state);
 	
 	intel_ddi_set_dp_msa(true);
 	
