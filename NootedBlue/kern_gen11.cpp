@@ -123,14 +123,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
 		static const uint8_t r9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
 		
-		static const uint8_t f9c[]= {0x41, 0x83, 0xbe, 0xdc, 0x01, 0x00, 0x00, 0x00, 0x0f, 0x85, 0xb8, 0x02, 0x00, 0x00};
-		static const uint8_t r9c[]= {0x41, 0x83, 0xbe, 0xdc, 0x01, 0x00, 0x00, 0x00, 0x48, 0xe9, 0xb8, 0x02, 0x00, 0x00};
-		
-		static const uint8_t f9d[]= {0xf6, 0x40, 0x14, 0x08, 0x0f, 0x84, 0x77, 0xff, 0xff, 0xff};
-		static const uint8_t r9d[]= {0xf6, 0x40, 0x14, 0x08, 0x48, 0xe9, 0x77, 0xff, 0xff, 0xff};
-		
-		static const uint8_t f9e[]= {0x80, 0xb8, 0x45, 0x1b, 0x00, 0x00, 0x00, 0x74, 0x13};
-		static const uint8_t r9e[]= {0x80, 0xb8, 0x45, 0x1b, 0x00, 0x00, 0x00, 0xeb, 0x13};
 		
 		
 		//register adresses
@@ -156,9 +148,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			{&kextG11FB, f9b, r9b, arrsize(f9b),    1},
-			{&kextG11FB, f9c, r9c, arrsize(f9c),    1},
-			{&kextG11FB, f9d, r9d, arrsize(f9d),    1},
-			{&kextG11FB, f9e, r9e, arrsize(f9e),    1},
 			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
 			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
@@ -513,10 +502,7 @@ void  Gen11::initPlatformWorkarounds(void *that)
 uint64_t  Gen11::getOSInformation2(void *that)
 {
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
-	if (bk==2){
-		NBlue::callback->parse_backlight();
-		bk=1;
-	}
+
 	
 	struct FramebufferICLLP *pinfo =static_cast<FramebufferICLLP *>(callback->gPlatformInformationList);
 	int p=0x6;
@@ -552,8 +538,8 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	
-	//pinfo[p].connectors[0].flags-=8;
-	//pinfo[p].connectors[0].pipe=1; // bad hack
+	pinfo[p].connectors[0].flags-=8;
+	pinfo[p].connectors[0].pipe=1;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -578,10 +564,7 @@ uint64_t  Gen11::getOSInformation(void *that)
 {
 	
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
-	if (bk==2){
-		NBlue::callback->parse_backlight();
-		bk=1;
-	}
+
 	
 	struct PlatformInfo *pinfo =static_cast<PlatformInfo *>(callback->gPlatformInformationList);
 	
@@ -716,10 +699,10 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 {
 	FunctionCast(hwGetCRTC, callback->ohwGetCRTC)(that,param_1,param_2 );
 	
-	/*if (bk==2){
+	if (bk==2){
 		NBlue::callback->parse_backlight();
 		bk=1;
-	}*/
+	}
 	
 	if (bk==1){
 		
@@ -769,10 +752,10 @@ void Gen11::hwGetCRTC(void *that,void *param_1,void *param_2)
 void Gen11::hwSetPanelPowerConfig(void *that, uint param_1)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
-	/*if (bk==2){
+	if (bk==2){
 		NBlue::callback->parse_backlight();
 		bk=1;
-	}*/
+	}
 	
 	if (kexticl) getMember<uint32_t>(that, 0xd00)= param_1;
 	else getMember<uint32_t>(that, 0xd48)= param_1;
@@ -1092,7 +1075,7 @@ int Gen11::getTranscoderOffset(void *that,void *param_1,uint param_2)
 {
 	auto ret=FunctionCast(getTranscoderOffset, callback->ogetTranscoderOffset)(that,param_1,param_2 );
 	
-	if (ret==0xf000) return 0;
+	return 0;
 	return ret;
 }
 
@@ -2356,7 +2339,6 @@ intel_ddi_transcoder_func_reg_val_get()
 	u32 temp;
 
 	
-	/* Enable TRANS_DDI_FUNC_CTL for the pipe to work in HDMI mode */
 	temp = TRANS_DDI_FUNC_ENABLE;
 	if (DISPLAY_VER(display) >= 12)
 		temp |= TGL_TRANS_DDI_SELECT_PORT(port);
@@ -3981,7 +3963,7 @@ intel_ddi_config_transcoder_func()
 	//intel_ddi_config_transcoder_dp2(crtc_state, true);
 
 	ctl = intel_ddi_transcoder_func_reg_val_get();
-	ctl &= ~TRANS_DDI_FUNC_ENABLE;
+	//ctl &= ~TRANS_DDI_FUNC_ENABLE;
 	NBlue::callback->intel_de_write(display, TRANS_DDI_FUNC_CTL(display, cpu_transcoder),
 			   ctl);
 }
@@ -4104,6 +4086,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
 	if (intel_dp->para != nullptr) {
+		intel_dp->para->portindex=0;
 		intel_dp->para->status = 0;
 		intel_dp->para->field1 = 0x200;
 		intel_dp->para->field2 = 0;
@@ -4158,7 +4141,6 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	Gen11::callback->readAUX(linkp,0,&intel_dp->edp_dpcd, EDP_DISPLAY_CTL_CAP_SIZE);//????
 	
-	//intel_ddi_get_config
 
 	/*
 	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,

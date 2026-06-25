@@ -109,15 +109,5 @@ else
     echo "⚠️ File $TARGET_KC not found. Skipping removal."
 fi
 
-# 5. Trigger macOS permissions/authorization prompt for Kernel Extensions
-echo "--------------------------------------------------"
-echo "🔔 Touching /Library/Extensions to trigger macOS kext authorization..."
-if [ -d "/Library/Extensions" ]; then
-    touch /Library/Extensions
-    echo "✅ Done. macOS should now prompt for kernel extension authorization (if applicable)."
-else
-    echo "⚠️ /Library/Extensions does not exist. Skipping touch."
-fi
-
 echo "--------------------------------------------------"
 echo "🎉 All operations completed!"

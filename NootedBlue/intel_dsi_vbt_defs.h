@@ -19,15 +19,16 @@ typedef uint64_t u64;
 typedef uint64_t resource_size_t;
 
 struct AGDCDPPortConfig_t { /* PlaceHolder Structure */
-	__uint64_t field0_0x0;
-	__uint16_t field1;
+	__uint32_t portindex;
+	__uint32_t field1;
+	__uint16_t AGDCLinkConfigP;
 	__uint8_t BitRate; /* Created by Rename Structure Field action */
 	__uint8_t enableMST; /* Created by Rename Structure Field action */
 	__uint16_t CR;
 	__uint16_t EQ;
-	__uint8_t field6_0x10;
-	__uint8_t field7_0x11;
-	__uint8_t field8_0x12;
+	__uint8_t field7_0x10;
+	__uint8_t field8_0x11;
+	__uint8_t field9_0x12;
 	__uint8_t NumberOfLanes; /* Created by Rename Structure Field action */
 	__uint8_t voltageSwing; /* Created by Rename Structure Field action */
 	__uint8_t preEmphasis; /* Created by Rename Structure Field action */
@@ -35,13 +36,16 @@ struct AGDCDPPortConfig_t { /* PlaceHolder Structure */
 	__uint8_t ASR; /* Created by Rename Structure Field action */
 	__uint8_t BitRate2; /* Created by Rename Structure Field action */
 	__uint8_t NumberOfLanes2; /* Created by Rename Structure Field action */
-	__uint8_t field16_0x1a;
+	__uint8_t field17_0x1a;
 	__uint8_t EnhancedFraming; /* Created by Rename Structure Field action */
 	__uint32_t field2;
-	__uint64_t field19_0x20;
-	__uint64_t field20_0x28;
-	__uint64_t field21_0x30;
+	__uint64_t field20_0x20;
+	__uint64_t field21_0x28;
+	__uint64_t field22_0x30;
 	__uint32_t status;
+	__uint64_t linkst;
+	__uint64_t field25_0x44;
+	__uint32_t field26_0x4c;
 };
 
 #define REG_BIT(n) (1UL << (n))
