@@ -4289,11 +4289,10 @@ static void intel_ddi_read_func_ctl_dp_sst(struct intel_crtc_state *crtc_state,
 
 	//if (encoder->type == INTEL_OUTPUT_EDP)
 	
-	if (display->bconnectors[0].type & ConnectorLVDS)
-		crtc_state->output_types = BIT(INTEL_OUTPUT_EDP);
-	
-	if (display->bconnectors[0].flags & CNFlagDP)
-			crtc_state->output_types = BIT(INTEL_OUTPUT_DP);
+	if (display->child0->device_type & DEVICE_TYPE_DISPLAYPORT_OUTPUT)
+		crtc_state->output_types |= BIT(INTEL_OUTPUT_DP);
+	else
+		crtc_state->output_types |= BIT(INTEL_OUTPUT_EDP);
 	
 	//crtc_state->lane_count =
 	//	((ddi_func_ctl & DDI_PORT_WIDTH_MASK) >> DDI_PORT_WIDTH_SHIFT) + 1;
