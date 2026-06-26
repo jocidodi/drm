@@ -45,6 +45,8 @@ class NBlue {
 	uint32_t deviceId {0};
 	uint16_t revision {0};
 	uint32_t pciRevision {0};
+	bool tglid;
+	bool iclid;
 	
 	IOMemoryMap *rmmio {nullptr};
 	volatile UInt32 *rmmioPtr {nullptr};

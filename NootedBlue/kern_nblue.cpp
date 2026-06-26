@@ -100,6 +100,11 @@ void NBlue::processPatcher(KernelPatcher &patcher) {
 		nlock=IOSimpleLockAlloc();
         this->deviceId = WIOKit::readPCIConfigValue(this->iGPU, WIOKit::kIOPCIConfigDeviceID);
         this->pciRevision = WIOKit::readPCIConfigValue(NBlue::callback->iGPU, WIOKit::kIOPCIConfigRevisionID);
+		
+		uint32_t device;
+		WIOKit::getOSDataValue(this->iGPU, "device-id", device);
+		this->tglid=device==0x9a49;
+		this->iclid=device==0x8a52;
 
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
 		KernelPatcher::routeVirtual(this->iGPU, WIOKit::PCIConfigOffset::ConfigRead32, configRead32, &orgConfigRead32);
@@ -136,7 +141,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 	if (!err) ok=1;
 	
 	
-	if (ok) { //not running mac os installer
+	if (ok && (NBlue::callback->tglid || NBlue::callback->iclid)) { //not running mac os installer
 		
 		
 		int ok2=0;
@@ -147,11 +152,12 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 			if (!err) vnode_put(vnode);
 			vfs_context_rele(ctxt);
 			if (!err) ok=1;
+			if (!NBlue::callback->tglid ) ok=0;
 			if (ok) ok2=1;
 		
 	
 		int tcap=0;
-		if (1) {
+		if (NBlue::callback->tglid || NBlue::callback->iclid) {
 
 				const auto driversXML = getFWByName(ok ? "Driverf2.xml":"Driverf1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
@@ -174,7 +180,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
 		}
-		if (1) {
+		if (NBlue::callback->tglid || NBlue::callback->iclid) {
 				ok=0;
 				int sle=-1;
 				vnode = NULLVP;
@@ -194,6 +200,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 					   if (!err) ok=1;
 						if (!err) sle=0;
 					}
+			if (!NBlue::callback->tglid ) ok=0;
 			
 			if (ok && sle>=0){
 				const auto driversXML = getFWByName(sle ? "Drivera2.xml": "Drivera3.xml");
@@ -217,7 +224,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 				OSSafeReleaseNULL(dataUnserialized);
 				IOFree(driversXML.data, driversXML.size);
 			}
-			else if (!ok2)
+			else if (!ok2 && NBlue::callback->iclid)
 			{
 				const auto driversXML = getFWByName("Drivera1.xml");
 				auto *dataNull = new char[driversXML.size + 1];
@@ -283,7 +290,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 	}  else if (kextBacklight.loadIndex == index) {
 		KernelPatcher::RouteRequest request {"__ZN15AppleIntelPanel10setDisplayEP9IODisplay", wrapApplePanelSetDisplay,
 	  orgApplePanelSetDisplay};
-			if (patcher.routeMultiple(kextBacklight.loadIndex, &request, 1, address, size)) {
+			if (patcher.routeMultipleLong(kextBacklight.loadIndex, &request, 1, address, size)) {
 				const UInt8 find[] = {"F%uT%04x"};
 				const UInt8 replace[] = {"F%uTxxxx"};
 				const LookupPatchPlus patch {&kextBacklight, find, replace, 1};
@@ -295,7 +302,7 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				{"__ZN25AppleMCCSControlGibraltar5probeEP9IOServicePi", wrapFunctionReturnZero},
 				{"__ZN21AppleMCCSControlCello5probeEP9IOServicePi", wrapFunctionReturnZero},
 			};
-			patcher.routeMultiple(index, requests, address, size);
+			patcher.routeMultipleLong(index, requests, address, size);
 			patcher.clearError();
 	return true;
 } else if (gen11.processKext(patcher, index, address, size)) {

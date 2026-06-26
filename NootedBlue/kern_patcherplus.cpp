@@ -37,7 +37,7 @@ bool SolveRequestPlus::solveAll(KernelPatcher &patcher, size_t id, SolveRequestP
 }
 
 bool RouteRequestPlus::route(KernelPatcher &patcher, size_t id, mach_vm_address_t address, size_t maxSize) {
-	if (patcher.routeMultiple(id, this, 1, address, maxSize)) { return true; }
+	if (patcher.routeMultipleLong(id, this, 1, address, maxSize)) { return true; }
 	patcher.clearError();
 
 	if (!this->pattern || !this->patternSize) {
