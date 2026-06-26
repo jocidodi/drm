@@ -666,6 +666,8 @@ public:
 	static bool dotrue();
 	static bool dofalse();
 	static int dozero();
+	
+	
 	volatile UInt32 *rmmioPtr {nullptr};
 	uint32_t rmmioLen;
 	
