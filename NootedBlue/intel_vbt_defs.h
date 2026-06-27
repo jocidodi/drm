@@ -5011,9 +5011,129 @@ enum intel_output_format {
 	INTEL_OUTPUT_FORMAT_YCBCR444,
 };
 
+enum drm_mode_status {
+	MODE_OK = 0,
+	MODE_HSYNC,
+	MODE_VSYNC,
+	MODE_H_ILLEGAL,
+	MODE_V_ILLEGAL,
+	MODE_BAD_WIDTH,
+	MODE_NOMODE,
+	MODE_NO_INTERLACE,
+	MODE_NO_DBLESCAN,
+	MODE_NO_VSCAN,
+	MODE_MEM,
+	MODE_VIRTUAL_X,
+	MODE_VIRTUAL_Y,
+	MODE_MEM_VIRT,
+	MODE_NOCLOCK,
+	MODE_CLOCK_HIGH,
+	MODE_CLOCK_LOW,
+	MODE_CLOCK_RANGE,
+	MODE_BAD_HVALUE,
+	MODE_BAD_VVALUE,
+	MODE_BAD_VSCAN,
+	MODE_HSYNC_NARROW,
+	MODE_HSYNC_WIDE,
+	MODE_HBLANK_NARROW,
+	MODE_HBLANK_WIDE,
+	MODE_VSYNC_NARROW,
+	MODE_VSYNC_WIDE,
+	MODE_VBLANK_NARROW,
+	MODE_VBLANK_WIDE,
+	MODE_PANEL,
+	MODE_INTERLACE_WIDTH,
+	MODE_ONE_WIDTH,
+	MODE_ONE_HEIGHT,
+	MODE_ONE_SIZE,
+	MODE_NO_REDUCED,
+	MODE_NO_STEREO,
+	MODE_NO_420,
+	MODE_STALE = -3,
+	MODE_BAD = -2,
+	MODE_ERROR = -1
+};
+
+struct drm_display_mode {
+
+	int clock;		/* in kHz */
+	u16 hdisplay;
+	u16 hsync_start;
+	u16 hsync_end;
+	u16 htotal;
+	u16 hskew;
+	u16 vdisplay;
+	u16 vsync_start;
+	u16 vsync_end;
+	u16 vtotal;
+	u16 vscan;
+
+
+	u32 flags;
+
+
+	int crtc_clock;
+	u16 crtc_hdisplay;
+	u16 crtc_hblank_start;
+	u16 crtc_hblank_end;
+	u16 crtc_hsync_start;
+	u16 crtc_hsync_end;
+	u16 crtc_htotal;
+	u16 crtc_hskew;
+	u16 crtc_vdisplay;
+	u16 crtc_vblank_start;
+	u16 crtc_vblank_end;
+	u16 crtc_vsync_start;
+	u16 crtc_vsync_end;
+	u16 crtc_vtotal;
+
+
+	u16 width_mm;
+
+
+	u16 height_mm;
+
+
+	u8 type;
+
+	bool expose_to_userspace;
+
+	/**
+	 * @head:
+	 *
+	 * struct list_head for mode lists.
+	 */
+	struct list_head head;
+
+	char name[32];
+
+	/**
+	 * @status:
+	 *
+	 * Status of the mode, used to filter out modes not supported by the
+	 * hardware. See enum &drm_mode_status.
+	 */
+	enum drm_mode_status status;
+
+	/**
+	 * @picture_aspect_ratio:
+	 *
+	 * Field for setting the HDMI picture aspect ratio of a mode.
+	 */
+	//enum hdmi_picture_aspect picture_aspect_ratio;
+
+};
 struct intel_crtc_state {
 
-
+	struct {
+		bool active, enable;
+		/* logical state of LUTs */
+		//struct drm_property_blob *degamma_lut, *gamma_lut, *ctm;
+		struct drm_display_mode mode, pipe_mode, adjusted_mode;
+		//enum drm_scaling_filter scaling_filter;
+		//struct intel_casf casf_params;
+	} hw;
+	
 #define PIPE_CONFIG_QUIRK_MODE_SYNC_FLAGS	(1<<0) /* unreliable sync mode.flags */
 	unsigned long quirks;
 
@@ -6270,6 +6390,17 @@ bool intel_phy_is_combo(struct intel_display *display, enum phy phy)
 		for_each_if(intel_phy_is_combo(__display, __phy))
 
 
+#define for_each_cpu_transcoder(__dev_priv, __t) \
+	for ((__t) = static_cast<decltype(__t)>(0); \
+		 static_cast<int>(__t) < I915_MAX_TRANSCODERS; \
+		 (__t) = static_cast<decltype(__t)>(static_cast<int>(__t) + 1)) \
+		for_each_if (DISPLAY_RUNTIME_INFO(__dev_priv)->cpu_transcoder_mask & BIT(__t))
+
+#define for_each_cpu_transcoder_masked(__dev_priv, __t, __mask) \
+	for_each_cpu_transcoder(__dev_priv, __t) \
+		for_each_if ((__mask) & BIT(__t))
+
+
 enum {
 	PROCMON_0_85V_DOT_0,
 	PROCMON_0_95V_DOT_0,
@@ -6808,7 +6939,24 @@ enum intel_output_type {
 #define  EDP4K2K_MODE_OVRD_EN			REG_BIT(3)
 #define  EDP4K2K_MODE_OVRD_OPTIMIZED		REG_BIT(2)
 
-
+#define DRM_MODE_FLAG_PHSYNC			(1<<0)
+#define DRM_MODE_FLAG_NHSYNC			(1<<1)
+#define DRM_MODE_FLAG_PVSYNC			(1<<2)
+#define DRM_MODE_FLAG_NVSYNC			(1<<3)
+#define DRM_MODE_FLAG_INTERLACE			(1<<4)
+#define DRM_MODE_FLAG_DBLSCAN			(1<<5)
+#define DRM_MODE_FLAG_CSYNC			(1<<6)
+#define DRM_MODE_FLAG_PCSYNC			(1<<7)
+#define DRM_MODE_FLAG_NCSYNC			(1<<8)
+#define DRM_MODE_FLAG_HSKEW			(1<<9) /* hskew provided */
+#define DRM_MODE_FLAG_BCAST			(1<<10) /* deprecated */
+#define DRM_MODE_FLAG_PIXMUX			(1<<11) /* deprecated */
+#define DRM_MODE_FLAG_DBLCLK			(1<<12)
+#define DRM_MODE_FLAG_CLKDIV2			(1<<13)
+#define _PIPEADSL		0x70000
+#define PIPEDSL(dev_priv, pipe)		_MMIO_PIPE2(dev_priv, pipe, _PIPEADSL)
+#define   PIPEDSL_CURR_FIELD	REG_BIT(31) /* ctg+ */
+#define   PIPEDSL_LINE_MASK	REG_GENMASK(19, 0)
 
 
 

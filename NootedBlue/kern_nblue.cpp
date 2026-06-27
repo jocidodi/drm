@@ -964,6 +964,14 @@ parse_lfp_backlight(struct intel_display *display)
 		display->port_clock = 162000;
 	else
 		display->port_clock = 270000;
+	
+	int port_clock= display->port_clock;
+	int lane_count=display->panel.vbt.edp.lanes;
+	enum phy phy=display->phy0;
+	enum port port=display->port0;
+	struct intel_dp *intel_dp=&display->intel_dp0;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
+	
 
 	panel->vbt.panel_type=panel_type;
 
@@ -1174,6 +1182,14 @@ parse_lfp_backlight(struct intel_display *display)
 	NBlue::callback->iGPU->setProperty("PANEL", connectorArray);
 	connectorArray->release();
 	
+	intel_dp->link_rate = port_clock;
+	intel_dp->lane_count = lane_count;
+	intel_dp->output_reg = DDI_BUF_CTL(port);
+	crtc_state->lane_count = lane_count;
+	crtc_state->port_clock=port_clock;
+	crtc_state->cpu_transcoder=(enum transcoder) display->pipe0;
+	crtc_state->dither=display->panel.vbt.lvds_dither;
+	crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
 	
 }
 
