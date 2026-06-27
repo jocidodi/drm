@@ -1202,7 +1202,21 @@ static enum hpd_pin tgl_hpd_pin(enum port port)
 		return static_cast<enum hpd_pin>( HPD_PORT_A + port - PORT_A);
 }
 
-
+static enum port
+dsi_dvo_port_to_port(struct intel_display *display, u8 dvo_port)
+{
+	switch (dvo_port) {
+	case DVO_PORT_MIPIA:
+		return PORT_A;
+	case DVO_PORT_MIPIC:
+		if (DISPLAY_VER(display) >= 11)
+			return PORT_B;
+		else
+			return PORT_C;
+	default:
+		return PORT_NONE;
+	}
+}
 
 void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
 {
@@ -1253,12 +1267,9 @@ void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb,
 				continue;
 
 			enum port port = dvo_port_to_port(display, child->dvo_port);
+			if (port == PORT_NONE && DISPLAY_VER(display) >= 11)
+				port = dsi_dvo_port_to_port(display, child->dvo_port);
 			
-			
-			if (port == PORT_NONE && (child->device_type & DEVICE_TYPE_MIPI_OUTPUT)) {
-				if (child->dvo_port == DVO_PORT_MIPIA) port = PORT_A;
-				else if (child->dvo_port == DVO_PORT_MIPIC) port = (DISPLAY_VER(display) >= 11) ? PORT_B : PORT_C;
-			}
 
 			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
 			bool is_hdmi  = is_dvi && !(child->device_type & DEVICE_TYPE_NOT_HDMI_OUTPUT);
@@ -1599,6 +1610,37 @@ static u32 get_allowed_dc_mask(struct intel_display *display, int enable_dc)
 	return mask;
 }
 
+static int intel_num_pps(struct intel_display *display)
+{
+	if (display->platform.valleyview || display->platform.cherryview)
+		return 2;
+
+	if (display->platform.geminilake || display->platform.broxton)
+		return 2;
+
+	if (INTEL_PCH_TYPE(display) >= PCH_MTL)
+		return 2;
+
+	if (INTEL_PCH_TYPE(display) >= PCH_DG1)
+		return 1;
+
+	if (INTEL_PCH_TYPE(display) >= PCH_ICP)
+		return 2;
+
+	return 1;
+}
+void intel_pps_unlock_regs_wa(struct intel_display *display)
+{
+	int pps_num;
+	int pps_idx;
+
+	
+	pps_num = intel_num_pps(display);
+
+	for (pps_idx = 0; pps_idx < pps_num; pps_idx++)
+		NBlue::callback->intel_de_rmw(display, PP_CONTROL(display, pps_idx),
+				 PANEL_UNLOCK_MASK, PANEL_UNLOCK_REGS);
+}
 
 int NBlue::intel_opregion_setup()
 {
@@ -1711,13 +1753,14 @@ int NBlue::intel_opregion_setup()
 					}
 				}
 
-				intel_display_device_probe(display);
-
 				display->pps.mmio_base = PCH_PPS_BASE;
 				display->pps.mutex=IOSimpleLockAlloc();
 				display->panel.pps.mmio_base = PCH_PPS_BASE;
 				display->vbt.version = bdb->version;
 				display->bdb=bdb;
+				
+				//intel_pps_unlock_regs_wa(display);
+				intel_display_device_probe(display);
 				init_bdb_blocks(display);
 			}
 		}

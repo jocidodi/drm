@@ -6,12 +6,17 @@
 
 2) nblue setup
 
-boot args: debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware
+use le_kexts.sh to install tgl frame+graph kexts
+
+opencore boot args: debug=0x144 keepsyms=1 IGLogLevel=0xe -disablegfxfirmware
 
 add -allow3d to load graphics
    
-use opencore device injection for icl (0x8a52)
+add you igpu to opencore DeviceProperties (e.g PciRoot(0x0)/Pci(0x2,0x0))
+add this properties (rename for swap icl/tgl)
+AAPL,ig-platform-id 0000528A 
+device-id 528A0000 
+AAPL,ig-platform-id1 0000499A 
+device-id1 499A0000 
 
-<img width="621" height="88" alt="Captura de ecrã 2026-06-09, às 17 12 37" src="https://github.com/user-attachments/assets/283a2569-d0ab-4fd7-8080-3448f14f8ecf" />
-
-for tgl use 0x9a49
+nblue will load based on installed kexts and injected device-id
