@@ -544,6 +544,75 @@ struct mipi_pps_data {
 	u16 panel_power_cycle_delay;
 } __packed;
 
+
+enum gmbus_gpio {
+	GPIOA,
+	GPIOB,
+	GPIOC,
+	GPIOD,
+	GPIOE,
+	GPIOF,
+	GPIOG,
+	GPIOH,
+	__GPIOI_UNUSED,
+	GPIOJ,
+	GPIOK,
+	GPIOL,
+	GPIOM,
+	GPION,
+	GPIOO,
+};
+
+struct gmbus_pin {
+	const char *name;
+	enum gmbus_gpio gpio;
+};
+
+#define GMBUS_PIN_DISABLED	0
+#define GMBUS_PIN_SSC		1
+#define GMBUS_PIN_VGADDC	2
+#define GMBUS_PIN_PANEL		3
+#define GMBUS_PIN_DPD_CHV	3 /* HDMID_CHV */
+#define GMBUS_PIN_DPC		4 /* HDMIC */
+#define GMBUS_PIN_DPB		5 /* SDVO, HDMIB */
+#define GMBUS_PIN_DPD		6 /* HDMID */
+#define GMBUS_PIN_RESERVED	7 /* 7 reserved */
+#define GMBUS_PIN_1_BXT		1 /* BXT+ (atom) and CNP+ (big core) */
+#define GMBUS_PIN_2_BXT		2
+#define GMBUS_PIN_3_BXT		3
+#define GMBUS_PIN_4_CNP		4
+#define GMBUS_PIN_5_MTP		5
+#define GMBUS_PIN_9_TC1_ICP	9
+#define GMBUS_PIN_10_TC2_ICP	10
+#define GMBUS_PIN_11_TC3_ICP	11
+#define GMBUS_PIN_12_TC4_ICP	12
+#define GMBUS_PIN_13_TC5_TGP	13
+#define GMBUS_PIN_14_TC6_TGP	14
+
+#define GMBUS_NUM_PINS	15 /* including 0 */
+static const struct gmbus_pin gmbus_pins_icp[] = {
+	[GMBUS_PIN_1_BXT] = { "dpa", GPIOB },
+	[GMBUS_PIN_2_BXT] = { "dpb", GPIOC },
+	[GMBUS_PIN_3_BXT] = { "dpc", GPIOD },
+	[GMBUS_PIN_9_TC1_ICP] = { "tc1", GPIOJ },
+	[GMBUS_PIN_10_TC2_ICP] = { "tc2", GPIOK },
+	[GMBUS_PIN_11_TC3_ICP] = { "tc3", GPIOL },
+	[GMBUS_PIN_12_TC4_ICP] = { "tc4", GPIOM },
+	[GMBUS_PIN_13_TC5_TGP] = { "tc5", GPION },
+	[GMBUS_PIN_14_TC6_TGP] = { "tc6", GPIOO },
+};
+
+#define WRITE_ONCE(x, val)						\
+do {									\
+	*(volatile __typeof(x) *)&(x) = (val);				\
+} while (0)
+static inline void INIT_LIST_HEAD(struct list_head *list)
+{
+	WRITE_ONCE(list->next, list);
+	WRITE_ONCE(list->prev, list);
+}
+
+
 #ifdef __cplusplus
 //}
 #endif

@@ -432,19 +432,22 @@ u32 _get_blocksize(const u8 *block_base)
 		return *((const u16 *)(block_base + 1));
 }
 
-const void *find_raw_section(const void *_bdb, int section_id)
+static const void *
+find_raw_section(const void *_bdb, enum bdb_block_id section_id)
 {
-	const struct bdb_header *bdb = static_cast<const struct bdb_header *>(_bdb);
-	const u8 *base = static_cast<const u8 *>(_bdb);
+	const struct bdb_header *bdb = (const struct bdb_header *)_bdb;
+	const u8 *base = (const u8 *)_bdb;
 	int index = 0;
 	u32 total, current_size;
-	int current_id;
+	enum bdb_block_id current_id;
 
-	index = (bdb->header_size) ? bdb->header_size : 16;
+	/* skip to first section */
+	index += bdb->header_size;
 	total = bdb->bdb_size;
 
+	/* walk the sections looking for section_id */
 	while (index + 3 < total) {
-		current_id = *(base + index);
+		current_id = static_cast<enum bdb_block_id>( *(base + index));
 		current_size = _get_blocksize(base + index);
 		index += 3;
 
@@ -460,12 +463,26 @@ const void *find_raw_section(const void *_bdb, int section_id)
 	return NULL;
 }
 
-size_t lfp_data_min_size(const struct bdb_header *bdb)
+static const void *
+bdb_find_section(struct intel_display *display,
+		 enum bdb_block_id section_id)
+{
+	struct bdb_block_entry *entry;
+
+	list_for_each_entry(entry, &display->vbt.bdb_blocks, node) {
+		if (entry->section_id == section_id)
+			return entry->data + 3;
+	}
+
+	return NULL;
+}
+
+static size_t lfp_data_min_size(struct intel_display *display)
 {
 	const struct bdb_lfp_data_ptrs *ptrs;
 	size_t size;
 
-	ptrs = (struct bdb_lfp_data_ptrs*)find_raw_section((void*)bdb, BDB_LFP_DATA_PTRS);
+	ptrs = (const struct bdb_lfp_data_ptrs *)bdb_find_section(display, BDB_LFP_DATA_PTRS);
 	if (!ptrs)
 		return 0;
 
@@ -688,26 +705,7 @@ const char* port_to_string(enum port port)
 }
 
 
-int vbt_get_panel_type(const struct bdb_header *bdb, struct intel_panel *panel)
-{
-	const struct bdb_lfp_options *lfp_options;
 
-	lfp_options = (struct bdb_lfp_options *)find_raw_section(bdb, BDB_LFP_OPTIONS);
-	if (!lfp_options)
-		return -1;
-
-	if (lfp_options->panel_type > 0xf &&
-		lfp_options->panel_type != 0xff) {
-		return -1;
-	}
-
-	panel->vbt.lvds_dither = lfp_options->pixel_dither;
-	
-	//if (devdata && devdata->child.handle == DEVICE_HANDLE_LFP2)
-	//	return lfp_options->panel_type2;
-
-	return lfp_options->panel_type;
-}
 
 
 
@@ -807,16 +805,15 @@ bool panel_bool(unsigned int value, int panel_type)
 	return panel_bits(value, panel_type, 1);
 }
 
-void
-parse_edp(const struct bdb_header *bdb,
-		  struct intel_panel *panel)
+static void
+parse_edp(struct intel_display *display,
+	  struct intel_panel *panel)
 {
 	const struct bdb_edp *edp;
 	const struct edp_fast_link_params *edp_link_params;
 	int panel_type = panel->vbt.panel_type;
 
-	edp = (struct bdb_edp *)find_raw_section(bdb, BDB_EDP);
-	
+	edp = (const struct bdb_edp *)bdb_find_section(display, BDB_EDP);
 	if (!edp)
 		return;
 
@@ -832,12 +829,13 @@ parse_edp(const struct bdb_header *bdb,
 		break;
 	}
 
+	/* Get the eDP sequencing and link info */
 	edp_link_params = &edp->fast_link_params[panel_type];
 
 	vbt_edp_to_pps_delays(&panel->vbt.edp.pps,
 				  &edp->power_seqs[panel_type]);
 
-	if (bdb->version >= 224) {
+	if (display->vbt.version >= 224) {
 		panel->vbt.edp.rate =
 			edp->edp_fast_link_training_rate[panel_type] * 20;
 	} else {
@@ -870,8 +868,6 @@ parse_edp(const struct bdb_header *bdb,
 		break;
 	}
 
-
-	
 	switch (edp_link_params->preemphasis) {
 	case EDP_PREEMPHASIS_NONE:
 		panel->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_0;
@@ -906,31 +902,31 @@ parse_edp(const struct bdb_header *bdb,
 		break;
 	}
 
-	if (bdb->version >= 173) {
+	if (display->vbt.version >= 173) {
 		u8 vswing;
 
 		/* Don't read from VBT if module parameter has valid value*/
-		if (0/*display->params.edp_vswing*/) {
-			//panel->vbt.edp.low_vswing =
-				//display->params.edp_vswing == 1;
-		} else {
+		/*if (display->params.edp_vswing) {
+			panel->vbt.edp.low_vswing =
+				display->params.edp_vswing == 1;
+		} else {*/
 			vswing = (edp->edp_vswing_preemph >> (panel_type * 4)) & 0xF;
 			panel->vbt.edp.low_vswing = vswing == 0;
-		}
+		//}
 	}
 
 	panel->vbt.edp.drrs_msa_timing_delay =
 		panel_bits(edp->sdrrs_msa_timing_delay, panel_type, 2);
 
-	if (bdb->version >= 244)
+	if (display->vbt.version >= 244)
 		panel->vbt.edp.max_link_rate =
 			edp->edp_max_port_link_rate[panel_type] * 20;
 
-	if (bdb->version >= 251)
+	if (display->vbt.version >= 251)
 		panel->vbt.edp.dsc_disable =
 			panel_bool(edp->edp_dsc_disable, panel_type);
 
-	if (bdb->version >= 261)
+	if (display->vbt.version >= 261)
 		panel->vbt.edp.pipe_joiner_enable =
 			panel_bool(edp->pipe_joiner_enable, panel_type);
 }
@@ -949,15 +945,13 @@ int msecs_to_pps_units(int msecs)
 
 
 
-
 void
 parse_lfp_backlight(struct intel_display *display)
 {
 	struct intel_panel *panel=&display->panel;
-	const struct bdb_header *bdb=display->bdb;
 	const struct bdb_lfp_backlight *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
-	int panel_type = vbt_get_panel_type(bdb, panel);
+	int panel_type = panel->vbt.panel_type;
 	u16 level;
 	
 	if ((NBlue::callback->readReg32( DP_A) & EDP_PLL_FREQ_MASK) == EDP_PLL_FREQ_162MHZ)
@@ -973,9 +967,8 @@ parse_lfp_backlight(struct intel_display *display)
 	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 	
 
-	panel->vbt.panel_type=panel_type;
 
-	backlight_data = (struct bdb_lfp_backlight *)find_raw_section(bdb, BDB_LFP_BACKLIGHT);
+	backlight_data = (const struct bdb_lfp_backlight *)bdb_find_section(display, BDB_LFP_BACKLIGHT);
 	if (!backlight_data)
 		return;
 
@@ -1110,7 +1103,7 @@ parse_lfp_backlight(struct intel_display *display)
 	spec.power_down = msecs_to_pps_units(500);
 	spec.power_cycle = msecs_to_pps_units(10+500);
 	
-	parse_edp(bdb,panel);
+	parse_edp(display,panel);
 	vbt = panel->vbt.edp.pps;
 	bios = panel->pps.bios_pps_delays;
 	
@@ -1218,137 +1211,337 @@ dsi_dvo_port_to_port(struct intel_display *display, u8 dvo_port)
 	}
 }
 
-void init_bdb_block(struct intel_display *display, const struct bdb_header *bdb, int section_id, size_t min_size)
+
+
+
+
+static inline void __list_add(struct list_head *new2,
+				  struct list_head *prev,
+				  struct list_head *next)
 {
-	const void *block_data = find_raw_section(bdb, section_id);
 
-	if (!block_data) {
-		// Block not found is not necessarily an error for optional blocks
-		return;
-	}
-
-	u32 block_size = _get_blocksize(static_cast<const u8 *>(block_data) - 3);
-
-	if (block_size < min_size) {
-		return;
-	}
-
-
-	if (section_id == BDB_GENERAL_DEFINITIONS) {
-			const struct bdb_general_definitions *defs = static_cast<const struct bdb_general_definitions *>(block_data);
-			int entry_size = defs->child_dev_size;
-			int child_device_num;
-			int i;
-
-			int expected_size = get_child_device_expected_size(bdb->version);
-			if (expected_size > 0 && entry_size != expected_size) {
-			}
-
-			child_device_num = (block_size - sizeof(struct bdb_general_definitions)) / entry_size;
-		
-		OSArray *connectorArray = OSArray::withCapacity(6);
-		
-		for (i = 0; i < 6; i++) {
-			display->bconnectors[i].index=i;
-			display->bconnectors[i].busId=0;
-			display->bconnectors[i].pipe=0;
-			display->bconnectors[i].pad=0;
-			display->bconnectors[i].type=ConnectorDummy;
-			display->bconnectors[i].flags=0;
-		}
-
-		int ii=0;
-		for (i = 0; i < child_device_num; i++) {
-			const u8 *base = (u8 *)(defs);
-			const struct child_device_config *child = reinterpret_cast<const struct child_device_config *>(
-				base + sizeof(struct bdb_general_definitions) + (i * entry_size));
-
-			if (child->device_type == 0)
-				continue;
-
-			enum port port = dvo_port_to_port(display, child->dvo_port);
-			if (port == PORT_NONE && DISPLAY_VER(display) >= 11)
-				port = dsi_dvo_port_to_port(display, child->dvo_port);
-			
-
-			bool is_dvi   = (child->device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING);
-			bool is_hdmi  = is_dvi && !(child->device_type & DEVICE_TYPE_NOT_HDMI_OUTPUT);
-			bool is_dp    = (child->device_type & DEVICE_TYPE_DISPLAYPORT_OUTPUT);
-			bool is_edp   = is_dp && (child->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
-			bool is_dsi   = (child->device_type & DEVICE_TYPE_MIPI_OUTPUT);
-			bool is_crt   = (child->device_type & DEVICE_TYPE_ANALOG_OUTPUT);
-			enum phy phy = intel_port_to_phy(display, port);
-			enum aux_ch aux_ch = map_aux_ch(display,child->aux_channel);
-			char buf[AUX_CH_NAME_BUFSIZE+3];
-			char buf2[6];
-			
-			if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
-			
-			if (port == PORT_A) {
-				display->hotplug.hpd_pin=tgl_hpd_pin(port);
-				display->child0=child;
-				display->port0=port;
-				display->phy0=phy;
-				display->aux_ch0=aux_ch;
-				display->pipe0=PIPE_A;
-			}
-			
-			OSDictionary *connectorDict = OSDictionary::withCapacity(10);
-
-			connectorDict->setObject("Index", OSNumber::withNumber(i, 32));
-
-			connectorDict->setObject("Port", OSString::withCString(port_to_string(port)));
-			
-			connectorDict->setObject("DVI", is_dvi ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("HDMI", is_hdmi ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("DP", is_dp ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("eDP", is_edp ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("DSI", is_dsi ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("CRT", is_crt ? kOSBooleanTrue : kOSBooleanFalse);
-			connectorDict->setObject("DDI", OSString::withCString(intel_ddi_encoder_name(display, port,buf2, sizeof(buf2))));
-			connectorDict->setObject("PHY", OSString::withCString(phy_to_string(phy)));
-			connectorDict->setObject("AUX", OSString::withCString(aux_ch_name(display, buf, sizeof(buf), aux_ch)));
-			connectorDict->setObject("GMBUS", OSNumber::withNumber(child->ddc_pin, 32));
-			
-			connectorArray->setObject(connectorDict);
-			connectorDict->release();
-			
-			ConnectorType type=ConnectorDummy;
-			if (is_dp) type=ConnectorDP;
-			if (is_edp) type=ConnectorLVDS;
-			if (is_hdmi) type=ConnectorHDMI;
-			
-			u32 flags=CNAlterAppertureRequirements;
-			if (is_dp) flags+=CNFlagDP;
-			if (is_edp) flags+=CNConnectorAlwaysConnected;
-			if (is_hdmi) flags+=CNFlagHDMI;
-			
-			if (type>ConnectorDummy) {
-				display->bconnectors[ii].busId=child->ddc_pin;
-				display->bconnectors[ii].pipe=port;
-				display->bconnectors[ii].type=type;
-				display->bconnectors[ii].flags=flags;
-				ii++;
-			}
-			
-		}
-
-		NBlue::callback->iGPU->setProperty("Bios_Connectors", connectorArray);
-		connectorArray->release();
-
-		}
+	next->prev = new2;
+	new2->next = next;
+	new2->prev = prev;
+	WRITE_ONCE(prev->next, new2);
+}
+static inline void list_add_tail(struct list_head *new2, struct list_head *head)
+{
+	__list_add(new2, head->prev, head);
 }
 
-void init_bdb_blocks(struct intel_display *display)
+static u32 get_blocksize(const void *block_data)
 {
-	for (size_t i = 0; i < ARRAY_SIZE(bdb_blocks); i++) {
-		int section_id = bdb_blocks[i].section_id;
+	return _get_blocksize((u8*)block_data - 3);
+}
+
+static int make_lfp_data_ptr(struct lfp_data_ptr_table *table,
+				 int table_size, int total_size)
+{
+	if (total_size < table_size)
+		return total_size;
+
+	table->table_size = table_size;
+	table->offset = total_size - table_size;
+
+	return total_size - table_size;
+}
+static void next_lfp_data_ptr(struct lfp_data_ptr_table *next,
+				  const struct lfp_data_ptr_table *prev,
+				  int size)
+{
+	next->table_size = prev->table_size;
+	next->offset = prev->offset + size;
+}
+static void *generate_lfp_data_ptrs(struct intel_display *display,
+					const void *bdb)
+{
+	int i, size, table_size, block_size, offset, fp_timing_size;
+	struct bdb_lfp_data_ptrs *ptrs;
+	const void *block;
+	void *ptrs_block;
+
+	/*
+	 * The hardcoded fp_timing_size is only valid for
+	 * modernish VBTs. All older VBTs definitely should
+	 * include block 41 and thus we don't need to
+	 * generate one.
+	 */
+	if (display->vbt.version < 155)
+		return NULL;
+
+	fp_timing_size = 38;
+
+	block = find_raw_section(bdb, BDB_LFP_DATA);
+	if (!block)
+		return NULL;
+
+
+	block_size = get_blocksize(block);
+
+	size = fp_timing_size + sizeof(struct bdb_edid_dtd) +
+		sizeof(struct bdb_edid_pnp_id);
+	if (size * 16 > block_size)
+		return NULL;
+	ptrs_block =IOMalloc(sizeof(*ptrs) + 3);
+	//ptrs_block = kzalloc(sizeof(*ptrs) + 3, GFP_KERNEL);
+	if (!ptrs_block)
+		return NULL;
+
+	*(u8 *)((u8 *)ptrs_block + 0) = BDB_LFP_DATA_PTRS;
+	*(u16 *)((u8 *)ptrs_block + 1) = sizeof(*ptrs);
+	ptrs =(struct bdb_lfp_data_ptrs *)( (u8 *)ptrs_block + 3);
+
+	table_size = sizeof(struct bdb_edid_pnp_id);
+	size = make_lfp_data_ptr(&ptrs->ptr[0].panel_pnp_id, table_size, size);
+
+	table_size = sizeof(struct bdb_edid_dtd);
+	size = make_lfp_data_ptr(&ptrs->ptr[0].dvo_timing, table_size, size);
+
+	table_size = fp_timing_size;
+	size = make_lfp_data_ptr(&ptrs->ptr[0].fp_timing, table_size, size);
+
+	if (ptrs->ptr[0].fp_timing.table_size)
+		ptrs->num_entries++;
+	if (ptrs->ptr[0].dvo_timing.table_size)
+		ptrs->num_entries++;
+	if (ptrs->ptr[0].panel_pnp_id.table_size)
+		ptrs->num_entries++;
+
+	if (size != 0 || ptrs->num_entries != 3) {
+		//kfree(ptrs_block);
+		IOFree(ptrs_block, sizeof(*ptrs) + 3);
+		return NULL;
+	}
+
+	size = fp_timing_size + sizeof(struct bdb_edid_dtd) +
+		sizeof(struct bdb_edid_pnp_id);
+	for (i = 1; i < 16; i++) {
+		next_lfp_data_ptr(&ptrs->ptr[i].fp_timing, &ptrs->ptr[i-1].fp_timing, size);
+		next_lfp_data_ptr(&ptrs->ptr[i].dvo_timing, &ptrs->ptr[i-1].dvo_timing, size);
+		next_lfp_data_ptr(&ptrs->ptr[i].panel_pnp_id, &ptrs->ptr[i-1].panel_pnp_id, size);
+	}
+
+	table_size = sizeof(struct bdb_edid_product_name);
+
+	if (16 * (size + table_size) <= block_size) {
+		ptrs->panel_name.table_size = table_size;
+		ptrs->panel_name.offset = size * 16;
+	}
+
+	offset = (u8 *)block - (u8 *)bdb;
+
+	for (i = 0; i < 16; i++) {
+		ptrs->ptr[i].fp_timing.offset += offset;
+		ptrs->ptr[i].dvo_timing.offset += offset;
+		ptrs->ptr[i].panel_pnp_id.offset += offset;
+	}
+
+	if (ptrs->panel_name.table_size)
+		ptrs->panel_name.offset += offset;
+
+	return ptrs_block;
+}
+static u32 raw_block_offset(const void *bdb, enum bdb_block_id section_id)
+{
+	const void *block;
+
+	block = find_raw_section(bdb, section_id);
+	if (!block)
+		return 0;
+
+	return (u8 *)block - (u8 *)bdb;
+}
+static bool validate_lfp_data_ptrs(const void *bdb,
+				   const struct bdb_lfp_data_ptrs *ptrs)
+{
+	int fp_timing_size, dvo_timing_size, panel_pnp_id_size, panel_name_size;
+	int data_block_size, lfp_data_size;
+	const void *data_block;
+	int i;
+
+	data_block = find_raw_section(bdb, BDB_LFP_DATA);
+	if (!data_block)
+		return false;
+
+	data_block_size = get_blocksize(data_block);
+	if (data_block_size == 0)
+		return false;
+
+	/* always 3 indicating the presence of fp_timing+dvo_timing+panel_pnp_id */
+	if (ptrs->num_entries != 3)
+		return false;
+
+	fp_timing_size = ptrs->ptr[0].fp_timing.table_size;
+	dvo_timing_size = ptrs->ptr[0].dvo_timing.table_size;
+	panel_pnp_id_size = ptrs->ptr[0].panel_pnp_id.table_size;
+	panel_name_size = ptrs->panel_name.table_size;
+
+	/* fp_timing has variable size */
+	if (fp_timing_size < 32 ||
+		dvo_timing_size != sizeof(struct bdb_edid_dtd) ||
+		panel_pnp_id_size != sizeof(struct bdb_edid_pnp_id))
+		return false;
+
+	/* panel_name is not present in old VBTs */
+	if (panel_name_size != 0 &&
+		panel_name_size != sizeof(struct bdb_edid_product_name))
+		return false;
+
+	lfp_data_size = ptrs->ptr[1].fp_timing.offset - ptrs->ptr[0].fp_timing.offset;
+	if (16 * lfp_data_size > data_block_size)
+		return false;
+
+	/* make sure the table entries have uniform size */
+	for (i = 1; i < 16; i++) {
+		if (ptrs->ptr[i].fp_timing.table_size != fp_timing_size ||
+			ptrs->ptr[i].dvo_timing.table_size != dvo_timing_size ||
+			ptrs->ptr[i].panel_pnp_id.table_size != panel_pnp_id_size)
+			return false;
+
+		if (ptrs->ptr[i].fp_timing.offset - ptrs->ptr[i-1].fp_timing.offset != lfp_data_size ||
+			ptrs->ptr[i].dvo_timing.offset - ptrs->ptr[i-1].dvo_timing.offset != lfp_data_size ||
+			ptrs->ptr[i].panel_pnp_id.offset - ptrs->ptr[i-1].panel_pnp_id.offset != lfp_data_size)
+			return false;
+	}
+
+	/*
+	 * Except for vlv/chv machines all real VBTs seem to have 6
+	 * unaccounted bytes in the fp_timing table. And it doesn't
+	 * appear to be a really intentional hole as the fp_timing
+	 * 0xffff terminator is always within those 6 missing bytes.
+	 */
+	if (fp_timing_size + 6 + dvo_timing_size + panel_pnp_id_size == lfp_data_size)
+		fp_timing_size += 6;
+
+	if (fp_timing_size + dvo_timing_size + panel_pnp_id_size != lfp_data_size)
+		return false;
+
+	if (ptrs->ptr[0].fp_timing.offset + fp_timing_size != ptrs->ptr[0].dvo_timing.offset ||
+		ptrs->ptr[0].dvo_timing.offset + dvo_timing_size != ptrs->ptr[0].panel_pnp_id.offset ||
+		ptrs->ptr[0].panel_pnp_id.offset + panel_pnp_id_size != lfp_data_size)
+		return false;
+
+	/* make sure the tables fit inside the data block */
+	for (i = 0; i < 16; i++) {
+		if (ptrs->ptr[i].fp_timing.offset + fp_timing_size > data_block_size ||
+			ptrs->ptr[i].dvo_timing.offset + dvo_timing_size > data_block_size ||
+			ptrs->ptr[i].panel_pnp_id.offset + panel_pnp_id_size > data_block_size)
+			return false;
+	}
+
+	if (ptrs->panel_name.offset + 16 * panel_name_size > data_block_size)
+		return false;
+
+	/* make sure fp_timing terminators are present at expected locations */
+	for (i = 0; i < 16; i++) {
+		 u16 *t = (u16 *)((u8 *)data_block + ptrs->ptr[i].fp_timing.offset +
+		fp_timing_size - 2);
+
+		if (*t != 0xffff)
+			return false;
+	}
+
+	return true;
+}
+static bool fixup_lfp_data_ptrs(const void *bdb, void *ptrs_block)
+{
+	struct bdb_lfp_data_ptrs *ptrs = (struct bdb_lfp_data_ptrs *)ptrs_block;
+	u32 offset;
+	int i;
+
+	offset = raw_block_offset(bdb, BDB_LFP_DATA);
+
+	for (i = 0; i < 16; i++) {
+		if (ptrs->ptr[i].fp_timing.offset < offset ||
+			ptrs->ptr[i].dvo_timing.offset < offset ||
+			ptrs->ptr[i].panel_pnp_id.offset < offset)
+			return false;
+
+		ptrs->ptr[i].fp_timing.offset -= offset;
+		ptrs->ptr[i].dvo_timing.offset -= offset;
+		ptrs->ptr[i].panel_pnp_id.offset -= offset;
+	}
+
+	if (ptrs->panel_name.table_size) {
+		if (ptrs->panel_name.offset < offset)
+			return false;
+
+		ptrs->panel_name.offset -= offset;
+	}
+
+	return validate_lfp_data_ptrs(bdb, ptrs);
+}
+
+static void
+init_bdb_block(struct intel_display *display,
+		   const void *bdb, enum bdb_block_id section_id,
+		   size_t min_size)
+{
+	struct bdb_block_entry *entry;
+	struct bdb_lfp_data_ptrs *ptrs;
+	void *temp_block = NULL;
+	const void *block;
+	size_t block_size;
+
+	block = find_raw_section(bdb, section_id);
+
+	if (!block && section_id == BDB_LFP_DATA_PTRS) {
+		temp_block = generate_lfp_data_ptrs(display, bdb);
+		if (temp_block)
+			block = (u8 *)temp_block + 3;
+	}
+	if (!block)
+		return;
+
+
+	block_size = get_blocksize(block);
+
+
+	if (section_id == BDB_MIPI_SEQUENCE && *(const u8 *)block >= 3)
+		block_size += 5;
+	
+	
+	entry = (struct bdb_block_entry*)IOMalloc(sizeof(struct bdb_block_entry) + max(min_size, block_size) + 3);
+	/*entry = kzalloc_flex(*entry, data, max(min_size, block_size) + 3);
+	if (!entry) {
+		kfree(temp_block);
+		return;
+	}*/
+
+	entry->section_id = section_id;
+	memcpy(entry->data, (u8 *)block - 3, block_size + 3);
+
+	//kfree(temp_block);
+	IOFree(temp_block,sizeof(*ptrs) + 3);
+
+	if (section_id == BDB_LFP_DATA_PTRS &&
+		!fixup_lfp_data_ptrs(bdb, entry->data + 3)) {
+		//kfree(entry);
+		IOFree(entry->data,max(min_size, block_size) + 3);
+		return;
+	}
+
+	list_add_tail(&entry->node, &display->vbt.bdb_blocks);
+}
+
+
+
+
+
+static void init_bdb_blocks(struct intel_display *display,
+				const void *bdb)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(bdb_blocks); i++) {
+		enum bdb_block_id section_id = bdb_blocks[i].section_id;
 		size_t min_size = bdb_blocks[i].min_size;
 
 		if (section_id == BDB_LFP_DATA)
-			min_size = lfp_data_min_size(display->bdb);
+			min_size = lfp_data_min_size(display);
 
-		init_bdb_block(display, display->bdb, section_id, min_size);
+		init_bdb_block(display, bdb, section_id, min_size);
 	}
 }
 
@@ -1642,6 +1835,529 @@ void intel_pps_unlock_regs_wa(struct intel_display *display)
 				 PANEL_UNLOCK_MASK, PANEL_UNLOCK_REGS);
 }
 
+
+
+static int intel_bios_ssc_frequency(struct intel_display *display,
+					bool alternate)
+{
+	switch (DISPLAY_VER(display)) {
+	case 2:
+		return alternate ? 66667 : 48000;
+	case 3:
+	case 4:
+		return alternate ? 100000 : 96000;
+	default:
+		return alternate ? 100000 : 120000;
+	}
+}
+
+static void
+parse_general_features(struct intel_display *display)
+{
+	const struct bdb_general_features *general;
+
+	general = (const struct bdb_general_features *)bdb_find_section(display, BDB_GENERAL_FEATURES);
+	if (!general)
+		return;
+
+	display->vbt.int_tv_support = general->int_tv_support;
+	/* int_crt_support can't be trusted on earlier platforms */
+	if (display->vbt.version >= 155 &&
+		(HAS_DDI(display) || display->platform.valleyview))
+		display->vbt.int_crt_support = general->int_crt_support;
+	display->vbt.lvds_use_ssc = general->enable_ssc;
+	display->vbt.lvds_ssc_freq =
+		intel_bios_ssc_frequency(display, general->ssc_freq);
+	display->vbt.display_clock_mode = general->display_clock_mode;
+	display->vbt.fdi_rx_polarity_inverted = general->fdi_rx_polarity_inverted;
+	if (display->vbt.version >= 181) {
+		display->vbt.orientation = general->rotate_180 ?
+			DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP :
+			DRM_MODE_PANEL_ORIENTATION_NORMAL;
+	} else {
+		display->vbt.orientation = DRM_MODE_PANEL_ORIENTATION_UNKNOWN;
+	}
+
+	if (display->vbt.version >= 249 && general->afc_startup_config) {
+		display->vbt.override_afc_startup = true;
+		display->vbt.override_afc_startup_val = general->afc_startup_config == 1 ? 0 : 7;
+	}
+
+
+}
+
+
+
+static const struct gmbus_pin *get_gmbus_pin(struct intel_display *display,
+						 unsigned int pin)
+{
+	const struct gmbus_pin *pins;
+	size_t size;
+
+	/*if (INTEL_PCH_TYPE(display) >= PCH_MTL) {
+		pins = gmbus_pins_mtp;
+		size = ARRAY_SIZE(gmbus_pins_mtp);
+	} else if (INTEL_PCH_TYPE(display) >= PCH_DG2) {
+		pins = gmbus_pins_dg2;
+		size = ARRAY_SIZE(gmbus_pins_dg2);
+	} else if (INTEL_PCH_TYPE(display) >= PCH_DG1) {
+		pins = gmbus_pins_dg1;
+		size = ARRAY_SIZE(gmbus_pins_dg1);
+	} else */if (INTEL_PCH_TYPE(display) >= PCH_ICP) {
+		pins = gmbus_pins_icp;
+		size = ARRAY_SIZE(gmbus_pins_icp);
+	}/* else if (HAS_PCH_CNP(display)) {
+		pins = gmbus_pins_cnp;
+		size = ARRAY_SIZE(gmbus_pins_cnp);
+	} else if (display->platform.geminilake || display->platform.broxton) {
+		pins = gmbus_pins_bxt;
+		size = ARRAY_SIZE(gmbus_pins_bxt);
+	} else if (DISPLAY_VER(display) == 9) {
+		pins = gmbus_pins_skl;
+		size = ARRAY_SIZE(gmbus_pins_skl);
+	} else if (display->platform.broadwell) {
+		pins = gmbus_pins_bdw;
+		size = ARRAY_SIZE(gmbus_pins_bdw);
+	} else {
+		pins = gmbus_pins;
+		size = ARRAY_SIZE(gmbus_pins);
+	}*/
+
+	if (pin >= size || !pins[pin].name)
+		return NULL;
+
+	return &pins[pin];
+}
+bool intel_gmbus_is_valid_pin(struct intel_display *display, unsigned int pin)
+{
+	return get_gmbus_pin(display, pin);
+}
+
+static int child_device_expected_size(u16 version)
+{
+
+	if (version > 264)
+		return -ENOENT;
+	else if (version >= 263)
+		return 44;
+	else if (version >= 256)
+		return 40;
+	else if (version >= 216)
+		return 39;
+	else if (version >= 196)
+		return 38;
+	else if (version >= 195)
+		return 37;
+	else if (version >= 111)
+		return LEGACY_CHILD_DEVICE_CONFIG_SIZE;
+	else if (version >= 106)
+		return 27;
+	else
+		return 22;
+}
+
+static bool child_device_size_valid(struct intel_display *display, int size)
+{
+	int expected_size;
+
+	expected_size = child_device_expected_size(display->vbt.version);
+	if (expected_size < 0) {
+		expected_size = sizeof(struct child_device_config);
+	}
+
+
+	if (size < LEGACY_CHILD_DEVICE_CONFIG_SIZE) {
+
+		return false;
+	}
+
+	return true;
+}
+
+static const struct child_device_config *
+child_device_ptr(const struct bdb_general_definitions *defs, int i)
+{
+	return (const struct child_device_config *) &defs->devices[i * defs->child_dev_size];
+}
+
+static void
+parse_general_definitions(struct intel_display *display)
+{
+	const struct bdb_general_definitions *defs;
+	struct intel_bios_encoder_data *devdata;
+	const struct child_device_config *child;
+	int i, child_device_num;
+	u16 block_size;
+	int bus_pin;
+
+	defs = (const struct bdb_general_definitions *)bdb_find_section(display, BDB_GENERAL_DEFINITIONS);
+	if (!defs) {
+		return;
+	}
+
+	block_size = get_blocksize(defs);
+	if (block_size < sizeof(*defs)) {
+		return;
+	}
+
+	bus_pin = defs->crt_ddc_gmbus_pin;
+
+	if (intel_gmbus_is_valid_pin(display, bus_pin))
+		display->vbt.crt_ddc_pin = bus_pin;
+
+	if (!child_device_size_valid(display, defs->child_dev_size))
+		return;
+
+	/* get the number of child device */
+	child_device_num = (block_size - sizeof(*defs)) / defs->child_dev_size;
+
+	for (i = 0; i < child_device_num; i++) {
+		child = child_device_ptr(defs, i);
+		if (!child->device_type)
+			continue;
+
+	//	drm_dbg_kms(display->drm,				"Found VBT child device with type 0x%x\n",				child->device_type);
+
+		devdata = (struct intel_bios_encoder_data *)IOMalloc(sizeof(*devdata));
+		
+		if (!devdata)
+			break;
+
+		devdata->display = display;
+
+		memcpy(&devdata->child, child,
+			   /*min_t(sizeof(size_t), defs->child_dev_size,*/ sizeof(*child));
+
+		list_add_tail(&devdata->node, &display->vbt.display_devices);
+	}
+
+	/*if (list_empty(&display->vbt.display_devices))
+		drm_dbg_kms(display->drm,
+				"no child dev is parsed from VBT\n");*/
+}
+
+static void
+parse_driver_features(struct intel_display *display)
+{
+	const struct bdb_driver_features *driver;
+
+	driver = (const struct bdb_driver_features *)bdb_find_section(display, BDB_DRIVER_FEATURES);
+	if (!driver)
+		return;
+
+	if (DISPLAY_VER(display) >= 5) {
+
+		if (driver->lvds_config != BDB_DRIVER_FEATURE_INT_LVDS)
+			display->vbt.int_lvds_support = 0;
+	} else {
+
+		if (display->vbt.version >= 134 &&
+			driver->lvds_config != BDB_DRIVER_FEATURE_INT_LVDS &&
+			driver->lvds_config != BDB_DRIVER_FEATURE_INT_SDVO_LVDS)
+			display->vbt.int_lvds_support = 0;
+	}
+}
+
+static void
+parse_compression_parameters(struct intel_display *display)
+{
+	const struct bdb_compression_parameters *params;
+	struct intel_bios_encoder_data *devdata;
+	u16 block_size;
+	int index;
+
+	if (display->vbt.version < 198)
+		return;
+
+	params = (const struct bdb_compression_parameters *)bdb_find_section(display, BDB_COMPRESSION_PARAMETERS);
+	if (params) {
+
+		if (params->entry_size != sizeof(params->data[0])) {
+			return;
+		}
+
+		block_size = get_blocksize(params);
+		if (block_size < sizeof(*params)) {
+			return;
+		}
+	}
+
+	list_for_each_entry(devdata, &display->vbt.display_devices, node) {
+		const struct child_device_config *child = &devdata->child;
+
+		if (!child->compression_enable)
+			continue;
+
+		if (!params) {
+			continue;
+		}
+
+		if (child->compression_method_cps) {
+			continue;
+		}
+
+		index = child->compression_structure_index;
+
+		devdata->dsc = (struct dsc_compression_parameters_entry *)IOMallocZero(sizeof(*devdata->dsc));
+		if (devdata->dsc) {
+			memcpy(devdata->dsc, &params->data[index], sizeof(*devdata->dsc));
+		}
+		//devdata->dsc = kmemdup(&params->data[index],sizeof(*devdata->dsc), GFP_KERNEL);
+	}
+}
+
+static bool is_port_valid(struct intel_display *display, enum port port)
+{
+
+	if (port == PORT_F && display->platform.icelake)
+		return display->platform.icelake_port_f;
+
+	return true;
+}
+enum port intel_bios_encoder_port(const struct intel_bios_encoder_data *devdata)
+{
+	struct intel_display *display = devdata->display;
+	const struct child_device_config *child = &devdata->child;
+	enum port port;
+
+	port = dvo_port_to_port(display, child->dvo_port);
+	if (port == PORT_NONE && DISPLAY_VER(display) >= 11)
+		port = dsi_dvo_port_to_port(display, child->dvo_port);
+
+	return port;
+}
+static void parse_ddi_port(struct intel_bios_encoder_data *devdata)
+{
+	struct intel_display *display = devdata->display;
+	enum port port;
+
+	port = intel_bios_encoder_port(devdata);
+	if (port == PORT_NONE)
+		return;
+
+	if (!is_port_valid(display, port)) {
+		return;
+	}
+
+	/*sanitize_dedicated_external(devdata, port);
+	sanitize_device_type(devdata, port);
+	sanitize_hdmi_level_shift(devdata, port);*/
+}
+
+
+static bool
+intel_bios_encoder_supports_crt(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata->child.device_type & DEVICE_TYPE_ANALOG_OUTPUT;
+}
+
+bool
+intel_bios_encoder_supports_dvi(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata->child.device_type & DEVICE_TYPE_TMDS_DVI_SIGNALING;
+}
+
+bool
+intel_bios_encoder_supports_hdmi(const struct intel_bios_encoder_data *devdata)
+{
+	return intel_bios_encoder_supports_dvi(devdata) &&
+		(devdata->child.device_type & DEVICE_TYPE_NOT_HDMI_OUTPUT) == 0;
+}
+
+bool
+intel_bios_encoder_supports_dp(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata->child.device_type & DEVICE_TYPE_DISPLAYPORT_OUTPUT;
+}
+
+bool
+intel_bios_encoder_supports_edp(const struct intel_bios_encoder_data *devdata)
+{
+	return intel_bios_encoder_supports_dp(devdata) &&
+		devdata->child.device_type & DEVICE_TYPE_INTERNAL_CONNECTOR;
+}
+
+bool
+intel_bios_encoder_supports_dsi(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata->child.device_type & DEVICE_TYPE_MIPI_OUTPUT;
+}
+
+bool
+intel_bios_encoder_is_lspcon(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata && HAS_LSPCON(devdata->display) && devdata->child.lspcon;
+}
+static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
+{
+	struct intel_display *display = devdata->display;
+	const struct child_device_config *child = &devdata->child;
+	bool is_dvi, is_hdmi, is_dp, is_edp, is_dsi, is_crt, supports_typec_usb, supports_tbt;
+	int dp_boost_level, dp_max_link_rate, hdmi_boost_level, hdmi_level_shift, max_tmds_clock;
+	enum port port;
+
+	port = intel_bios_encoder_port(devdata);
+	if (port == PORT_NONE)
+		return;
+
+	is_dvi = intel_bios_encoder_supports_dvi(devdata);
+	is_dp = intel_bios_encoder_supports_dp(devdata);
+	is_crt = intel_bios_encoder_supports_crt(devdata);
+	is_hdmi = intel_bios_encoder_supports_hdmi(devdata);
+	is_edp = intel_bios_encoder_supports_edp(devdata);
+	is_dsi = intel_bios_encoder_supports_dsi(devdata);
+
+	//supports_typec_usb = intel_bios_encoder_supports_typec_usb(devdata);
+	//supports_tbt = intel_bios_encoder_supports_tbt(devdata);
+	
+	enum phy phy = intel_port_to_phy(display, port);
+	enum aux_ch aux_ch = map_aux_ch(display,child->aux_channel);
+
+	
+	if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
+	
+	if (port == PORT_A) {
+		display->hotplug.hpd_pin=tgl_hpd_pin(port);
+		display->child0=child;
+		display->port0=port;
+		display->phy0=phy;
+		display->aux_ch0=aux_ch;
+		display->pipe0=PIPE_A;
+	}
+	
+	int ii=0;
+	for (int i = 0; i < 6; i++) {
+		if (display->bconnectors[i].type==ConnectorDummy) {
+			ii=i;
+			break;
+		}
+	}
+	
+	
+	ConnectorType type=ConnectorDummy;
+	if (is_dp) type=ConnectorDP;
+	if (is_edp) type=ConnectorLVDS;
+	if (is_hdmi) type=ConnectorHDMI;
+	
+	u32 flags=CNAlterAppertureRequirements;
+	if (is_dp) flags+=CNFlagDP;
+	if (is_edp) flags+=CNConnectorAlwaysConnected;
+	if (is_hdmi) flags+=CNFlagHDMI;
+	
+	display->bconnectors[ii].busId=child->ddc_pin;
+	display->bconnectors[ii].pipe=port;
+	display->bconnectors[ii].type=type;
+	display->bconnectors[ii].flags=flags;
+
+	/*drm_dbg_kms(display->drm,
+			"Port %c VBT info: CRT:%d DVI:%d HDMI:%d DP:%d eDP:%d DSI:%d DP++:%d LSPCON:%d USB-Type-C:%d TBT:%d DSC:%d\n",
+			port_name(port), is_crt, is_dvi, is_hdmi, is_dp, is_edp, is_dsi,
+			intel_bios_encoder_supports_dp_dual_mode(devdata),
+			intel_bios_encoder_is_lspcon(devdata),
+			supports_typec_usb, supports_tbt,
+			devdata->dsc != NULL);*/
+
+	/*if (intel_bios_encoder_is_dedicated_external(devdata))
+		drm_dbg_kms(display->drm,
+				"Port %c is dedicated external\n",
+				port_name(port));
+
+	if (intel_bios_encoder_supports_dyn_port_over_tc(devdata))
+		drm_dbg_kms(display->drm,
+				"Port %c supports dynamic DDI allocation in TCSS\n",
+				port_name(port));
+
+	hdmi_level_shift = intel_bios_hdmi_level_shift(devdata);
+	if (hdmi_level_shift >= 0) {
+		drm_dbg_kms(display->drm,
+				"Port %c VBT HDMI level shift: %d\n",
+				port_name(port), hdmi_level_shift);
+	}
+
+	max_tmds_clock = intel_bios_hdmi_max_tmds_clock(devdata);
+	if (max_tmds_clock)
+		drm_dbg_kms(display->drm,
+				"Port %c VBT HDMI max TMDS clock: %d kHz\n",
+				port_name(port), max_tmds_clock);
+
+
+	 dp_boost_level = intel_bios_dp_boost_level(devdata);
+	if (dp_boost_level)
+		drm_dbg_kms(display->drm,
+				"Port %c VBT (e)DP boost level: %d\n",
+				port_name(port), dp_boost_level);
+
+	hdmi_boost_level = intel_bios_hdmi_boost_level(devdata);
+	if (hdmi_boost_level)
+		drm_dbg_kms(display->drm,
+				"Port %c VBT HDMI boost level: %d\n",
+				port_name(port), hdmi_boost_level);
+
+	dp_max_link_rate = intel_bios_dp_max_link_rate(devdata);
+	if (dp_max_link_rate)
+		drm_dbg_kms(display->drm,
+				"Port %c VBT DP max link rate: %d\n",
+				port_name(port), dp_max_link_rate);
+
+	drm_WARN(display->drm, child->use_vbt_vswing,
+		 "Port %c asks to use VBT vswing/preemph tables\n",
+		 port_name(port));*/
+}
+
+static bool has_ddi_port_info(struct intel_display *display)
+{
+	return DISPLAY_VER(display) >= 5 || display->platform.g4x;
+}
+
+static void parse_ddi_ports(struct intel_display *display)
+{
+	struct intel_bios_encoder_data *devdata;
+
+	if (!has_ddi_port_info(display))
+		return;
+
+	list_for_each_entry(devdata, &display->vbt.display_devices, node)
+		parse_ddi_port(devdata);
+
+	list_for_each_entry(devdata, &display->vbt.display_devices, node)
+		print_ddi_port(devdata);
+}
+
+static void
+parse_panel_options(struct intel_display *display,
+			struct intel_panel *panel)
+{
+	const struct bdb_lfp_options *lfp_options;
+	int panel_type = panel->vbt.panel_type;
+	int drrs_mode;
+
+	lfp_options = (const struct bdb_lfp_options *)bdb_find_section(display, BDB_LFP_OPTIONS);
+	if (!lfp_options)
+		return;
+
+	panel->vbt.lvds_dither = lfp_options->pixel_dither;
+
+	panel->vbt.panel_type=lfp_options->panel_type;
+	
+	/*if (get_blocksize(lfp_options) < 16)
+		return;
+
+	drrs_mode = panel_bits(lfp_options->dps_panel_type_bits,
+				   panel_type, 2);
+
+	switch (drrs_mode) {
+	case 0:
+		panel->vbt.drrs_type = DRRS_TYPE_STATIC;
+		break;
+	case 2:
+		panel->vbt.drrs_type = DRRS_TYPE_SEAMLESS;
+		break;
+	default:
+		panel->vbt.drrs_type = DRRS_TYPE_NONE;
+		break;
+	}*/
+}
+
 int NBlue::intel_opregion_setup()
 {
 	struct intel_display *display=&display_base;
@@ -1752,16 +2468,47 @@ int NBlue::intel_opregion_setup()
 						break;
 					}
 				}
+				
+				
+				for (i = 0; i < 6; i++) {
+					display->bconnectors[i].index=i;
+					display->bconnectors[i].busId=0;
+					display->bconnectors[i].pipe=0;
+					display->bconnectors[i].pad=0;
+					display->bconnectors[i].type=ConnectorDummy;
+					display->bconnectors[i].flags=0;
+				}
 
 				display->pps.mmio_base = PCH_PPS_BASE;
 				display->pps.mutex=IOSimpleLockAlloc();
 				display->panel.pps.mmio_base = PCH_PPS_BASE;
 				display->vbt.version = bdb->version;
 				display->bdb=bdb;
+				display->vbt.crt_ddc_pin = GMBUS_PIN_VGADDC;
+				display->vbt.int_tv_support = 1;
+				display->vbt.int_crt_support = 1;
+				display->vbt.int_lvds_support = 1;
+				display->vbt.lvds_use_ssc = 1;
+				
+				INIT_LIST_HEAD(&display->vbt.display_devices);
+				INIT_LIST_HEAD(&display->vbt.bdb_blocks);
 				
 				//intel_pps_unlock_regs_wa(display);
 				intel_display_device_probe(display);
-				init_bdb_blocks(display);
+				init_bdb_blocks(display, bdb);
+				
+				parse_general_features(display);
+				parse_general_definitions(display);
+				
+				parse_driver_features(display);
+				parse_compression_parameters(display);
+				parse_ddi_ports(display);
+				
+				display->panel.vbt.backlight.present = true;
+				display->panel.vbt.lvds_dither = true;
+				parse_panel_options(display, &display->panel);
+				
+				
 			}
 		}
 	

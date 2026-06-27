@@ -6957,6 +6957,11 @@ enum intel_output_type {
 #define PIPEDSL(dev_priv, pipe)		_MMIO_PIPE2(dev_priv, pipe, _PIPEADSL)
 #define   PIPEDSL_CURR_FIELD	REG_BIT(31) /* ctg+ */
 #define   PIPEDSL_LINE_MASK	REG_GENMASK(19, 0)
+#define HAS_DDI(__display)		(DISPLAY_INFO(__display)->has_ddi)
+#define HAS_LSPCON(__display)		(IS_DISPLAY_VER(__display, 9, 10))
+
+
+
 
 
 
