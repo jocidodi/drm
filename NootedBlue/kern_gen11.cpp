@@ -96,7 +96,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController16disableVDDForAuxEP14AppleIntelPort",disableVDDForAux2, this->odisableVDDForAux2},
 			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
-
+			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
@@ -204,7 +204,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
-			
+			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			
 			
 		};
@@ -212,6 +212,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
+
 				//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 				{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 				{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
@@ -1457,12 +1458,12 @@ static struct intel_dmc *display_to_dmc(struct intel_display *display)
 static void disable_event_handler(struct intel_display *display,
 				  u32 ctl_reg, u32 htp_reg)
 {
-	NBlue::callback->writeReg32(  ctl_reg,
+	intel_de_write(display,  ctl_reg,
 			   REG_FIELD_PREP(DMC_EVT_CTL_TYPE_MASK,
 					  DMC_EVT_CTL_TYPE_EDGE_0_1) |
 			   REG_FIELD_PREP(DMC_EVT_CTL_EVENT_ID_MASK,
 					  DMC_EVENT_FALSE));
-	NBlue::callback->writeReg32( htp_reg, 0);
+	intel_de_write(display, htp_reg, 0);
 }
 static bool has_dmc_id_fw(struct intel_display *display, enum intel_dmc_id dmc_id)
 {
@@ -1538,7 +1539,7 @@ static void dmc_load_mmio(struct intel_display *display, enum intel_dmc_id dmc_i
 	u32 i;
 
 	for (i = 0; i < dmc->dmc_info[dmc_id].mmio_count; i++) {
-		NBlue::callback->writeReg32( dmc->dmc_info[dmc_id].mmioaddr[i],
+		intel_de_write(display, dmc->dmc_info[dmc_id].mmioaddr[i],
 				   dmc_mmiodata(display, dmc, dmc_id, i));
 	}
 }
@@ -1556,7 +1557,7 @@ static void dmc_load_program(struct intel_display *display, enum intel_dmc_id dm
 	//preempt_disable();
 
 	for (i = 0; i < dmc->dmc_info[dmc_id].dmc_fw_size; i++) {
-		NBlue::callback->writeReg32(
+		intel_de_write(display,
 				  DMC_PROGRAM(dmc->dmc_info[dmc_id].start_mmioaddr, i),
 				  dmc->dmc_info[dmc_id].payload[i]);
 	}
@@ -1597,7 +1598,7 @@ void intel_dmc_update_dc6_allowed_count(struct intel_display *display,
 	if (DISPLAY_VER(dmc->display) < 14)
 		return;
 
-	dc5_cur_count = NBlue::callback->readReg32( DG1_DMC_DEBUG_DC5_COUNT);
+	dc5_cur_count = intel_de_read(display,  DG1_DMC_DEBUG_DC5_COUNT);
 
 	if (!start_tracking)
 		dmc->dc6_allowed.count += dc5_cur_count - dmc->dc6_allowed.dc5_start;
@@ -1612,13 +1613,13 @@ static void gen9_write_dc_state(struct intel_display *display,
 	int rereads = 0;
 	u32 v;
 
-	NBlue::callback->writeReg32( DC_STATE_EN, state);
+	intel_de_write(display, DC_STATE_EN, state);
 
 	do  {
-		v = NBlue::callback->readReg32( DC_STATE_EN);
+		v = intel_de_read(display,  DC_STATE_EN);
 
 		if (v != state) {
-			NBlue::callback->writeReg32( DC_STATE_EN, state);
+			intel_de_write(display, DC_STATE_EN, state);
 			rewrites++;
 			rereads = 0;
 		} else if (rereads++ > 5) {
@@ -1653,7 +1654,7 @@ void gen9_set_dc_state(struct intel_display *display, u32 state)
 	//if (!power_domains->initializing)
 	//	intel_psr_notify_dc5_dc6(display);
 
-	val = NBlue::callback->readReg32( DC_STATE_EN);
+	val = intel_de_read(display,  DC_STATE_EN);
 	mask = gen9_dc_mask(display);
 	//drm_dbg_kms(display->drm, "Setting DC state from %02x to %02x\n",
 		//	val & mask, state);
@@ -2716,7 +2717,7 @@ static void icl_ddi_combo_vswing_program(struct intel_display *display)
 	}
 
 	
-	val = NBlue::callback->readReg32( ICL_PORT_TX_DW5_LN(0, phy));
+	val = intel_de_read(display,  ICL_PORT_TX_DW5_LN(0, phy));
 	val &= ~(SCALING_MODE_SEL_MASK | RTERM_SELECT_MASK |
 		 COEFF_POLARITY | CURSOR_PROGRAM |
 		 TAP2_DISABLE | TAP3_DISABLE);
@@ -2763,7 +2764,7 @@ static void icl_combo_phy_set_signal_levels(struct intel_display *display)
 	int ln;
 	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 
-	val = NBlue::callback->readReg32( ICL_PORT_PCS_DW1_LN(0, phy));
+	val = intel_de_read(display, ICL_PORT_PCS_DW1_LN(0, phy));
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
 		val &= ~COMMON_KEEPER_EN;
 	else
@@ -3469,7 +3470,7 @@ int intel_de_wait_ms(struct intel_display *display, UInt32 reg, UInt32 mask, u32
 	for (;;) {
 		bool expired = mach_absolute_time() > deadline;
 
-		regValue = NBlue::callback->readReg32(reg);
+		regValue = intel_de_read(display,reg);
 
 		if ((regValue & mask) == value)
 			return 0;
@@ -4838,4 +4839,11 @@ int Gen11::readAUX(void *that,uint param_1,void *param_2,uint param_3)
 int Gen11::isConflictRegister(void *that,uint param_1)
 {
 	return -1;
+}
+
+int Gen11::fgetPixelInformation(void *that,int param_1,int param_2,int param_3,void *param_4)
+{
+	auto ret=FunctionCast(fgetPixelInformation, callback->ofgetPixelInformation)(that ,param_1,param_2,param_3,param_4);
+	if (ret!=0) ret=0;
+	return ret;
 }

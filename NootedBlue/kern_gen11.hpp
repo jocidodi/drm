@@ -655,6 +655,10 @@ public:
 	
 	static int isConflictRegister(void *that,uint param_1);
 	
+	static int 	fgetPixelInformation(void *that,int param_1,int param_2,int param_3,void *param_4);
+	mach_vm_address_t ofgetPixelInformation {};
+	
+	
 	
 	
 public:

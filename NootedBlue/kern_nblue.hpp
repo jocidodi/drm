@@ -79,6 +79,11 @@ class NBlue {
 	mach_vm_address_t orgApplePanelSetDisplay {0};
 	static bool wrapApplePanelSetDisplay(IOService *that, IODisplay *display);
 	
+	static uint64_t lset_id_mode(void *that,uint param_1,uint param_2);
+	mach_vm_address_t olset_id_mode {0};
+	
+	
+	
 //private:
 	
 	static bool wrapAddDrivers(void* const self, OSArray* const array, const bool doNubMatching);
