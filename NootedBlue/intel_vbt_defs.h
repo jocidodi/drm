@@ -1844,6 +1844,12 @@ struct intel_pps_delays {
 	u16 power_cycle;   /* eDP: T11+T12, LVDS: T7+T4 */
 };
 
+enum drrs_type {
+	DRRS_TYPE_NONE,
+	DRRS_TYPE_STATIC,
+	DRRS_TYPE_SEAMLESS,
+};
+
 struct intel_vbt_panel_data {
 	void *lfp_vbt_mode; /* if any */
 	void *sdvo_lvds_vbt_mode; /* if any */
@@ -1856,7 +1862,7 @@ struct intel_vbt_panel_data {
 	bool vrr;
 	
 	u8 seamless_drrs_min_refresh_rate;
-	//enum drrs_type drrs_type;
+	enum drrs_type drrs_type;
 	
 	struct {
 		int max_link_rate;

@@ -255,13 +255,7 @@ bool NBlue::wrapAddDrivers(void* const self, OSArray* const array, const bool do
 }
 
 
-void NBlue::setRMMIOIfNecessary() {
-	if (UNLIKELY(!this->rmmio || !this->rmmio->getLength())) {
-		/*this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
-		this->rmmioPtr = reinterpret_cast<volatile uint32_t *>(this->rmmio->getVirtualAddress());
-		this->rmmioLen=this->rmmio->getLength();*/
-	}
-}
+
 
 
 bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
@@ -810,7 +804,8 @@ void vbt_edp_to_pps_delays(struct intel_pps_delays *pps,
 	pps->power_down = edp_pps->t10;
 	pps->power_cycle = edp_pps->t11_t12;
 }
-bool panel_bool(unsigned int value, int panel_type)
+
+static bool panel_bool(unsigned int value, int panel_type)
 {
 	return panel_bits(value, panel_type, 1);
 }
@@ -970,12 +965,13 @@ parse_lfp_backlight(struct intel_display *display)
 		display->port_clock = 270000;
 	
 	int port_clock= display->port_clock;
-	int lane_count=display->panel.vbt.edp.lanes;
 	enum phy phy=display->phy0;
 	enum port port=display->port0;
 	struct intel_dp *intel_dp=&display->intel_dp0;
 	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 	
+	intel_dp->link_rate = port_clock;
+	crtc_state->port_clock=port_clock;
 
 
 	backlight_data = (const struct bdb_lfp_backlight *)bdb_find_section(display, BDB_LFP_BACKLIGHT);
@@ -1113,7 +1109,7 @@ parse_lfp_backlight(struct intel_display *display)
 	spec.power_down = msecs_to_pps_units(500);
 	spec.power_cycle = msecs_to_pps_units(10+500);
 	
-	parse_edp(display,panel);
+	//parse_edp(display,panel);
 	vbt = panel->vbt.edp.pps;
 	bios = panel->pps.bios_pps_delays;
 	
@@ -1185,14 +1181,7 @@ parse_lfp_backlight(struct intel_display *display)
 	NBlue::callback->iGPU->setProperty("PANEL", connectorArray);
 	connectorArray->release();
 	
-	intel_dp->link_rate = port_clock;
-	intel_dp->lane_count = lane_count;
-	intel_dp->output_reg = DDI_BUF_CTL(port);
-	crtc_state->lane_count = lane_count;
-	crtc_state->port_clock=port_clock;
-	crtc_state->cpu_transcoder=(enum transcoder) display->pipe0;
-	crtc_state->dither=display->panel.vbt.lvds_dither;
-	crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
+	
 	
 }
 
@@ -2349,7 +2338,7 @@ parse_panel_options(struct intel_display *display,
 
 	panel->vbt.panel_type=lfp_options->panel_type;
 	
-	/*if (get_blocksize(lfp_options) < 16)
+	if (get_blocksize(lfp_options) < 16)
 		return;
 
 	drrs_mode = panel_bits(lfp_options->dps_panel_type_bits,
@@ -2365,7 +2354,150 @@ parse_panel_options(struct intel_display *display,
 	default:
 		panel->vbt.drrs_type = DRRS_TYPE_NONE;
 		break;
-	}*/
+	}
+}
+
+static void
+parse_panel_driver_features(struct intel_display *display,
+				struct intel_panel *panel)
+{
+	const struct bdb_driver_features *driver;
+
+	driver = (const struct bdb_driver_features *)bdb_find_section(display, BDB_DRIVER_FEATURES);
+	if (!driver)
+		return;
+
+	if (display->vbt.version < 228) {
+
+		if (!driver->drrs_enabled && panel->vbt.drrs_type != DRRS_TYPE_NONE) {
+
+			if (driver->dmrrs_enabled)
+				panel->vbt.drrs_type = DRRS_TYPE_STATIC;
+			else
+				panel->vbt.drrs_type = DRRS_TYPE_NONE;
+		}
+
+		panel->vbt.psr.enable = driver->psr_enabled;
+	}
+}
+
+
+static void
+parse_power_conservation_features(struct intel_display *display,
+				  struct intel_panel *panel)
+{
+	const struct bdb_lfp_power *power;
+	u8 panel_type = panel->vbt.panel_type;
+
+	panel->vbt.vrr = true; /* matches Windows behaviour */
+
+	if (display->vbt.version < 228)
+		return;
+
+	power = (const struct bdb_lfp_power *)bdb_find_section(display, BDB_LFP_POWER);
+	if (!power)
+		return;
+
+	panel->vbt.psr.enable = panel_bool(power->psr, panel_type);
+
+
+	if (!panel_bool(power->drrs, panel_type) && panel->vbt.drrs_type != DRRS_TYPE_NONE) {
+
+		if (panel_bool(power->dmrrs, panel_type))
+			panel->vbt.drrs_type = DRRS_TYPE_STATIC;
+		else
+			panel->vbt.drrs_type = DRRS_TYPE_NONE;
+	}
+
+	if (display->vbt.version >= 232)
+		panel->vbt.edp.hobl = panel_bool(power->hobl, panel_type);
+
+	if (display->vbt.version >= 233)
+		panel->vbt.vrr = panel_bool(power->vrr_feature_enabled,
+						panel_type);
+}
+
+static void
+parse_psr(struct intel_display *display,
+	  struct intel_panel *panel)
+{
+	const struct bdb_psr *psr;
+	const struct psr_table *psr_table;
+	int panel_type = panel->vbt.panel_type;
+
+	psr = (const struct bdb_psr *)bdb_find_section(display, BDB_PSR);
+	if (!psr) {
+		return;
+	}
+
+	psr_table = &psr->psr_table[panel_type];
+
+	panel->vbt.psr.full_link = psr_table->full_link;
+	panel->vbt.psr.require_aux_wakeup = psr_table->require_aux_to_wakeup;
+	panel->vbt.psr.idle_frames = psr_table->idle_frames;
+
+
+	if (display->vbt.version >= 205 &&
+		(DISPLAY_VER(display) >= 9 && !display->platform.broxton)) {
+		switch (psr_table->tp1_wakeup_time) {
+		case 0:
+			panel->vbt.psr.tp1_wakeup_time_us = 500;
+			break;
+		case 1:
+			panel->vbt.psr.tp1_wakeup_time_us = 100;
+			break;
+		case 3:
+			panel->vbt.psr.tp1_wakeup_time_us = 0;
+			break;
+		default:
+		case 2:
+			panel->vbt.psr.tp1_wakeup_time_us = 2500;
+			break;
+		}
+
+		switch (psr_table->tp2_tp3_wakeup_time) {
+		case 0:
+			panel->vbt.psr.tp2_tp3_wakeup_time_us = 500;
+			break;
+		case 1:
+			panel->vbt.psr.tp2_tp3_wakeup_time_us = 100;
+			break;
+		case 3:
+			panel->vbt.psr.tp2_tp3_wakeup_time_us = 0;
+			break;
+		default:
+		case 2:
+			panel->vbt.psr.tp2_tp3_wakeup_time_us = 2500;
+		break;
+		}
+	} else {
+		panel->vbt.psr.tp1_wakeup_time_us = psr_table->tp1_wakeup_time * 100;
+		panel->vbt.psr.tp2_tp3_wakeup_time_us = psr_table->tp2_tp3_wakeup_time * 100;
+	}
+
+	if (display->vbt.version >= 226) {
+		u32 wakeup_time = psr->psr2_tp2_tp3_wakeup_time;
+
+		wakeup_time = panel_bits(wakeup_time, panel_type, 2);
+		switch (wakeup_time) {
+		case 0:
+			wakeup_time = 500;
+			break;
+		case 1:
+			wakeup_time = 100;
+			break;
+		case 3:
+			wakeup_time = 50;
+			break;
+		default:
+		case 2:
+			wakeup_time = 2500;
+			break;
+		}
+		panel->vbt.psr.psr2_tp2_tp3_wakeup_time_us = wakeup_time;
+	} else {
+		panel->vbt.psr.psr2_tp2_tp3_wakeup_time_us = panel->vbt.psr.tp2_tp3_wakeup_time_us;
+	}
 }
 
 int NBlue::intel_opregion_setup()
@@ -2500,24 +2632,38 @@ int NBlue::intel_opregion_setup()
 				display->vbt.int_lvds_support = 1;
 				display->vbt.lvds_use_ssc = 1;
 				
+				struct intel_dp *intel_dp=&display->intel_dp0;
+				struct intel_crtc_state *crtc_state=&display->crtc_state0;
+				struct intel_panel *panel=&display->panel;
 				INIT_LIST_HEAD(&display->vbt.display_devices);
 				INIT_LIST_HEAD(&display->vbt.bdb_blocks);
 				
+				
 				//intel_pps_unlock_regs_wa(display);
 				intel_display_device_probe(display);
+				
 				init_bdb_blocks(display, bdb);
 				
 				parse_general_features(display);
 				parse_general_definitions(display);
-				
 				parse_driver_features(display);
 				parse_compression_parameters(display);
 				parse_ddi_ports(display);
+				parse_panel_options(display, panel);
 				
-				display->panel.vbt.backlight.present = true;
-				display->panel.vbt.lvds_dither = true;
-				parse_panel_options(display, &display->panel);
+				//parse_generic_dtd(display, panel);
+				//parse_lfp_data(display, panel);
+				parse_panel_driver_features(display, panel);
+				parse_power_conservation_features(display, panel);
+				parse_edp(display, panel);
+				parse_psr(display, panel);
 				
+				intel_dp->output_reg = DDI_BUF_CTL(display->port0);
+				intel_dp->lane_count = display->panel.vbt.edp.lanes;
+				crtc_state->lane_count = display->panel.vbt.edp.lanes;
+				crtc_state->cpu_transcoder=(enum transcoder) display->pipe0;
+				crtc_state->dither=display->panel.vbt.lvds_dither;
+				crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
 				
 			}
 		}
@@ -2540,9 +2686,7 @@ UInt32 NBlue::readReg32(unsigned long reg) {
 	//IOSimpleLockLock(nlock);
 	
 	if (Gen11::callback) {
-		//auto ret= Gen11::callback->raReadRegister32(nullptr,reg);
 		//IOSimpleLockUnlock(nlock);
-		//return ret;
 		if (rmmioPtr==nullptr) {
 			rmmioPtr= Gen11::callback->rmmioPtr;
 			rmmioLen= Gen11::callback->rmmioLen;
@@ -2550,7 +2694,6 @@ UInt32 NBlue::readReg32(unsigned long reg) {
 	}
 	
 	if (reg < rmmioLen-4) {
-		//auto ret=  rmmioPtr[reg];
 		auto ret= *(uint *)((long)rmmioPtr + reg);
 		//IOSimpleLockUnlock(nlock);
 		return ret;
@@ -2566,9 +2709,7 @@ void NBlue::writeReg32(unsigned long reg, UInt32 val) {
 	//IOSimpleLockLock(nlock);
 	
 	if (Gen11::callback) {
-		//Gen11::callback->raWriteRegister32(nullptr,reg,val);
 		//IOSimpleLockUnlock(nlock);
-		//return ;
 		if (rmmioPtr==nullptr) {
 			rmmioPtr= Gen11::callback->rmmioPtr;
 			rmmioLen= Gen11::callback->rmmioLen;
@@ -2576,7 +2717,6 @@ void NBlue::writeReg32(unsigned long reg, UInt32 val) {
 	}
 	
 	if (reg < rmmioLen-4) {
-		//rmmioPtr[reg] = val;
 		*(uint *)((long)rmmioPtr + reg) = val;
 	}
 	//IOSimpleLockUnlock(nlock);

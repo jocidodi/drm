@@ -59,7 +59,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 	
 	if (kextG11FB.loadIndex == index) {
 		kexticl=true;
-		NBlue::callback->setRMMIOIfNecessary();
 		
 		SolveRequestPlus solveRequests[] = {
 			{"_gPlatformInformationList", this->gPlatformInformationList},
@@ -162,7 +161,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		
 	}	else if (kextG11FBT.loadIndex == index) {
-		NBlue::callback->setRMMIOIfNecessary();
+
 		SYSLOG("nblue", "AppleIntelTGLGraphicsFramebuffer");
 		
 		bool isprod=false;
@@ -375,7 +374,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		return true;
 		
 	}     else if (kextG11HW.loadIndex == index) {
-		NBlue::callback->setRMMIOIfNecessary();
 		 
 		 RouteRequestPlus requests[] = {
 			 
@@ -408,7 +406,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		
     } else if (kextG11HWT.loadIndex == index || kextG11HWTe.loadIndex == index) {
-		NBlue::callback->setRMMIOIfNecessary();
+
 		auto kext=kextG11HWT.loadIndex == index ? kextG11HWT: kextG11HWTe;
 		
 		SolveRequestPlus solveRequests[] = {
@@ -2318,6 +2316,7 @@ void Gen11::hwInitializeCState(void *that)
 void Gen11::setupPlane(void *that,void *param_1,int param_2)
 {//icl
 	FunctionCast(setupPlane, callback->osetupPlane)(that ,param_1,param_2);
+	//skl_get_initial_plane_config
 	
 	//PLANE_CTL_1_A (0x00070180): 0x84000400
 	//PLANE_STRIDE_1_A (0x00070188): 0x0000000d

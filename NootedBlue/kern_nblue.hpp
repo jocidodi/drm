@@ -48,14 +48,12 @@ class NBlue {
 	bool tglid;
 	bool iclid;
 	
-	IOMemoryMap *rmmio {nullptr};
 	volatile UInt32 *rmmioPtr {nullptr};
 	unsigned long rmmioLen;
 	
     void init();
     void processPatcher(KernelPatcher &patcher);
     bool processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
-	void setRMMIOIfNecessary();
 	
 	IOSimpleLock *nlock;
 	
