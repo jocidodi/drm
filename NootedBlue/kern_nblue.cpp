@@ -262,11 +262,12 @@ bool NBlue::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 	
 	if (kextIOAcceleratorFamily2.loadIndex == index) {
 		KernelPatcher::RouteRequest requests[] = {
-				{"__ZN20IOAccelLegacySurface11set_id_modeEjj", lset_id_mode, olset_id_mode},
-			};
+			{"__ZN14IOAccelSurface11set_id_modeEjj", lset_id_mode, olset_id_mode},
+			{"__ZN20IOAccelLegacySurface11set_id_modeEjj", lset_id_mode, olset_id_mode},
+		};
 			
-		SYSLOG_COND(!patcher.routeMultipleLong(index, requests, address, size), "IOAcceleratorFamily2", "Failed to apply patch");
-			patcher.clearError();
+			//SYSLOG_COND(!patcher.routeMultipleLong(index, requests, address, size), "IOAcceleratorFamily2", "Failed to apply patch");
+			//patcher.clearError();
 		return true;
 	}  else if (kextIOGraphics.loadIndex == index) {
 
@@ -427,6 +428,13 @@ uint64_t NBlue::lset_id_mode(void *that,uint param_1,uint param_2)
 	return ret;
 }
 
+uint64_t NBlue::lset_id_mode2(void *that,uint param_1,uint param_2)
+{
+	#define APPLE_LEGACY_VALID_MASK 0x007f8c3f
+	param_2 &= APPLE_LEGACY_VALID_MASK;
+	auto ret = FunctionCast(lset_id_mode2, callback->olset_id_mode2)(that, param_1,param_2);
+	return ret;
+}
 
 u32 _get_blocksize(const u8 *block_base)
 {

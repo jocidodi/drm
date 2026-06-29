@@ -80,7 +80,8 @@ class NBlue {
 	static uint64_t lset_id_mode(void *that,uint param_1,uint param_2);
 	mach_vm_address_t olset_id_mode {0};
 	
-	
+	static uint64_t lset_id_mode2(void *that,uint param_1,uint param_2);
+	mach_vm_address_t olset_id_mode2 {0};
 	
 //private:
 	

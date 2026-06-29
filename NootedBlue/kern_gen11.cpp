@@ -118,10 +118,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		//builtin
 		static const uint8_t f9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0x75, 0x0a};
 		static const uint8_t r9[]= {0x48, 0x8b, 0xb8, 0x40, 0x04, 0x00, 0x00, 0xf6, 0x47, 0x14, 0x08, 0xeb, 0x0a};
-		
+		//edp panel
 		static const uint8_t f9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0x74, 0x51};
 		static const uint8_t r9b[]= {0x8b, 0x40, 0x08, 0x85, 0xc0, 0xeb, 0x51};
-		
+		//sleep
+		static const uint8_t f9c[]= {0x74, 0x1f, 0x85, 0xc0, 0x0f, 0x85, 0x81, 0x00, 0x00, 0x00};
+		static const uint8_t r9c[]= {0x90, 0x90, 0x85, 0xc0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
 		
 		
 		//register adresses
@@ -137,6 +139,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		static const uint8_t f24e[]= {0xbe, 0x00, 0xf8, 0x06, 0x00};
 		static const uint8_t r24e[]= {0xbe, 0x00, 0x08, 0x06, 0x00};
 		
+		static const uint8_t f24f[]= {0xbe, 0x08, 0xf0, 0x07, 0x00};
+		static const uint8_t r24f[]= {0xbe, 0x08, 0x00, 0x07, 0x00};
+		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
 		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
@@ -147,10 +152,12 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			{&kextG11FB, f9b, r9b, arrsize(f9b),    1},
+			{&kextG11FB, f9c, r9c, arrsize(f9c),    1},
 			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
 			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
 			{&kextG11FB, f24e, r24e, arrsize(f24e),    28},
+			{&kextG11FB, f24f, r24f, arrsize(f24f),    5},
 			{&kextG11FB, f25, r25, arrsize(f25),    7},
 			
 		};
