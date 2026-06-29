@@ -331,7 +331,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
+		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
 
 
 
@@ -557,7 +557,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	
-	pinfo[p].connectors[0].flags-=8;
+	pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
 	pinfo[p].connectors[0].pipe=1;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -2071,7 +2071,12 @@ static void icl_mbus_init(struct intel_display *display)
 	for_each_set_bit(i, &abox_regs, BITS_PER_TYPE(abox_regs))
 	intel_de_rmw(display, MBUS_ABOX_CTL(i), mask, val);
 }
+bool intel_dp_is_edp()
+{
+	struct intel_display *display = &NBlue::callback->display_base;
 
+	return (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR);
+}
 
 static int icl_pcode_read_mem_global_info(struct intel_display *display,
 					  struct dram_info *dram_info)
@@ -2305,6 +2310,7 @@ void Gen11::hwInitializeCState(void *that)
 			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
 	intel_de_posting_read(display,DC_STATE_DEBUG);
 
+	//hsw_crtc_enable
 	intel_de_rmw(display, PIPEDMC_CONTROL(PIPE_A), 0, PIPEDMC_ENABLE);
 	
 	icl_set_pipe_chicken();
@@ -2317,7 +2323,6 @@ void Gen11::setupPlane(void *that,void *param_1,int param_2)
 {//icl
 	FunctionCast(setupPlane, callback->osetupPlane)(that ,param_1,param_2);
 	//skl_get_initial_plane_config
-	
 	//PLANE_CTL_1_A (0x00070180): 0x84000400
 	//PLANE_STRIDE_1_A (0x00070188): 0x0000000d
 	
@@ -2387,7 +2392,7 @@ intel_ddi_transcoder_func_reg_val_get()
 	if (crtc_state->hw.adjusted_mode.flags & DRM_MODE_FLAG_PHSYNC)
 		temp |= TRANS_DDI_PHSYNC;
 
-	/*if (cpu_transcoder == TRANSCODER_EDP) {
+	if (cpu_transcoder == TRANSCODER_EDP) {
 		switch (pipe) {
 		default:
 		case PIPE_A:
@@ -2403,7 +2408,7 @@ intel_ddi_transcoder_func_reg_val_get()
 			temp |= TRANS_DDI_EDP_INPUT_C_ONOFF;
 			break;
 		}
-	}*/
+	}
 
 		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
 		temp |= DDI_PORT_WIDTH(display->panel.vbt.edp.lanes);
@@ -4127,22 +4132,29 @@ bool tgl_ddi_pre_enable_dp(struct intel_crtc_state *crtc_state)
 	//if (!kexticl) Gen11::callback->enableVDDForAux(ccont2,linkp);
 	//else Gen11::callback->enableVDDForAux2(ccont2,linkp);
 
+	if (intel_dp_is_edp())
 	Gen11::callback->hwSetPanelPower(ccont2,2);
 
 	//if (!kexticl) Gen11::callback->disableVDDForAux(ccont2);
 	//else Gen11::callback->disableVDDForAux2(ccont2,linkp);
 	
-	/*
+	
 
-	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(display->phy0),
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, display->phy0),
-				  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(display->phy0));
+	/*_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
+							  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(display->phy0),
+							  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, display->phy0),
+							  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(display->phy0));
+	*/
+	/*if (!intel_tc_port_in_tbt_alt_mode(dig_port)) {
+		drm_WARN_ON(display->drm, dig_port->ddi_io_wakeref);
+		dig_port->ddi_io_wakeref = intel_display_power_get(display,
+								   dig_port->ddi_io_power_domain);
+	}*/
+	
+	//intel_ddi_enable_transcoder_clock(crtc_state);
+	
+	//intel_ddi_config_transcoder_func(crtc_state);
 
-	intel_ddi_enable_transcoder_clock(crtc_state);
- 
-	intel_ddi_config_transcoder_func(crtc_state);
-*/
 	icl_combo_phy_set_signal_levels(display);
 	
 	intel_combo_phy_power_up_lanes(display, display->phy0, false,
@@ -4197,7 +4209,16 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 	
 	int ret = 0, link_bpp_x16;
 
-
+	
+	
+	/*const struct drm_display_mode *fixed_mode;
+	fixed_mode = intel_panel_fixed_mode(connector, adjusted_mode);
+	if (intel_dp_is_edp() && fixed_mode) {
+		ret = intel_panel_compute_config(connector, adjusted_mode);
+		if (ret)
+			return ret;
+	}*/
+	
 	pipe_config->sink_format =INTEL_OUTPUT_FORMAT_RGB;
 	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
 	
@@ -4207,6 +4228,13 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 		ret = intel_dp_compute_output_format(encoder, pipe_config, conn_state, false);
 	if (ret)
 		return ret;
+	 
+	 if ((intel_dp_is_edp(intel_dp) && fixed_mode) ||
+		 pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420) {
+		 ret = intel_pfit_compute_config(pipe_config, conn_state);
+		 if (ret)
+			 return ret;
+	 }
 */
 
 	pipe_config->limited_color_range = false;
@@ -4472,6 +4500,7 @@ static void bdw_get_trans_port_sync_config(struct intel_crtc_state *crtc_state)
 }
 
 
+
 static void intel_ddi_get_config(struct intel_crtc_state *pipe_config)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -4487,6 +4516,8 @@ static void intel_ddi_get_config(struct intel_crtc_state *pipe_config)
 
 	//if (encoder->type == INTEL_OUTPUT_EDP)
 	//	intel_edp_fixup_vbt_bpp(encoder, pipe_config->pipe_bpp);
+	
+	if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
 	if (display->panel.vbt.edp.bpp && pipe_config->pipe_bpp > display->panel.vbt.edp.bpp) {
 
 		display->panel.vbt.edp.bpp = pipe_config->pipe_bpp;
@@ -4705,7 +4736,7 @@ static void intel_ddi_enable(struct intel_crtc_state *crtc_state)
 	if (is_hdmi)
 		intel_ddi_enable_hdmi(state, encoder, crtc_state, conn_state);
 	else*/
-		//intel_ddi_enable_dp(  crtc_state);
+	//	intel_ddi_enable_dp(  crtc_state);
 
 	//intel_hdcp_enable(  crtc_state);
 
@@ -4792,11 +4823,14 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_ddi_compute_config_late(crtc_state);
 	
+	//intel_edp_init_connector
 	//intel_ddi_pre_enable_dp
 	auto ret=tgl_ddi_pre_enable_dp(crtc_state);
 	
 	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST))
 		intel_ddi_set_dp_msa(true);
+	
+	//intel_dp_detect
 	
 	intel_ddi_enable(crtc_state);
 	

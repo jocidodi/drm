@@ -1771,7 +1771,7 @@ static u32 get_allowed_dc_mask(struct intel_display *display, int enable_dc)
 		DISPLAY_VER(display) >= 11 ? DC_STATE_EN_DC9 : 0;
 
 	//if (!display->params.disable_power_well)
-		max_dc = 0;
+	//	max_dc = 0;
 
 	if (enable_dc >= 0 && enable_dc <= max_dc) {
 		requested_dc = enable_dc;
@@ -2235,12 +2235,12 @@ static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
 	
 	ConnectorType type=ConnectorDummy;
 	if (is_dp) type=ConnectorDP;
-	if (is_edp) type=ConnectorLVDS;
 	if (is_hdmi) type=ConnectorHDMI;
 	
 	u32 flags=CNAlterAppertureRequirements;
 	if (is_dp) flags+=CNFlagDP;
 	if (is_edp) flags+=CNConnectorAlwaysConnected;
+	if (is_edp) flags+=CNUseMiscIoPowerWell;
 	if (is_hdmi) flags+=CNFlagHDMI;
 	
 	display->bconnectors[ii].busId=child->ddc_pin;
@@ -2649,8 +2649,16 @@ int NBlue::intel_opregion_setup()
 				parse_driver_features(display);
 				parse_compression_parameters(display);
 				parse_ddi_ports(display);
-				parse_panel_options(display, panel);
 				
+				intel_dp->output_reg = DDI_BUF_CTL(display->port0);
+				
+				if (HAS_TRANSCODER(display, TRANSCODER_EDP) && display->port0 == PORT_A)
+					crtc_state->cpu_transcoder = TRANSCODER_EDP;
+				else
+					crtc_state->cpu_transcoder = (enum transcoder) display->pipe0;
+				
+				
+				parse_panel_options(display, panel);
 				//parse_generic_dtd(display, panel);
 				//parse_lfp_data(display, panel);
 				parse_panel_driver_features(display, panel);
@@ -2658,12 +2666,12 @@ int NBlue::intel_opregion_setup()
 				parse_edp(display, panel);
 				parse_psr(display, panel);
 				
-				intel_dp->output_reg = DDI_BUF_CTL(display->port0);
 				intel_dp->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->lane_count = display->panel.vbt.edp.lanes;
-				crtc_state->cpu_transcoder=(enum transcoder) display->pipe0;
 				crtc_state->dither=display->panel.vbt.lvds_dither;
 				crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
+				
+				//intel_dp_init_connector
 				
 			}
 		}

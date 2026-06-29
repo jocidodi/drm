@@ -6966,7 +6966,8 @@ enum intel_output_type {
 #define HAS_DDI(__display)		(DISPLAY_INFO(__display)->has_ddi)
 #define HAS_LSPCON(__display)		(IS_DISPLAY_VER(__display, 9, 10))
 
-
+#define HAS_TRANSCODER(__display, trans)	((DISPLAY_RUNTIME_INFO(__display)->cpu_transcoder_mask & \
+						  BIT(trans)) != 0)
 
 
 
