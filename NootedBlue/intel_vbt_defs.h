@@ -1953,7 +1953,7 @@ struct intel_panel {
 	/* Fixed EDID for eDP and LVDS. May hold ERR_PTR for invalid EDID. */
 	void *fixed_edid;
 
-	//struct list_head fixed_modes;
+	struct list_head fixed_modes;
 
 	
 	/* backlight */
@@ -1992,7 +1992,7 @@ struct intel_panel {
 			} intel_cap;
 		} edp;
 
-		///struct backlight_device *device;
+		//struct backlight_device *device;
 
 		//const struct intel_panel_bl_funcs *funcs;
 		//const struct intel_panel_bl_funcs *pwm_funcs;
@@ -5701,7 +5701,7 @@ struct intel_display {
 	struct intel_dp intel_dp0;
 	
 	enum intel_pch pch_type;
-	
+	bool initok;
 
 	
 	struct intel_hotplug hotplug;
@@ -5759,7 +5759,6 @@ struct intel_display {
 	const struct child_device_config *child0;
 	enum port port0;
 	enum phy phy0;
-	enum aux_ch aux_ch0;
 	enum pipe pipe0;
 	
 };
@@ -6968,6 +6967,7 @@ enum intel_output_type {
 
 #define HAS_TRANSCODER(__display, trans)	((DISPLAY_RUNTIME_INFO(__display)->cpu_transcoder_mask & \
 						  BIT(trans)) != 0)
+#define HAS_MSO(__display)		(DISPLAY_VER(__display) >= 12)
 
 
 

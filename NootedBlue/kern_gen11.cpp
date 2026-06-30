@@ -96,12 +96,17 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
 			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
-			
+			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
 			{"__ZN31AppleIntelFramebufferController9hwSetModeEP21AppleIntelFramebufferP21AppleIntelDisplayPathiPK29IODetailedTimingInformationV2",hwSetMode, this->ohwSetMode},*/
 			
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
+			
+			{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer18prepareToEnterWakeEv",dovoid},
 			
 			
 		};
@@ -211,6 +216,11 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
+			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
+			{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer18prepareToEnterWakeEv",dovoid},
 			
 			
 		};
@@ -218,7 +228,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		if (isprod) {
 			RouteRequestPlus requests[] = {
-
 				//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 				{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 				{"__ZN31AppleIntelFramebufferController11SetupParamsEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2",SetupParams,	this->oSetupParams},
@@ -338,7 +347,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		
 		//linktrainig 2 lines
 		static const uint8_t f25[]= {0x77, 0x77, 0x00, 0x00};
-		static const uint8_t r25[]= {0x33, 0x00, 0x00, 0x00};
+		static const uint8_t r25[]= {0x77, 0x00, 0x00, 0x00};
 
 
 
@@ -564,7 +573,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	
-	pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
+	//pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
 	pinfo[p].connectors[0].pipe=1;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -627,7 +636,6 @@ uint64_t  Gen11::getOSInformation(void *that)
 	}
 	
 	pinfo[p].connectors[1].type=ConnectorDummy;
-	
 		
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -2219,7 +2227,7 @@ static void icl_set_pipe_chicken()
 void Gen11::hwInitializeCState(void *that)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
-	
+	if (display->initok) return;
 	
 	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
 	
@@ -2418,7 +2426,7 @@ intel_ddi_transcoder_func_reg_val_get()
 	}
 
 		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
-		temp |= DDI_PORT_WIDTH(display->panel.vbt.edp.lanes);
+		temp |= DDI_PORT_WIDTH(crtc_state->lane_count);
 	
 
 	return temp;
@@ -2472,7 +2480,7 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 
 
 	//if (intel_dp_needs_vsc_sdp())
-		temp |= DP_MSA_MISC_COLOR_VSC_SDP;
+	//	temp |= DP_MSA_MISC_COLOR_VSC_SDP;
 	
 	if (wr)
 	intel_de_write(display, TRANS_MSA_MISC(display, cpu_transcoder),temp);
@@ -2486,7 +2494,7 @@ static u32 bdw_set_pipe_misc()
 	
 	u32 val = 0;
 
-	switch (display->panel.vbt.edp.bpp) {
+	switch (crtc_state->pipe_bpp) {
 	case 18:
 		val |= PIPE_MISC_BPC_6;
 		break;
@@ -2504,7 +2512,7 @@ static u32 bdw_set_pipe_misc()
 		break;
 	}
 
-	if (display->panel.vbt.lvds_dither)
+	if (crtc_state->dither)
 		val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
 
 	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
@@ -2520,6 +2528,9 @@ static u32 bdw_set_pipe_misc()
 
 	if (DISPLAY_VER(display) >= 12)
 		val |= PIPE_MISC_PIXEL_ROUNDING_TRUNC;
+
+
+	//intel_de_write_dsb(display, dsb, PIPE_MISC(crtc->pipe), val);
 
 	
 	return val;
@@ -4050,7 +4061,6 @@ bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 
 	//intel_hpd_block(encoder);
 
-	drm_dp_read_dpcd_caps(intel_dp);
 	/*lttpr_count = intel_dp_init_lttpr_and_dprx_caps(intel_dp);
 
 	if (lttpr_count < 0)
@@ -4146,8 +4156,8 @@ bool tgl_ddi_pre_enable_dp(struct intel_crtc_state *crtc_state)
 	//else Gen11::callback->disableVDDForAux2(ccont2,linkp);
 	
 	
-
-	/*_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
+/*
+	_icl_ddi_enable_clock(display, ICL_DPCLKA_CFGCR0,
 							  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL_MASK(display->phy0),
 							  ICL_DPCLKA_CFGCR0_DDI_CLK_SEL(DPLL_ID_ICL_DPLL0, display->phy0),
 							  ICL_DPCLKA_CFGCR0_DDI_CLK_OFF(display->phy0));
@@ -4208,23 +4218,21 @@ drm_dp_enhanced_frame_cap(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
 		(dpcd[9] & DP_ENHANCED_FRAME_CAP);
 }
 
+
+
 int
 intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	struct intel_dp *intel_dp=&display->intel_dp0;
-	
+	struct drm_display_mode *adjusted_mode = &pipe_config->hw.adjusted_mode;
+	struct drm_display_mode *mode = (struct drm_display_mode *)display->panel.vbt.lfp_vbt_mode;
 	int ret = 0, link_bpp_x16;
 
 	
+	adjusted_mode = mode;
 	
-	/*const struct drm_display_mode *fixed_mode;
-	fixed_mode = intel_panel_fixed_mode(connector, adjusted_mode);
-	if (intel_dp_is_edp() && fixed_mode) {
-		ret = intel_panel_compute_config(connector, adjusted_mode);
-		if (ret)
-			return ret;
-	}*/
+
 	
 	pipe_config->sink_format =INTEL_OUTPUT_FORMAT_RGB;
 	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
@@ -4325,6 +4333,8 @@ static void intel_ddi_mso_get_config( struct intel_crtc_state *pipe_config)
 	enum pipe pipe = display->pipe0;
 	u32 dss1;
 
+	if (!HAS_MSO(display))
+		return;
 
 	dss1 = intel_de_read(display, ICL_PIPE_DSS_CTL1(pipe));
 
@@ -4358,11 +4368,13 @@ static void intel_ddi_read_func_ctl_dp_sst(struct intel_crtc_state *crtc_state,
 
 	//if (encoder->type == INTEL_OUTPUT_EDP)
 	
-	if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
-		crtc_state->output_types |= BIT(INTEL_OUTPUT_EDP);
-	else
-		crtc_state->output_types |= BIT(INTEL_OUTPUT_DP);
-	
+	if (!crtc_state->output_types)
+	{
+		if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
+			crtc_state->output_types |= BIT(INTEL_OUTPUT_EDP);
+		else
+			crtc_state->output_types |= BIT(INTEL_OUTPUT_DP);
+	}
 	//crtc_state->lane_count =
 	//	((ddi_func_ctl & DDI_PORT_WIDTH_MASK) >> DDI_PORT_WIDTH_SHIFT) + 1;
 
@@ -4524,6 +4536,7 @@ static void intel_ddi_get_config(struct intel_crtc_state *pipe_config)
 	//if (encoder->type == INTEL_OUTPUT_EDP)
 	//	intel_edp_fixup_vbt_bpp(encoder, pipe_config->pipe_bpp);
 	
+	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
 	if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
 	if (display->panel.vbt.edp.bpp && pipe_config->pipe_bpp > display->panel.vbt.edp.bpp) {
 
@@ -4757,8 +4770,6 @@ static void icl_ddi_combo_get_config(struct intel_crtc_state *crtc_state)
 
 
 
-
-
 static int intel_ddi_compute_config_late(struct intel_crtc_state *crtc_state)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -4823,6 +4834,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->preEmphasis = 0;
 	}
 	
+	drm_dp_read_dpcd_caps(intel_dp);
 	
 	//intel_ddi_init
 	intel_dp_compute_config(crtc_state);
@@ -4839,7 +4851,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	//intel_dp_detect
 	
-	intel_ddi_enable(crtc_state);
+	//intel_ddi_enable(crtc_state);
 	
 	return 0; // hack
 	

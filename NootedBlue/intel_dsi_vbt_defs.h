@@ -612,6 +612,13 @@ static inline void INIT_LIST_HEAD(struct list_head *list)
 	WRITE_ONCE(list->prev, list);
 }
 
+#define DRM_DISPLAY_MODE_LEN	32
+#define DRM_MODE_TYPE_PREFERRED	(1<<3)
+
+
+
+
+
 
 #ifdef __cplusplus
 //}

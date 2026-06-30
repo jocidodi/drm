@@ -961,6 +961,9 @@ int msecs_to_pps_units(int msecs)
 void
 parse_lfp_backlight(struct intel_display *display)
 {
+	if (display->initok) return;
+	display->initok=true;
+	
 	struct intel_panel *panel=&display->panel;
 	const struct bdb_lfp_backlight *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
@@ -1143,7 +1146,7 @@ parse_lfp_backlight(struct intel_display *display)
 	finalb->power_cycle = roundup(finalb->power_cycle, msecs_to_pps_units(100));
 	
 	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
-	if (panel->vbt.edp.bpp==18) panel->vbt.edp.bpp=24;
+	//if (panel->vbt.edp.bpp==18) panel->vbt.edp.bpp=24;
 	
 	OSArray *connectorArray = OSArray::withCapacity(1);
 	OSDictionary *connectorDict = OSDictionary::withCapacity(40);
@@ -2218,21 +2221,16 @@ static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
 	//supports_tbt = intel_bios_encoder_supports_tbt(devdata);
 	
 	enum phy phy = intel_port_to_phy(display, port);
-	enum aux_ch aux_ch = map_aux_ch(display,child->aux_channel);
 
-	
-	if (aux_ch ==AUX_CH_NONE) aux_ch = (enum aux_ch)port;
-	
 	if (port == PORT_A) {
 		display->hotplug.hpd_pin=tgl_hpd_pin(port);
 		display->child0=child;
 		display->port0=port;
 		display->phy0=phy;
-		display->aux_ch0=aux_ch;
 		display->pipe0=PIPE_A;
 	}
 	
-	int ii=0;
+	int ii=-1;
 	for (int i = 0; i < 6; i++) {
 		if (display->bconnectors[i].type==ConnectorDummy) {
 			ii=i;
@@ -2240,21 +2238,24 @@ static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
 		}
 	}
 	
-	
-	ConnectorType type=ConnectorDummy;
-	if (is_dp) type=ConnectorDP;
-	if (is_hdmi) type=ConnectorHDMI;
-	
-	u32 flags=CNAlterAppertureRequirements;
-	if (is_dp) flags+=CNFlagDP;
-	if (is_edp) flags+=CNConnectorAlwaysConnected;
-	if (is_edp) flags+=CNUseMiscIoPowerWell;
-	if (is_hdmi) flags+=CNFlagHDMI;
-	
-	display->bconnectors[ii].busId=child->ddc_pin;
-	display->bconnectors[ii].pipe=port;
-	display->bconnectors[ii].type=type;
-	display->bconnectors[ii].flags=flags;
+	if (ii!=-1) {
+		
+		ConnectorType type=ConnectorDummy;
+		if (is_dp) type=ConnectorDP;
+		if (is_hdmi) type=ConnectorHDMI;
+		
+		u32 flags=CNAlterAppertureRequirements;
+		if (is_dp) flags+=CNFlagDP;
+		if (is_edp) flags+=CNFlagInternalOverride;
+		if (is_edp) flags+=CNUseMiscIoPowerWell;
+		if (is_edp) flags+=CNFlagNoHPD;
+		if (is_hdmi) flags+=CNFlagHDMI;
+		
+		display->bconnectors[ii].busId=child->ddc_pin;
+		display->bconnectors[ii].pipe=port;
+		display->bconnectors[ii].type=type;
+		display->bconnectors[ii].flags=flags;
+	}
 
 	/*drm_dbg_kms(display->drm,
 			"Port %c VBT info: CRT:%d DVI:%d HDMI:%d DP:%d eDP:%d DSI:%d DP++:%d LSPCON:%d USB-Type-C:%d TBT:%d DSC:%d\n",
@@ -2508,9 +2509,91 @@ parse_psr(struct intel_display *display,
 	}
 }
 
+void drm_mode_set_name(struct drm_display_mode *mode)
+{
+	bool interlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
+
+	snprintf(mode->name, DRM_DISPLAY_MODE_LEN, "%dx%d%s",
+		 mode->hdisplay, mode->vdisplay,
+		 interlaced ? "i" : "");
+}
+
+static void
+parse_generic_dtd(struct intel_display *display,
+		  struct intel_panel *panel)
+{
+	const struct bdb_generic_dtd *generic_dtd;
+	const struct generic_dtd_entry *dtd;
+	struct drm_display_mode *panel_fixed_mode;
+	int num_dtd;
+
+	if (display->vbt.version < 229)
+		return;
+
+	generic_dtd = (const struct bdb_generic_dtd *)bdb_find_section(display, BDB_GENERIC_DTD);
+	if (!generic_dtd)
+		return;
+
+	if (generic_dtd->gdtd_size < sizeof(struct generic_dtd_entry)) {
+		return;
+	} else if (generic_dtd->gdtd_size !=
+		   sizeof(struct generic_dtd_entry)) {
+	}
+
+	num_dtd = (get_blocksize(generic_dtd) -
+		   sizeof(struct bdb_generic_dtd)) / generic_dtd->gdtd_size;
+	if (panel->vbt.panel_type >= num_dtd) {
+		return;
+	}
+
+	dtd = &generic_dtd->dtd[panel->vbt.panel_type];
+
+	panel_fixed_mode = (struct drm_display_mode *)IOMalloc(sizeof(*panel_fixed_mode));
+	if (!panel_fixed_mode)
+		return;
+
+	panel_fixed_mode->hdisplay = dtd->hactive;
+	panel_fixed_mode->hsync_start =
+		panel_fixed_mode->hdisplay + dtd->hfront_porch;
+	panel_fixed_mode->hsync_end =
+		panel_fixed_mode->hsync_start + dtd->hsync;
+	panel_fixed_mode->htotal =
+		panel_fixed_mode->hdisplay + dtd->hblank;
+
+	panel_fixed_mode->vdisplay = dtd->vactive;
+	panel_fixed_mode->vsync_start =
+		panel_fixed_mode->vdisplay + dtd->vfront_porch;
+	panel_fixed_mode->vsync_end =
+		panel_fixed_mode->vsync_start + dtd->vsync;
+	panel_fixed_mode->vtotal =
+		panel_fixed_mode->vdisplay + dtd->vblank;
+
+	panel_fixed_mode->clock = dtd->pixel_clock;
+	panel_fixed_mode->width_mm = dtd->width_mm;
+	panel_fixed_mode->height_mm = dtd->height_mm;
+
+	panel_fixed_mode->type = DRM_MODE_TYPE_PREFERRED;
+	drm_mode_set_name(panel_fixed_mode);
+
+	if (dtd->hsync_positive_polarity)
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_PHSYNC;
+	else
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_NHSYNC;
+
+	if (dtd->vsync_positive_polarity)
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_PVSYNC;
+	else
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_NVSYNC;
+
+
+	panel->vbt.lfp_vbt_mode = panel_fixed_mode;
+}
+
 int NBlue::intel_opregion_setup()
 {
 	struct intel_display *display=&display_base;
+	if (display->initok) return 0;
+	
 	struct intel_opregion *opregion = &display->opregion;
 	display->dmc.dmc=&dmc0;
 	display->dmc.dmc->display=display;
@@ -2610,17 +2693,7 @@ int NBlue::intel_opregion_setup()
 
 			if (bdb) {
 				
-				u32 i;
-				for (i = 0; i < ARRAY_SIZE(intel_platform_ids); i++) {
-					if (intel_platform_ids[i].devid == deviceId)
-					{
-						info_base= intel_platform_ids[i].desc;
-						break;
-					}
-				}
-				
-				
-				for (i = 0; i < 6; i++) {
+				for (int i = 0; i < 6; i++) {
 					display->bconnectors[i].index=i;
 					display->bconnectors[i].busId=0;
 					display->bconnectors[i].pipe=0;
@@ -2635,10 +2708,6 @@ int NBlue::intel_opregion_setup()
 				display->vbt.version = bdb->version;
 				display->bdb=bdb;
 				display->vbt.crt_ddc_pin = GMBUS_PIN_VGADDC;
-				display->vbt.int_tv_support = 1;
-				display->vbt.int_crt_support = 1;
-				display->vbt.int_lvds_support = 1;
-				display->vbt.lvds_use_ssc = 1;
 				
 				struct intel_dp *intel_dp=&display->intel_dp0;
 				struct intel_crtc_state *crtc_state=&display->crtc_state0;
@@ -2646,9 +2715,8 @@ int NBlue::intel_opregion_setup()
 				INIT_LIST_HEAD(&display->vbt.display_devices);
 				INIT_LIST_HEAD(&display->vbt.bdb_blocks);
 				
-				
-				//intel_pps_unlock_regs_wa(display);
 				intel_display_device_probe(display);
+				//intel_pps_unlock_regs_wa(display);
 				
 				init_bdb_blocks(display, bdb);
 				
@@ -2667,12 +2735,14 @@ int NBlue::intel_opregion_setup()
 				
 				
 				parse_panel_options(display, panel);
-				//parse_generic_dtd(display, panel);
+				parse_generic_dtd(display, panel);
 				//parse_lfp_data(display, panel);
 				parse_panel_driver_features(display, panel);
 				parse_power_conservation_features(display, panel);
 				parse_edp(display, panel);
 				parse_psr(display, panel);
+				
+				//intel_panel_add_edid_fixed_modes(connector, true);
 				
 				intel_dp->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->lane_count = display->panel.vbt.edp.lanes;
