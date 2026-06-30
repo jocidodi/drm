@@ -2597,7 +2597,6 @@ int NBlue::intel_opregion_setup()
 	struct intel_opregion *opregion = &display->opregion;
 	display->dmc.dmc=&dmc0;
 	display->dmc.dmc->display=display;
-	display->dmc.dmc->max_fw_size=0x20000;
 	
 	unsigned short id = deviceId & INTEL_PCH_DEVICE_ID_MASK;
 	display->pch_type = intel_pch_type( id);

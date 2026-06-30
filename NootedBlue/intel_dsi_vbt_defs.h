@@ -615,9 +615,14 @@ static inline void INIT_LIST_HEAD(struct list_head *list)
 #define DRM_DISPLAY_MODE_LEN	32
 #define DRM_MODE_TYPE_PREFERRED	(1<<3)
 
+#define for_each_dmc_id(__dmc_id) \
+	for ((__dmc_id) = static_cast<decltype(__dmc_id)>(DMC_FW_MAIN); \
+		 static_cast<int>(__dmc_id) < static_cast<int>(DMC_FW_MAX); \
+		 (__dmc_id) = static_cast<decltype(__dmc_id)>(static_cast<int>(__dmc_id) + 1))
 
-
-
+#define ICL_DMC_MAX_FW_SIZE		0x6000
+#define DISPLAY_VER13_DMC_MAX_FW_SIZE	0x20000
+#define DISPLAY_VER12_DMC_MAX_FW_SIZE	ICL_DMC_MAX_FW_SIZE
 
 
 #ifdef __cplusplus

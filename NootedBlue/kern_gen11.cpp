@@ -2225,12 +2225,169 @@ static void icl_set_pipe_chicken()
 	intel_de_write(display, PIPE_CHICKEN(pipe), tmp);
 }
 
+static int parse_dmc_fw(struct intel_display * display)
+{
+	struct intel_dmc *dmc=display->dmc.dmc;
+	
+	struct intel_css_header *css_header;
+	struct intel_package_header *package_header;
+	struct intel_dmc_header_base *dmc_header;
+	struct stepping_info si = {};
+	u32 readcount = 0;
+	u32 r, offset;
+	
+	struct Firmware fw;
+	
+	
+if (display->platform.alderlake_p) {
+	fw = getFWByName("adlp_dmc_ver2_16.bin");
+	display->dmc.dmc->max_fw_size= DISPLAY_VER13_DMC_MAX_FW_SIZE;
+} else if (display->platform.alderlake_s) {
+	fw = getFWByName("adls_dmc_ver2_01.bin");
+	display->dmc.dmc->max_fw_size=DISPLAY_VER12_DMC_MAX_FW_SIZE;
+} else if (display->platform.rocketlake) {
+	fw = getFWByName("rkl_dmc_ver2_03.bin");
+	display->dmc.dmc->max_fw_size= DISPLAY_VER12_DMC_MAX_FW_SIZE;
+} else if (display->platform.tigerlake) {
+	fw = getFWByName("tgl_dmc_ver2_12.bin");
+	display->dmc.dmc->max_fw_size= DISPLAY_VER12_DMC_MAX_FW_SIZE;
+}
+	
+	if (!fw.data || fw.size == 0) {
+		return -1;
+	}
+	
+	initialize_stepping_info(display, &si);
+	
+	css_header = (struct intel_css_header *)fw.data;
+	r = parse_dmc_fw_css(dmc, css_header, fw.size);
+	if (!r)
+		return -1;
+
+	readcount += r;
+
+	package_header = (struct intel_package_header *)&fw.data[readcount];
+	r = parse_dmc_fw_package(dmc, package_header, &si, fw.size - readcount);
+	if (!r)
+		return -1;
+
+	readcount += r;
+
+	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
+		if (!dmc->dmc_info[i].present)
+			continue;
+		offset = readcount + dmc->dmc_info[i].dmc_offset * 4;
+		if (offset > fw.size) {
+			continue;
+		}
+
+		dmc_header = (struct intel_dmc_header_base *)&fw.data[offset];
+		parse_dmc_fw_header(dmc, dmc_header, fw.size - offset, static_cast<intel_dmc_id>(i));
+	}
+
+	if (!intel_dmc_has_payload(display)) {
+		return -1;
+	}
+	
+	return 0;
+}
+
+static void adlp_pipedmc_clock_gating_wa(struct intel_display *display, bool enable)
+{
+	enum pipe p;
+
+	if (enable) {
+		for (p = static_cast<pipe>(PIPE_A); p <= PIPE_D;
+			 p = static_cast<pipe>(static_cast<int>(p) + 1)) {
+			intel_de_rmw(display, CLKGATE_DIS_PSL_EXT(static_cast<int>(p)),
+					 0, PIPEDMC_GATING_DIS);
+		}
+	} else {
+		for (p = static_cast<pipe>(PIPE_C); p <= PIPE_D;
+			 p = static_cast<pipe>(static_cast<int>(p) + 1)) {
+			intel_de_rmw(display, CLKGATE_DIS_PSL_EXT(static_cast<int>(p)),
+					 PIPEDMC_GATING_DIS, 0);
+		}
+	}
+}
+static void pipedmc_clock_gating_wa(struct intel_display *display, bool enable)
+{
+	/*if (display->platform.meteorlake && enable)
+		mtl_pipedmc_clock_gating_wa(display);
+	else*/ if (DISPLAY_VER(display) == 13)
+		adlp_pipedmc_clock_gating_wa(display, enable);
+}
+
+static void assert_dmc_loaded(struct intel_display *display,
+				  enum intel_dmc_id dmc_id)
+{
+	struct intel_dmc *dmc = display_to_dmc(display);
+	u32 expected, found;
+	int i;
+
+	if (!is_valid_dmc_id(dmc_id) || !has_dmc_id_fw(display, dmc_id))
+		return;
+
+	found = intel_de_read(display, DMC_PROGRAM(dmc->dmc_info[dmc_id].start_mmioaddr, 0));
+	expected = dmc->dmc_info[dmc_id].payload[0];
+
+
+	for (i = 0; i < dmc->dmc_info[dmc_id].mmio_count; i++) {
+		u32 reg = dmc->dmc_info[dmc_id].mmioaddr[i];
+
+		found = intel_de_read(display, reg);
+		expected = dmc_mmiodata(display, dmc, dmc_id, i);
+
+	}
+}
+
+static void gen9_set_dc_state_debugmask(struct intel_display *display)
+{
+	intel_de_rmw(display, DC_STATE_DEBUG, 0,
+			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
+	intel_de_posting_read(display, DC_STATE_DEBUG);
+}
+
+
+void intel_dmc_load_program(struct intel_display *display)
+{
+	struct i915_power_domains *power_domains = &display->power.domains;
+	enum intel_dmc_id dmc_id;
+
+	if (!intel_dmc_has_payload(display))
+		return;
+
+	//assert_display_rpm_held(display);
+
+	pipedmc_clock_gating_wa(display, true);
+
+	for_each_dmc_id(dmc_id) {
+		dmc_load_program(display, dmc_id);
+		assert_dmc_loaded(display, dmc_id);
+	}
+
+	/*if (DISPLAY_VER(display) >= 20)
+		intel_de_write(display, DMC_FQ_W2_PTS_CFG_SEL,
+				   PIPE_D_DMC_W2_PTS_CONFIG_SELECT(PIPE_D) |
+				   PIPE_C_DMC_W2_PTS_CONFIG_SELECT(PIPE_C) |
+				   PIPE_B_DMC_W2_PTS_CONFIG_SELECT(PIPE_B) |
+				   PIPE_A_DMC_W2_PTS_CONFIG_SELECT(PIPE_A));
+*/
+	power_domains->dc_state = 0;
+
+	gen9_set_dc_state_debugmask(display);
+
+	pipedmc_clock_gating_wa(display, false);
+}
+
 void Gen11::hwInitializeCState(void *that)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	if (display->initok) return;
 	
 	if (getMember<int>(that, kexticl ? 0xb38 : 0xb48) != 1) return;
+	
+	icl_set_pipe_chicken();
 	
 	gen9_set_dc_state(display,DC_STATE_DISABLE);
 	
@@ -2260,76 +2417,34 @@ void Gen11::hwInitializeCState(void *that)
 		tgl_bw_buddy_init(display);
 	
 	
-	struct intel_dmc *dmc=display->dmc.dmc;
+	if (parse_dmc_fw(display)!=0) return;
 	
-	struct intel_css_header *css_header;
-	struct intel_package_header *package_header;
-	struct intel_dmc_header_base *dmc_header;
-	struct stepping_info si = {};
-	u32 readcount = 0;
-	u32 r, offset;
-	
-	auto fw = getFWByName("tgl_dmc_ver2_12.bin");
-	if (!fw.data || fw.size == 0) {
-		return;
-	}
-	
-	initialize_stepping_info(display, &si);
-	
-	css_header = (struct intel_css_header *)fw.data;
-	r = parse_dmc_fw_css(dmc, css_header, fw.size);
-	if (!r)
-		return ;
+	intel_dmc_load_program(display);
 
-	readcount += r;
-
-	package_header = (struct intel_package_header *)&fw.data[readcount];
-	r = parse_dmc_fw_package(dmc, package_header, &si, fw.size - readcount);
-	if (!r)
-		return ;
-
-	readcount += r;
-
-	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
-		if (!dmc->dmc_info[i].present)
-			continue;
-		offset = readcount + dmc->dmc_info[i].dmc_offset * 4;
-		if (offset > fw.size) {
-			continue;
-		}
-
-		dmc_header = (struct intel_dmc_header_base *)&fw.data[offset];
-		parse_dmc_fw_header(dmc, dmc_header, fw.size - offset, static_cast<intel_dmc_id>(i));
-	}
-
-	if (!intel_dmc_has_payload(display)) {
-		return ;
-	}
-	
 
 	
-	//skip DMC_FW_MAIN if i=1
-	for (uint8_t i = 0; i < DMC_FW_MAX; i++) {
-		if (!dmc->dmc_info[i].present)
-			continue;
-		dmc_load_program(display, static_cast<intel_dmc_id>(i));
-	}
-	
-	
-	
+	/* Wa_14011508470:tgl,dg1,rkl,adl-s,adl-p,dg2 */
 	if (intel_display_wa(display, INTEL_DISPLAY_WA_14011508470))
-			intel_de_rmw(display, GEN11_CHICKEN_DCPR_2, 0,
-					 DCPR_CLEAR_MEMSTAT_DIS | DCPR_SEND_RESP_IMM |
-					 DCPR_MASK_LPMODE | DCPR_MASK_MAXLATENCY_MEMUP_CLR);
+		intel_de_rmw(display, GEN11_CHICKEN_DCPR_2, 0,
+				 DCPR_CLEAR_MEMSTAT_DIS | DCPR_SEND_RESP_IMM |
+				 DCPR_MASK_LPMODE | DCPR_MASK_MAXLATENCY_MEMUP_CLR);
+
+	/* Wa_14011503030:xelpd */
+	//if (intel_display_wa(display, INTEL_DISPLAY_WA_14011503030))
+	//	intel_de_write(display, XELPD_DISPLAY_ERR_FATAL_MASK, ~0);
+
+	/* Wa_15013987218 */
+	if (intel_display_wa(display, INTEL_DISPLAY_WA_15013987218)) {
+		intel_de_rmw(display, SOUTH_DSPCLK_GATE_D,
+				 0, PCH_GMBUSUNIT_CLOCK_GATE_DISABLE);
+		intel_de_rmw(display, SOUTH_DSPCLK_GATE_D,
+				 PCH_GMBUSUNIT_CLOCK_GATE_DISABLE, 0);
+	}
 	
-	intel_de_rmw(display, DC_STATE_DEBUG, 0,
-			 DC_STATE_DEBUG_MASK_CORES | DC_STATE_DEBUG_MASK_MEMORY_UP);
-	intel_de_posting_read(display,DC_STATE_DEBUG);
 
 	//hsw_crtc_enable
 	intel_de_rmw(display, PIPEDMC_CONTROL(PIPE_A), 0, PIPEDMC_ENABLE);
 	
-	icl_set_pipe_chicken();
 
 	hwConfigureCustomAUX(that, true);
 	
