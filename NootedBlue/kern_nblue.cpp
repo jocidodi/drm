@@ -2246,9 +2246,9 @@ static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
 		
 		u32 flags=CNAlterAppertureRequirements;
 		if (is_dp) flags+=CNFlagDP;
-		if (is_edp) flags+=CNFlagInternalOverride;
+		if (is_edp) flags+=CNConnectorAlwaysConnected;
 		if (is_edp) flags+=CNUseMiscIoPowerWell;
-		if (is_edp) flags+=CNFlagNoHPD;
+		//if (is_edp) flags+=CNFlagNoHPD;
 		if (is_hdmi) flags+=CNFlagHDMI;
 		
 		display->bconnectors[ii].busId=child->ddc_pin;
@@ -2733,6 +2733,7 @@ int NBlue::intel_opregion_setup()
 				else
 					crtc_state->cpu_transcoder = (enum transcoder) display->pipe0;
 				
+				//crtc_state->master_transcoder = INVALID_TRANSCODER;
 				
 				parse_panel_options(display, panel);
 				parse_generic_dtd(display, panel);
@@ -2743,6 +2744,11 @@ int NBlue::intel_opregion_setup()
 				parse_psr(display, panel);
 				
 				//intel_panel_add_edid_fixed_modes(connector, true);
+				
+				if (display->panel.vbt.edp.bpp==18) {
+
+					display->panel.vbt.edp.bpp = 24;
+				}
 				
 				intel_dp->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->lane_count = display->panel.vbt.edp.lanes;

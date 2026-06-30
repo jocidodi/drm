@@ -95,7 +95,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN31AppleIntelFramebufferController16disableVDDForAuxEP14AppleIntelPort",disableVDDForAux2, this->odisableVDDForAux2},
 			{"__ZN31AppleIntelFramebufferController15hwSetPanelPowerEj",hwSetPanelPower, this->ohwSetPanelPower},
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
-			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
+			//{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
 			/*{"__ZN21AppleIntelFramebuffer31frameBufferNotificationcallbackEP8OSObjectPvP13IOFramebufferiS2_",aframeBufferNotificationcallback, this->oaframeBufferNotificationcallback},
@@ -215,8 +215,9 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN14AppleIntelPort8writeAUXEjPvj",writeAUX, this->owriteAUX},
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
-			{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
+			//{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
+			
 			{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
@@ -573,7 +574,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	pinfo[p].connectors[1].type=ConnectorDummy;
 	
-	//pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
+	pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
 	pinfo[p].connectors[0].pipe=1;
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
@@ -2369,8 +2370,7 @@ void Gen11::setupPipeWatermarks (void *that,void *param_1,void *param_2,CRTCPara
 	FunctionCast(setupPipeWatermarks, callback->osetupPipeWatermarks)(that ,param_1,param_2,param_3);
 }
 
-static u32
-intel_ddi_transcoder_func_reg_val_get()
+static u32 intel_ddi_transcoder_func_reg_val_get()
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	enum pipe pipe = display->pipe0;
@@ -2378,7 +2378,6 @@ intel_ddi_transcoder_func_reg_val_get()
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	enum port port = display->port0;
 	u32 temp;
-
 	
 	temp = TRANS_DDI_FUNC_ENABLE;
 	if (DISPLAY_VER(display) >= 12)
@@ -2424,9 +2423,9 @@ intel_ddi_transcoder_func_reg_val_get()
 			break;
 		}
 	}
-
-		temp |= TRANS_DDI_MODE_SELECT_DP_SST;
-		temp |= DDI_PORT_WIDTH(crtc_state->lane_count);
+	
+	temp |= TRANS_DDI_MODE_SELECT_DP_SST;
+	temp |= DDI_PORT_WIDTH(crtc_state->lane_count);
 	
 
 	return temp;
@@ -2448,8 +2447,8 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	u32 temp;
 
-	if (!intel_crtc_has_dp_encoder(crtc_state))
-		return 0;
+	//if (!intel_crtc_has_dp_encoder(crtc_state))
+	//	return 0;
 	
 	temp = DP_MSA_MISC_SYNC_CLOCK;
 
@@ -2512,8 +2511,8 @@ static u32 bdw_set_pipe_misc()
 		break;
 	}
 
-	if (crtc_state->dither)
-		val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
+	//if (crtc_state->dither)
+	//	val |= PIPE_MISC_DITHER_ENABLE | PIPE_MISC_DITHER_TYPE_SP;
 
 	if (crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
 		crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444)
@@ -4144,7 +4143,7 @@ bool tgl_ddi_pre_enable_dp(struct intel_crtc_state *crtc_state)
 
 	intel_ddi_init_dp_buf_reg( intel_dp);
 	
-
+	//intel_dp_enable_port(intel_dp);
 
 	//if (!kexticl) Gen11::callback->enableVDDForAux(ccont2,linkp);
 	//else Gen11::callback->enableVDDForAux2(ccont2,linkp);
@@ -4225,15 +4224,10 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 {
 	struct intel_display *display=&NBlue::callback->display_base;
 	struct intel_dp *intel_dp=&display->intel_dp0;
-	struct drm_display_mode *adjusted_mode = &pipe_config->hw.adjusted_mode;
-	struct drm_display_mode *mode = (struct drm_display_mode *)display->panel.vbt.lfp_vbt_mode;
 	int ret = 0, link_bpp_x16;
 
 	
-	adjusted_mode = mode;
-	
 
-	
 	pipe_config->sink_format =INTEL_OUTPUT_FORMAT_RGB;
 	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
 	
@@ -4360,6 +4354,19 @@ static void intel_ddi_mso_get_config( struct intel_crtc_state *pipe_config)
 	pipe_config->splitter.pixel_overlap = REG_FIELD_GET(OVERLAP_PIXELS_MASK, dss1);
 }
 
+bool
+intel_bios_encoder_supports_dp(struct intel_display *display)
+{
+	return display->child0->device_type & DEVICE_TYPE_DISPLAYPORT_OUTPUT;
+}
+
+bool
+intel_bios_encoder_supports_edp(struct intel_display *display)
+{
+	return intel_bios_encoder_supports_dp(display) &&
+	display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR;
+}
+
 static void intel_ddi_read_func_ctl_dp_sst(struct intel_crtc_state *crtc_state,
 					   u32 ddi_func_ctl)
 {
@@ -4370,7 +4377,7 @@ static void intel_ddi_read_func_ctl_dp_sst(struct intel_crtc_state *crtc_state,
 	
 	if (!crtc_state->output_types)
 	{
-		if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
+		if (intel_bios_encoder_supports_edp(display))
 			crtc_state->output_types |= BIT(INTEL_OUTPUT_EDP);
 		else
 			crtc_state->output_types |= BIT(INTEL_OUTPUT_DP);
@@ -4537,11 +4544,11 @@ static void intel_ddi_get_config(struct intel_crtc_state *pipe_config)
 	//	intel_edp_fixup_vbt_bpp(encoder, pipe_config->pipe_bpp);
 	
 	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
-	if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
+	/*if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
 	if (display->panel.vbt.edp.bpp && pipe_config->pipe_bpp > display->panel.vbt.edp.bpp) {
 
 		display->panel.vbt.edp.bpp = pipe_config->pipe_bpp;
-	}
+	}*/
 	
 	//ddi_dotclock_get(pipe_config);
 
@@ -4737,7 +4744,7 @@ static void intel_ddi_enable(struct intel_crtc_state *crtc_state)
 
 
 
-	//intel_ddi_enable_transcoder_func( crtc_state);
+	intel_ddi_enable_transcoder_func( crtc_state);
 
 	//intel_vrr_transcoder_enable(crtc_state);
 
@@ -4851,7 +4858,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	//intel_dp_detect
 	
-	//intel_ddi_enable(crtc_state);
+	intel_ddi_enable(crtc_state);
 	
 	return 0; // hack
 	
