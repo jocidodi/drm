@@ -6969,6 +6969,87 @@ enum intel_output_type {
 						  BIT(trans)) != 0)
 #define HAS_MSO(__display)		(DISPLAY_VER(__display) >= 12)
 
+#define _TRANS_HTOTAL_A		0x60000
+#define _TRANS_HTOTAL_B		0x61000
+#define TRANS_HTOTAL(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_HTOTAL_A)
+#define   HTOTAL_MASK			REG_GENMASK(31, 16)
+#define   HTOTAL(htotal)		REG_FIELD_PREP(HTOTAL_MASK, (htotal))
+#define   HACTIVE_MASK			REG_GENMASK(15, 0)
+#define   HACTIVE(hdisplay)		REG_FIELD_PREP(HACTIVE_MASK, (hdisplay))
+
+#define _TRANS_HBLANK_A		0x60004
+#define _TRANS_HBLANK_B		0x61004
+#define TRANS_HBLANK(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_HBLANK_A)
+#define   HBLANK_END_MASK		REG_GENMASK(31, 16)
+#define   HBLANK_END(hblank_end)	REG_FIELD_PREP(HBLANK_END_MASK, (hblank_end))
+#define   HBLANK_START_MASK		REG_GENMASK(15, 0)
+#define   HBLANK_START(hblank_start)	REG_FIELD_PREP(HBLANK_START_MASK, (hblank_start))
+
+#define _TRANS_HSYNC_A		0x60008
+#define _TRANS_HSYNC_B		0x61008
+#define TRANS_HSYNC(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_HSYNC_A)
+#define   HSYNC_END_MASK		REG_GENMASK(31, 16)
+#define   HSYNC_END(hsync_end)		REG_FIELD_PREP(HSYNC_END_MASK, (hsync_end))
+#define   HSYNC_START_MASK		REG_GENMASK(15, 0)
+#define   HSYNC_START(hsync_start)	REG_FIELD_PREP(HSYNC_START_MASK, (hsync_start))
+
+#define _TRANS_VTOTAL_A		0x6000c
+#define _TRANS_VTOTAL_B		0x6100c
+#define TRANS_VTOTAL(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_VTOTAL_A)
+#define   VTOTAL_MASK			REG_GENMASK(31, 16)
+#define   VTOTAL(vtotal)		REG_FIELD_PREP(VTOTAL_MASK, (vtotal))
+#define   VACTIVE_MASK			REG_GENMASK(15, 0)
+#define   VACTIVE(vdisplay)		REG_FIELD_PREP(VACTIVE_MASK, (vdisplay))
+
+#define _TRANS_VBLANK_A		0x60010
+#define _TRANS_VBLANK_B		0x61010
+#define TRANS_VBLANK(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_VBLANK_A)
+#define   VBLANK_END_MASK		REG_GENMASK(31, 16)
+#define   VBLANK_END(vblank_end)	REG_FIELD_PREP(VBLANK_END_MASK, (vblank_end))
+#define   VBLANK_START_MASK		REG_GENMASK(15, 0)
+#define   VBLANK_START(vblank_start)	REG_FIELD_PREP(VBLANK_START_MASK, (vblank_start))
+
+#define _TRANS_VSYNC_A		0x60014
+#define _TRANS_VSYNC_B		0x61014
+#define TRANS_VSYNC(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_VSYNC_A)
+#define   VSYNC_END_MASK		REG_GENMASK(31, 16)
+#define   VSYNC_END(vsync_end)		REG_FIELD_PREP(VSYNC_END_MASK, (vsync_end))
+#define   VSYNC_START_MASK		REG_GENMASK(15, 0)
+#define   VSYNC_START(vsync_start)	REG_FIELD_PREP(VSYNC_START_MASK, (vsync_start))
+
+#define _PIPEASRC		0x6001c
+#define _PIPEBSRC		0x6101c
+#define PIPESRC(dev_priv, pipe)		_MMIO_TRANS2(dev_priv, (pipe), _PIPEASRC)
+#define   PIPESRC_WIDTH_MASK	REG_GENMASK(31, 16)
+#define   PIPESRC_WIDTH(w)	REG_FIELD_PREP(PIPESRC_WIDTH_MASK, (w))
+#define   PIPESRC_HEIGHT_MASK	REG_GENMASK(15, 0)
+#define   PIPESRC_HEIGHT(h)	REG_FIELD_PREP(PIPESRC_HEIGHT_MASK, (h))
+
+#define _BCLRPAT_A		0x60020
+#define _BCLRPAT_B		0x61020
+#define BCLRPAT(dev_priv, trans)		_MMIO_TRANS2(dev_priv, (trans), _BCLRPAT_A)
+
+#define _TRANS_VSYNCSHIFT_A	0x60028
+#define _TRANS_VSYNCSHIFT_B	0x61028
+#define TRANS_VSYNCSHIFT(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_VSYNCSHIFT_A)
+
+#define _TRANS_MULT_A		0x6002c
+#define _TRANS_MULT_B		0x6102c
+#define TRANS_MULT(dev_priv, trans)	_MMIO_TRANS2(dev_priv, (trans), _TRANS_MULT_A)
+#define   TRANSCONF_INTERLACE_MASK_HSW		REG_GENMASK(22, 21) /* hsw+ */
+#define   TRANSCONF_INTERLACE_MASK		REG_GENMASK(23, 21) /* gen3+ */
+#define _TRANS_A_SET_CONTEXT_LATENCY		0x6007C
+#define _TRANS_B_SET_CONTEXT_LATENCY		0x6107C
+#define _TRANS_C_SET_CONTEXT_LATENCY		0x6207C
+#define _TRANS_D_SET_CONTEXT_LATENCY		0x6307C
+#define TRANS_SET_CONTEXT_LATENCY(dev_priv, tran)		_MMIO_TRANS2(dev_priv, tran, _TRANS_A_SET_CONTEXT_LATENCY)
+#define  TRANS_SET_CONTEXT_LATENCY_MASK		REG_GENMASK(15, 0)
+#define  TRANS_SET_CONTEXT_LATENCY_VALUE(x)	REG_FIELD_PREP(TRANS_SET_CONTEXT_LATENCY_MASK, (x))
+#define _DP_MIN_HBLANK_CTL_A			0x600ac
+#define _DP_MIN_HBLANK_CTL_B			0x610ac
+#define DP_MIN_HBLANK_CTL(trans)		_MMIO_TRANS(trans, _DP_MIN_HBLANK_CTL_A, _DP_MIN_HBLANK_CTL_B)
+
+
 
 
 

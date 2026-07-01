@@ -2246,9 +2246,9 @@ static void print_ddi_port(const struct intel_bios_encoder_data *devdata)
 		
 		u32 flags=CNAlterAppertureRequirements;
 		if (is_dp) flags+=CNFlagDP;
-		if (is_edp) flags+=CNConnectorAlwaysConnected;
+		if (is_edp) flags+=CNFlagInternalOverride;
 		if (is_edp) flags+=CNUseMiscIoPowerWell;
-		//if (is_edp) flags+=CNFlagNoHPD;
+		if (is_edp) flags+=CNFlagNoHPD;
 		if (is_hdmi) flags+=CNFlagHDMI;
 		
 		display->bconnectors[ii].busId=child->ddc_pin;
