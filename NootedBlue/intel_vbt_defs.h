@@ -5517,6 +5517,7 @@ struct intel_dp {
 	
 	u8 dpcd[0xf];
 	u8 edp_dpcd[5];
+	u8 lttpr_common_caps[8];
 	
 	/*u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
 	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
@@ -5921,7 +5922,7 @@ struct intel_display {
 #define   DP_TP_CTL_MODE_MASK			REG_BIT(27)
 #define   DP_TP_CTL_MODE_SST			REG_FIELD_PREP(DP_TP_CTL_MODE_MASK, 0)
 #define   DP_TP_CTL_ENHANCED_FRAME_ENABLE	REG_BIT(18)
-
+#define   DP_TP_CTL_MODE_MST			REG_FIELD_PREP(DP_TP_CTL_MODE_MASK, 1)
 
 enum intel_dpll_id {
 	/**

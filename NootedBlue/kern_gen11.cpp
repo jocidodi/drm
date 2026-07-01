@@ -537,7 +537,7 @@ void  Gen11::initPlatformWorkarounds(void *that)
 }
 
 uint64_t  Gen11::getOSInformation2(void *that)
-{
+{//icl
 	if (NBlue::callback->intel_opregion_setup()!=0) panic("BAD BIOS");
 
 	
@@ -2508,9 +2508,9 @@ static u32 intel_ddi_transcoder_func_reg_val_get()
 
 	switch (crtc_state->pipe_bpp) {
 	default:
-	case 18:
+	/*case 18:
 		temp |= TRANS_DDI_BPC_6;
-		break;
+		break;*/
 	case 24:
 		temp |= TRANS_DDI_BPC_8;
 		break;
@@ -2574,9 +2574,10 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 	temp = DP_MSA_MISC_SYNC_CLOCK;
 
 	switch (display->panel.vbt.edp.bpp) {
-	case 18:
-		temp |= DP_MSA_MISC_6_BPC;
-		break;
+	//case 18:
+	//	temp |= DP_MSA_MISC_6_BPC;
+	//	break;
+	default:
 	case 24:
 		temp |= DP_MSA_MISC_8_BPC;
 		break;
@@ -2586,8 +2587,7 @@ static u32 intel_ddi_set_dp_msa(bool wr)
 	case 36:
 		temp |= DP_MSA_MISC_12_BPC;
 		break;
-	default:
-		break;
+
 	}
 
 
@@ -2615,9 +2615,10 @@ static u32 bdw_set_pipe_misc()
 	u32 val = 0;
 
 	switch (crtc_state->pipe_bpp) {
-	case 18:
+		default:
+	/*case 18:
 		val |= PIPE_MISC_BPC_6;
-		break;
+		break;*/
 	case 24:
 		val |= PIPE_MISC_BPC_8;
 		break;
@@ -2628,8 +2629,8 @@ static u32 bdw_set_pipe_misc()
 		if (DISPLAY_VER(display) >= 13)
 			val |= PIPE_MISC_BPC_12_ADLP;
 		break;
-	default:
-		break;
+	//default:
+		//break;
 	}
 
 	//if (crtc_state->dither)
@@ -2796,19 +2797,28 @@ static int translate_signal_level(u8 signal_levels)
 	return 0;
 }
 
+static inline bool drm_dp_is_uhbr_rate(int link_rate)
+{
+	return link_rate >= 1000000;
+}
+bool intel_dp_is_uhbr(const struct intel_crtc_state *crtc_state)
+{
+	return drm_dp_is_uhbr_rate(crtc_state->port_clock);
+}
+
 static int intel_ddi_dp_level(struct intel_display *display,
 				  int lane)
 {
 	u8 train_set = display->intel_dp0.train_set[lane];
 	
-	/*if (intel_dp_is_uhbr(crtc_state)) {
+	if (intel_dp_is_uhbr(&display->crtc_state0)) {
 		return train_set & DP_TX_FFE_PRESET_VALUE_MASK;
-	} else {*/
+	} else {
 		u8 signal_levels = train_set & (DP_TRAIN_VOLTAGE_SWING_MASK |
 						DP_TRAIN_PRE_EMPHASIS_MASK);
 
 		return translate_signal_level( signal_levels);
-	//}
+	}
 }
 
 
@@ -3573,16 +3583,16 @@ static void intel_ddi_init_dp_buf_reg(struct intel_dp *intel_dp)
 	
 /*	if (dig_port->ddi_a_4_lanes)
 		intel_dp->DP |= DDI_A_4_LANES;
-*/
-	/*if (DISPLAY_VER(display) >= 14) {
+
+	if (DISPLAY_VER(display) >= 14) {
 		if (intel_dp_is_uhbr(crtc_state))
 			intel_dp->DP |= DDI_BUF_PORT_DATA_40BIT;
 		else
 			intel_dp->DP |= DDI_BUF_PORT_DATA_10BIT;
-	}*/
+	}
 
 
-	/*if (IS_DISPLAY_VER(display, 11, 13) && intel_encoder_is_tc(encoder)) {
+	if (IS_DISPLAY_VER(display, 11, 13) && intel_encoder_is_tc(encoder)) {
 		int delay = dp_phy_lane_stagger_delay(crtc_state->port_clock);
 
 		intel_dp->DP |= DDI_BUF_LANE_STAGGER_DELAY(delay);
@@ -3673,6 +3683,8 @@ static void intel_ddi_buf_enable( u32 buf_ctl)
 	intel_wait_ddi_buf_active();
 }
 
+
+
 static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -3680,16 +3692,18 @@ static void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
 	u32 dp_tp_ctl;
 
 	
+	dp_tp_ctl = intel_de_read(display, dp_tp_ctl_reg( ));
+	
 	dp_tp_ctl = DP_TP_CTL_ENABLE | DP_TP_CTL_LINK_TRAIN_PAT1;
-	/*if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||
+	
+	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST) ||
 		intel_dp_is_uhbr(crtc_state)) {
 		dp_tp_ctl |= DP_TP_CTL_MODE_MST;
-	} else {*/
+	} else {
 		dp_tp_ctl |= DP_TP_CTL_MODE_SST;
-	
 		if (crtc_state->enhanced_framing)
 			dp_tp_ctl |= DP_TP_CTL_ENHANCED_FRAME_ENABLE;
-	//}
+	}
 
 	intel_de_write(display, dp_tp_ctl_reg(), dp_tp_ctl);
 	intel_de_posting_read(display, dp_tp_ctl_reg());
@@ -3933,10 +3947,7 @@ void intel_dp_compute_rate(struct intel_dp *intel_dp, int port_clock,
 		*rate_select = 0;
 	}
 }
-static inline bool drm_dp_is_uhbr_rate(int link_rate)
-{
-	return link_rate >= 1000000;
-}
+
 void intel_dp_link_training_set_mode(struct intel_dp *intel_dp, int link_rate, bool is_vrr)
 {
 	u8 link_config[2];
@@ -4181,12 +4192,12 @@ bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 	int lttpr_count;
 
 	//intel_hpd_block(encoder);
-
-	/*lttpr_count = intel_dp_init_lttpr_and_dprx_caps(intel_dp);
+/*
+	lttpr_count = intel_dp_init_lttpr_and_dprx_caps(intel_dp);
 
 	if (lttpr_count < 0)
-		lttpr_count = 0;*/
-
+		lttpr_count = 0;
+*/
 	intel_dp_prepare_link_train(intel_dp);
 
 	/*if (intel_dp_is_uhbr(crtc_state))
@@ -4594,6 +4605,8 @@ static void intel_ddi_read_func_ctl(struct intel_crtc_state *pipe_config)
 	default:
 		break;
 	}
+	
+	if (pipe_config->pipe_bpp == 18) pipe_config->pipe_bpp = 24;
 
 	ddi_mode = ddi_func_ctl & TRANS_DDI_MODE_SELECT_MASK;
 
@@ -4698,11 +4711,7 @@ static void intel_ddi_get_config(struct intel_crtc_state *pipe_config)
 	//	intel_edp_fixup_vbt_bpp(encoder, pipe_config->pipe_bpp);
 	
 	//[drm:intel_edp_fixup_vbt_bpp [i915]] pipe has 24 bpp for eDP panel, overriding BIOS-provided max 18 bpp
-	/*if (display->child0->device_type & DEVICE_TYPE_INTERNAL_CONNECTOR)
-	if (display->panel.vbt.edp.bpp && pipe_config->pipe_bpp > display->panel.vbt.edp.bpp) {
-
-		display->panel.vbt.edp.bpp = pipe_config->pipe_bpp;
-	}*/
+	
 	
 	//ddi_dotclock_get(pipe_config);
 
@@ -5073,7 +5082,9 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->preEmphasis = 0;
 	}
 	
+	//dpcd_access_needs_probe
 	drm_dp_read_dpcd_caps(intel_dp);
+	memset(intel_dp->lttpr_common_caps, 0, sizeof(intel_dp->lttpr_common_caps));
 	
 	//intel_ddi_init
 	intel_get_transcoder_timings(crtc_state);
@@ -5082,7 +5093,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	
 	intel_ddi_compute_config_late(crtc_state);
 	
-	
+	//intel_dpcd_quirks
 	
 	//intel_edp_init_connector
 	//intel_ddi_pre_enable_dp
@@ -5092,6 +5103,7 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_ddi_set_dp_msa(true);
 	
 	//intel_dp_detect
+	//intel_quirks
 	
 	intel_ddi_enable(crtc_state);
 	

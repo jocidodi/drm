@@ -215,7 +215,7 @@ enum intel_backlight_type {
 	INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE,
 };
 
-
+# define DP_TX_FFE_PRESET_VALUE_MASK        (0xf << 0)
 # define DP_TRAIN_PRE_EMPHASIS_MASK	    (3 << 3)
 # define DP_TRAIN_PRE_EMPH_LEVEL_0		(0 << 3)
 # define DP_TRAIN_PRE_EMPH_LEVEL_1		(1 << 3)

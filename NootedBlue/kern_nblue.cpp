@@ -842,6 +842,8 @@ parse_edp(struct intel_display *display,
 		break;
 	}
 
+	if (panel->vbt.edp.bpp == 18) panel->vbt.edp.bpp = 24;
+	
 	/* Get the eDP sequencing and link info */
 	edp_link_params = &edp->fast_link_params[panel_type];
 
@@ -2744,15 +2746,12 @@ int NBlue::intel_opregion_setup()
 				
 				//intel_panel_add_edid_fixed_modes(connector, true);
 				
-				if (display->panel.vbt.edp.bpp==18) {
 
-					display->panel.vbt.edp.bpp = 24;
-				}
 				
 				intel_dp->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->dither=display->panel.vbt.lvds_dither;
-				crtc_state->pipe_bpp=display->panel.vbt.edp.bpp;
+				
 				
 				//intel_dp_init_connector
 				
