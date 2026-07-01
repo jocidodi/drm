@@ -831,9 +831,10 @@ parse_edp(struct intel_display *display,
 		return;
 
 	switch (panel_bits(edp->color_depth, panel_type, 2)) {
-	case EDP_18BPP:
+	default:
+	/*case EDP_18BPP:
 		panel->vbt.edp.bpp = 18;
-		break;
+		break;*/
 	case EDP_24BPP:
 		panel->vbt.edp.bpp = 24;
 		break;
@@ -842,7 +843,6 @@ parse_edp(struct intel_display *display,
 		break;
 	}
 
-	if (panel->vbt.edp.bpp == 18) panel->vbt.edp.bpp = 24;
 	
 	/* Get the eDP sequencing and link info */
 	edp_link_params = &edp->fast_link_params[panel_type];

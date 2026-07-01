@@ -4590,9 +4590,10 @@ static void intel_ddi_read_func_ctl(struct intel_crtc_state *pipe_config)
 	pipe_config->hw.adjusted_mode.flags |= flags;
 
 	switch (ddi_func_ctl & TRANS_DDI_BPC_MASK) {
-	case TRANS_DDI_BPC_6:
+		default:
+	/*case TRANS_DDI_BPC_6:
 		pipe_config->pipe_bpp = 18;
-		break;
+		break;*/
 	case TRANS_DDI_BPC_8:
 		pipe_config->pipe_bpp = 24;
 		break;
@@ -4602,11 +4603,9 @@ static void intel_ddi_read_func_ctl(struct intel_crtc_state *pipe_config)
 	case TRANS_DDI_BPC_12:
 		pipe_config->pipe_bpp = 36;
 		break;
-	default:
-		break;
+
 	}
 	
-	if (pipe_config->pipe_bpp == 18) pipe_config->pipe_bpp = 24;
 
 	ddi_mode = ddi_func_ctl & TRANS_DDI_MODE_SELECT_MASK;
 
