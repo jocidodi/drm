@@ -39,6 +39,7 @@ IOFramebuffer *frame0;
 int hwu=4;
 int setpc=0;
 void *linkp;
+bool dpcdconf=false;;
 
 Gen11 *Gen11::callback = nullptr;
 
@@ -103,8 +104,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			
-			/*{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
-			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
+			{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
+			/*{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer18prepareToEnterWakeEv",dovoid},*/
 			
@@ -157,7 +158,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{&kextG11FB, f7a, r7a, arrsize(f7a),    1},
 			{&kextG11FB, f9, r9, arrsize(f9),    1},
 			//{&kextG11FB, f9b, r9b, arrsize(f9b),    1},
-			{&kextG11FB, f9c, r9c, arrsize(f9c),    1},
+			//{&kextG11FB, f9c, r9c, arrsize(f9c),    1},
 			{&kextG11FB, f24b, r24b, arrsize(f24b),    12},
 			{&kextG11FB, f24c, r24c, arrsize(f24c),    1},
 			{&kextG11FB, f24d, r24d, arrsize(f24d),    10},
@@ -217,6 +218,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			//{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
+			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 			
 			/*{"__ZN21AppleIntelFramebuffer17prepareToExitWakeEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer18prepareToExitSleepEv",dovoid},
@@ -577,6 +579,7 @@ uint64_t  Gen11::getOSInformation2(void *that)
 	
 	//pinfo[p].connectors[0].flags-=CNConnectorAlwaysConnected;
 	pinfo[p].connectors[0].pipe=1;
+
 	
 	OSArray *connectorArray = OSArray::withCapacity(6);
 	for (int i = 0; i < 6; i++) {
@@ -1119,8 +1122,11 @@ int Gen11::getTranscoderOffset(void *that,void *param_1,uint param_2)
 unsigned long  Gen11::AppleIntelPortHALinit(void *that,void *param_1)
 {
 	auto ret=FunctionCast(AppleIntelPortHALinit, callback->oAppleIntelPortHALinit)(that,param_1 );
-	getMember<uint32_t>(that, 0x584)=0x60540;
-	getMember<uint32_t>(that, 0x588)=0x60544;
+	if (kexticl) {
+		getMember<uint32_t>(that, 0x584)=0x60540;
+		getMember<uint32_t>(that, 0x588)=0x60544;
+	}
+	if (linkp==nullptr) linkp=that;
 	return ret;
 }
 
@@ -2657,34 +2663,7 @@ static u32 bdw_set_pipe_misc()
 	return val;
 }
 
-void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
-{
-	struct intel_display *display = &NBlue::callback->display_base;
-	if (setpc){
-		setpc=0;
-		
-		
-		//param_3->TRANS_CLK_SEL=0x10000000;
-		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(display->port0);
-		param_3->TRANS_MSA_MISC =intel_ddi_set_dp_msa(false);
-		//param_3->TRANS_MSA_MISC = 0x21;
-		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
-		param_3->TRANS_DDI_FUNC_CTL= intel_ddi_transcoder_func_reg_val_get();
-		//param_3->PIPE_MISC= 0x1800010;
-		param_3->PIPE_MISC=bdw_set_pipe_misc();
-		//i9xx_set_pipeconf
-		param_3->TRANSCONF= 0xc0000024;
-		
-		int fScanoutHeight=getMember<int>(param_2, kexticl ? 0x2fc : 0xfc);
-		int fLinkScanoutWidth=getMember<int>(param_2, kexticl ? 0x2f8 : 0xf8);
-		param_3->PIPESRC =
-			 (fScanoutHeight - 1) & 0x1fff |
-			 param_3->PIPESRC & 0xe000e000 |
-			 (fLinkScanoutWidth * 0x10000 + 0x1fff0000) & 0x1fff0000;
-		
-	}
-	
-}
+
 
 static const struct intel_ddi_buf_trans *
 intel_get_buf_trans(const struct intel_ddi_buf_trans *trans, int *num_entries)
@@ -5054,16 +5033,14 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 {
 	//return FunctionCast(linkTraining, callback->olinkTraining)(that,param_1);
 	
-	linkp=that;
 	struct intel_display *display = &NBlue::callback->display_base;
 	struct intel_dp *intel_dp=&display->intel_dp0;
 	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 	int lane_count=display->panel.vbt.edp.lanes;
 
-	
 	intel_dp->para=(struct AGDCDPPortConfig_t *)param_1;
 	if (intel_dp->para != nullptr) {
-		intel_dp->para->portindex=0;
+		intel_dp->para->portindex=display->bconnectors[0].index+1;
 		intel_dp->para->status = 0;
 		intel_dp->para->field1 = 0x200;
 		intel_dp->para->field2 = 0;
@@ -5081,28 +5058,10 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->preEmphasis = 0;
 	}
 	
-	//dpcd_access_needs_probe
-	drm_dp_read_dpcd_caps(intel_dp);
-	memset(intel_dp->lttpr_common_caps, 0, sizeof(intel_dp->lttpr_common_caps));
-	
-	//intel_ddi_init
-	intel_get_transcoder_timings(crtc_state);
-	intel_dp_compute_config(crtc_state);
-	icl_ddi_combo_get_config(crtc_state);
-	
-	intel_ddi_compute_config_late(crtc_state);
-	
-	//intel_dpcd_quirks
-	
-	//intel_edp_init_connector
-	//intel_ddi_pre_enable_dp
 	auto ret=tgl_ddi_pre_enable_dp(crtc_state);
 	
 	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST))
 		intel_ddi_set_dp_msa(true);
-	
-	//intel_dp_detect
-	//intel_quirks
 	
 	intel_ddi_enable(crtc_state);
 	
@@ -5113,6 +5072,52 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 	return -1;
 }
 
+void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	if (setpc){
+		setpc=0;
+		
+		if (!dpcdconf)
+		{
+			dpcdconf=true;
+			struct intel_dp *intel_dp=&display->intel_dp0;
+			struct intel_crtc_state *crtc_state=&display->crtc_state0;
+			
+			//dpcd_access_needs_probe
+			drm_dp_read_dpcd_caps(intel_dp);
+			memset(intel_dp->lttpr_common_caps, 0, sizeof(intel_dp->lttpr_common_caps));
+			
+			//intel_ddi_init
+			intel_get_transcoder_timings(crtc_state);
+			intel_dp_compute_config(crtc_state);
+			icl_ddi_combo_get_config(crtc_state);
+			
+			intel_ddi_compute_config_late(crtc_state);
+			
+		}
+		
+		//param_3->TRANS_CLK_SEL=0x10000000;
+		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(display->port0);
+		param_3->TRANS_MSA_MISC =intel_ddi_set_dp_msa(false);
+		//param_3->TRANS_MSA_MISC = 0x21;
+		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
+		param_3->TRANS_DDI_FUNC_CTL= intel_ddi_transcoder_func_reg_val_get();
+		//param_3->PIPE_MISC= 0x1800010;
+		param_3->PIPE_MISC=bdw_set_pipe_misc();
+		//i9xx_set_pipeconf
+		param_3->TRANSCONF= 0xc0000024;
+		
+		int fScanoutHeight=getMember<int>(param_2, kexticl ? 0x2fc : 0xfc);
+		int fLinkScanoutWidth=getMember<int>(param_2, kexticl ? 0x2f8 : 0xf8);
+		param_3->PIPESRC =
+			 (fScanoutHeight - 1) & 0x1fff |
+			 param_3->PIPESRC & 0xe000e000 |
+			 (fLinkScanoutWidth * 0x10000 + 0x1fff0000) & 0x1fff0000;
+		
+	}
+	
+}
 
 uint64_t Gen11::hwSetPanelPower(void *that,uint param_1)
 {
