@@ -9,7 +9,6 @@
 
 
 
-
 static constexpr uint32_t ICL_REG_CDCLK_CTL = 0x46000;
 
 static constexpr uint32_t ICL_REG_DSSM = 0x51004;
@@ -658,8 +657,8 @@ public:
 	static int 	fgetPixelInformation(void *that,int param_1,int param_2,int param_3,void *param_4);
 	mach_vm_address_t ofgetPixelInformation {};
 	
-	
-	
+	static uint64_t getLinkConfig(void *that,IOFBDPLinkConfig *param_1);
+	mach_vm_address_t ogetLinkConfig {};
 	
 public:
 

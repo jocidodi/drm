@@ -5511,9 +5511,21 @@ struct intel_dp {
 	bool needs_modeset_retry;
 	bool use_max_params;
 	
+	struct {
+		u8 dpcd[2];
+
+		bool support;
+		bool su_support;
+
+		u16 su_w_granularity;
+		u16 su_y_granularity;
+
+		u8 sync_latency;
+	} psr_caps;
 	
 	struct AGDCDPPortConfig_t *para;
 	struct intel_psr psr;
+	IOFBDPLinkConfig para0;
 	
 	u8 dpcd[0xf];
 	u8 edp_dpcd[5];
@@ -6305,7 +6317,14 @@ bool __intel_display_wa(struct intel_display *display, enum intel_display_wa wa,
 							   _ICL_PIPE_DSS_CTL2_PC)
 #define  VDSC0_ENABLE				REG_BIT(31)
 #define DP_EDP_DPCD_REV			    0x700    /* eDP 1.2 */
+# define DP_EDP_11			    0x00
+# define DP_EDP_12			    0x01
+# define DP_EDP_13			    0x02
 # define DP_EDP_14			    0x03
+# define DP_EDP_14a                         0x04    /* eDP 1.4a */
+# define DP_EDP_14b                         0x05    /* eDP 1.4b */
+# define DP_EDP_15			    0x06    /* eDP 1.5 */
+
 #define DP_MSA_MISC_SYNC_CLOCK			(1 << 0)
 #define DP_MSA_MISC_INTERLACE_VTOTAL_EVEN	(1 << 8)
 #define DP_MSA_MISC_STEREO_NO_3D		(0 << 9)
@@ -7049,6 +7068,46 @@ enum intel_output_type {
 #define _DP_MIN_HBLANK_CTL_A			0x600ac
 #define _DP_MIN_HBLANK_CTL_B			0x610ac
 #define DP_MIN_HBLANK_CTL(trans)		_MMIO_TRANS(trans, _DP_MIN_HBLANK_CTL_A, _DP_MIN_HBLANK_CTL_B)
+#define DP_MAX_DOWNSPREAD                   0x003
+# define DP_TPS4_SUPPORTED                  (1 << 7)
+# define DP_TPS3_SUPPORTED		    (1 << 6) /* 1.2 */
+#define DP_LANE_COUNT_SET	            0x101
+#define DP_LINK_RATE_SET		    0x115 
+#define DP_MAX_LANE_COUNT                   0x002
+
+#define DP_PSR_SUPPORT                      0x070   /* XXX 1.2? */
+# define DP_PSR_IS_SUPPORTED                1
+# define DP_PSR2_IS_SUPPORTED		    2	    /* eDP 1.4 */
+# define DP_PSR2_WITH_Y_COORD_IS_SUPPORTED  3	    /* eDP 1.4a */
+# define DP_PSR2_WITH_Y_COORD_ET_SUPPORTED  4	    /* eDP 1.5, adopted eDP 1.4b SCR */
+
+#define DP_PSR_CAPS                         0x071   /* XXX 1.2? */
+# define DP_PSR_NO_TRAIN_ON_EXIT            1
+# define DP_PSR_SETUP_TIME_330              (0 << 1)
+# define DP_PSR_SETUP_TIME_275              (1 << 1)
+# define DP_PSR_SETUP_TIME_220              (2 << 1)
+# define DP_PSR_SETUP_TIME_165              (3 << 1)
+# define DP_PSR_SETUP_TIME_110              (4 << 1)
+# define DP_PSR_SETUP_TIME_55               (5 << 1)
+# define DP_PSR_SETUP_TIME_0                (6 << 1)
+# define DP_PSR_SETUP_TIME_MASK             (7 << 1)
+# define DP_PSR_SETUP_TIME_SHIFT            1
+# define DP_PSR2_SU_Y_COORDINATE_REQUIRED   (1 << 4)  /* eDP 1.4a */
+# define DP_PSR2_SU_GRANULARITY_REQUIRED    (1 << 5)  /* eDP 1.4b */
+# define DP_PSR2_SU_AUX_FRAME_SYNC_NOT_NEEDED (1 << 6)/* eDP 1.5, adopted eDP 1.4b SCR */
+
+#define DP_PSR2_SU_X_GRANULARITY	    0x072 /* eDP 1.4b */
+#define DP_PSR2_SU_Y_GRANULARITY	    0x074 /* eDP 1.4b */
+#define DP_SYNCHRONIZATION_LATENCY_IN_SINK		0x2009 /* edp 1.4 */
+# define DP_MAX_RESYNC_FRAME_COUNT_MASK			(0xf << 0)
+# define DP_MAX_RESYNC_FRAME_COUNT_SHIFT		0
+# define DP_LAST_ACTUAL_SYNCHRONIZATION_LATENCY_MASK	(0xf << 4)
+# define DP_LAST_ACTUAL_SYNCHRONIZATION_LATENCY_SHIFT	4
+#define DP_RECEIVER_ALPM_CAP		    0x02e   /* eDP 1.4 */
+# define DP_ALPM_CAP			    (1 << 0)
+
+
+
 
 
 
