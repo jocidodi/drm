@@ -2591,6 +2591,151 @@ parse_generic_dtd(struct intel_display *display,
 	panel->vbt.lfp_vbt_mode = panel_fixed_mode;
 }
 
+static const struct bdb_edid_dtd *
+get_lfp_dvo_timing(const struct bdb_lfp_data *data,
+		   const struct bdb_lfp_data_ptrs *ptrs,
+		   int index)
+{
+	return (const struct bdb_edid_dtd *)((u8*)data + ptrs->ptr[index].dvo_timing.offset);
+}
+
+static void
+fill_detail_timing_data(struct intel_display *display,
+			struct drm_display_mode *panel_fixed_mode,
+			const struct bdb_edid_dtd *dvo_timing)
+{
+	panel_fixed_mode->hdisplay = (dvo_timing->hactive_hi << 8) |
+		dvo_timing->hactive_lo;
+	panel_fixed_mode->hsync_start = panel_fixed_mode->hdisplay +
+		((dvo_timing->hsync_off_hi << 8) | dvo_timing->hsync_off_lo);
+	panel_fixed_mode->hsync_end = panel_fixed_mode->hsync_start +
+		((dvo_timing->hsync_pulse_width_hi << 8) |
+			dvo_timing->hsync_pulse_width_lo);
+	panel_fixed_mode->htotal = panel_fixed_mode->hdisplay +
+		((dvo_timing->hblank_hi << 8) | dvo_timing->hblank_lo);
+
+	panel_fixed_mode->vdisplay = (dvo_timing->vactive_hi << 8) |
+		dvo_timing->vactive_lo;
+	panel_fixed_mode->vsync_start = panel_fixed_mode->vdisplay +
+		((dvo_timing->vsync_off_hi << 4) | dvo_timing->vsync_off_lo);
+	panel_fixed_mode->vsync_end = panel_fixed_mode->vsync_start +
+		((dvo_timing->vsync_pulse_width_hi << 4) |
+			dvo_timing->vsync_pulse_width_lo);
+	panel_fixed_mode->vtotal = panel_fixed_mode->vdisplay +
+		((dvo_timing->vblank_hi << 8) | dvo_timing->vblank_lo);
+	panel_fixed_mode->clock = dvo_timing->clock * 10;
+	panel_fixed_mode->type = DRM_MODE_TYPE_PREFERRED;
+
+	if (dvo_timing->hsync_positive)
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_PHSYNC;
+	else
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_NHSYNC;
+
+	if (dvo_timing->vsync_positive)
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_PVSYNC;
+	else
+		panel_fixed_mode->flags |= DRM_MODE_FLAG_NVSYNC;
+
+	panel_fixed_mode->width_mm = (dvo_timing->himage_hi << 8) |
+		dvo_timing->himage_lo;
+	panel_fixed_mode->height_mm = (dvo_timing->vimage_hi << 8) |
+		dvo_timing->vimage_lo;
+
+	/* Some VBTs have bogus h/vsync_end values */
+	if (panel_fixed_mode->hsync_end > panel_fixed_mode->htotal) {
+		panel_fixed_mode->hsync_end = panel_fixed_mode->htotal;
+	}
+	if (panel_fixed_mode->vsync_end > panel_fixed_mode->vtotal) {
+		panel_fixed_mode->vsync_end = panel_fixed_mode->vtotal;
+	}
+
+	drm_mode_set_name(panel_fixed_mode);
+}
+
+static const struct fp_timing *
+get_lfp_fp_timing(const struct bdb_lfp_data *data,
+		  const struct bdb_lfp_data_ptrs *ptrs,
+		  int index)
+{
+	return (const struct fp_timing *)((u8*)data + ptrs->ptr[index].fp_timing.offset);
+}
+static void
+parse_lfp_panel_dtd(struct intel_display *display,
+			struct intel_panel *panel,
+			const struct bdb_lfp_data *lfp_data,
+			const struct bdb_lfp_data_ptrs *lfp_data_ptrs)
+{
+	const struct bdb_edid_dtd *panel_dvo_timing;
+	const struct fp_timing *fp_timing;
+	struct drm_display_mode *panel_fixed_mode;
+	int panel_type = panel->vbt.panel_type;
+
+	panel_dvo_timing = get_lfp_dvo_timing(lfp_data,
+						  lfp_data_ptrs,
+						  panel_type);
+
+	panel_fixed_mode = (struct drm_display_mode *)IOMalloc(sizeof(*panel_fixed_mode));
+	if (!panel_fixed_mode)
+		return;
+
+	fill_detail_timing_data(display, panel_fixed_mode, panel_dvo_timing);
+
+	panel->vbt.lfp_vbt_mode = panel_fixed_mode;
+
+	fp_timing = get_lfp_fp_timing(lfp_data,
+					  lfp_data_ptrs,
+					  panel_type);
+
+	/* check the resolution, just to be sure */
+	if (fp_timing->x_res == panel_fixed_mode->hdisplay &&
+		fp_timing->y_res == panel_fixed_mode->vdisplay) {
+		panel->vbt.bios_lvds_val = fp_timing->lvds_reg_val;
+
+	}
+}
+
+static const struct bdb_lfp_data_tail *
+get_lfp_data_tail(const struct bdb_lfp_data *data,
+		  const struct bdb_lfp_data_ptrs *ptrs)
+{
+	if (ptrs->panel_name.table_size)
+		return (const struct bdb_lfp_data_tail *) ((u8*)data + ptrs->panel_name.offset);
+	else
+		return NULL;
+}
+
+static void
+parse_lfp_data(struct intel_display *display,
+		   struct intel_panel *panel)
+{
+	const struct bdb_lfp_data *data;
+	const struct bdb_lfp_data_tail *tail;
+	const struct bdb_lfp_data_ptrs *ptrs;
+	int panel_type = panel->vbt.panel_type;
+
+	ptrs = (const struct bdb_lfp_data_ptrs *)bdb_find_section(display, BDB_LFP_DATA_PTRS);
+	if (!ptrs)
+		return;
+
+	data = (const struct bdb_lfp_data *)bdb_find_section(display, BDB_LFP_DATA);
+	if (!data)
+		return;
+
+	if (!panel->vbt.lfp_vbt_mode)
+		parse_lfp_panel_dtd(display, panel, data, ptrs);
+	
+	tail = get_lfp_data_tail(data, ptrs);
+	if (!tail)
+		return;
+
+	if (display->vbt.version >= 188) {
+		panel->vbt.seamless_drrs_min_refresh_rate =
+			tail->seamless_drrs_min_refresh_rate[panel_type];
+
+	}
+}
+
+
 int NBlue::intel_opregion_setup()
 {
 	struct intel_display *display=&display_base;
@@ -2738,15 +2883,13 @@ int NBlue::intel_opregion_setup()
 				
 				parse_panel_options(display, panel);
 				parse_generic_dtd(display, panel);
-				//parse_lfp_data(display, panel);
+				parse_lfp_data(display, panel);
 				parse_panel_driver_features(display, panel);
 				parse_power_conservation_features(display, panel);
 				parse_edp(display, panel);
 				parse_psr(display, panel);
 				
 				//intel_panel_add_edid_fixed_modes(connector, true);
-				
-
 				
 				intel_dp->lane_count = display->panel.vbt.edp.lanes;
 				crtc_state->lane_count = display->panel.vbt.edp.lanes;

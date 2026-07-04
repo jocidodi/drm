@@ -98,7 +98,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN14AppleIntelPort12linkTrainingEP18AGDCDPPortConfig_t",linkTraining, this->olinkTraining},
 			//{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
 			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
-			
+			//{"__ZN15AppleIntelPlane17configurePlaneCUSEP19FlipTransactionArgs10IGColorCtl",dovoid},
+			//{"__ZN15AppleIntelPlane18configurePlaneiCSCEP19FlipTransactionArgs10IGColorCtl",dovoid},
 			{"__ZN17AppleIntelPortHAL13getLinkConfigEP16IOFBDPLinkConfig",getLinkConfig, this->ogetLinkConfig},
 			
 			//{"__ZN31AppleIntelFramebufferController16hwRegsNeedUpdateEP21AppleIntelFramebufferP21AppleIntelDisplayPathP10CRTCParamsPK29IODetailedTimingInformationV2PN16AppleIntelScaler12SCALERPARAMSE",hwRegsNeedUpdate, this->ohwRegsNeedUpdate},
@@ -115,7 +116,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			
 		};
 		PANIC_COND(!RouteRequestPlus::routeAll(patcher, index, requests, address, size), "nblue","Failed to route symbols");
-		
 		
 		//cache + boot
 		static const uint8_t f7[]= {0x83, 0x78, 0x08, 0x00, 0x0f, 0x84, 0x32, 0x01, 0x00, 0x00};
@@ -220,6 +220,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN14AppleIntelPort7readAUXEjPvj",readAUX, this->oreadAUX},
 			//{"__ZN21AppleIntelFramebuffer12setAttributeEjm",fsetAttribute, this->ofsetAttribute},
 			//{"__ZN21AppleIntelFramebuffer19getPixelInformationEiiiP18IOPixelInformation",fgetPixelInformation, this->ofgetPixelInformation},
+			//{"__ZN15AppleIntelPlane18configurePlaneiCSCEP19FlipTransactionArgs10IGColorCtl",dovoid},
+			//{"__ZN15AppleIntelPlane17configurePlaneCUSEP19FlipTransactionArgs10IGColorCtl",dovoid},
 			{"__ZN21AppleIntelDisplayPath8initHDCPEv", dozero},
 			{"__ZN17AppleIntelPortHAL4initEP10PortConfig",AppleIntelPortHALinit, this->oAppleIntelPortHALinit},
 			
@@ -229,7 +231,6 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			{"__ZN21AppleIntelFramebuffer19prepareToEnterSleepEv",dovoid},
 			{"__ZN21AppleIntelFramebuffer18prepareToEnterWakeEv",dovoid},
 			*/
-			//{"__ZN21AppleIntelFramebuffer28isHorizontalBlankingRequiredEPK29IODetailedTimingInformationV2", dozero},
 			
 			
 		};
@@ -4086,7 +4087,11 @@ void intel_dp_stop_link_train(struct intel_dp *intel_dp)
 	}*/
 }
 
-
+static inline bool
+drm_dp_is_branch(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	return dpcd[DP_DOWNSTREAMPORT_PRESENT] & DP_DWN_STRM_PORT_PRESENT;
+}
 
 static void
 intel_dp_init_source_oui(struct intel_dp *intel_dp)
@@ -4106,6 +4111,14 @@ intel_dp_init_source_oui(struct intel_dp *intel_dp)
 	Gen11::callback->writeAUX(linkp,DP_SOURCE_OUI,oui,sizeof(oui));
 }
 
+static bool downstream_hpd_needs_d0(struct intel_dp *intel_dp)
+{
+
+	return intel_dp->dpcd[DP_DPCD_REV] == 0x11 &&
+		drm_dp_is_branch(intel_dp->dpcd) &&
+		intel_dp->downstream_ports[0] & DP_DS_PORT_HPD;
+}
+
 void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
 {
 	int ret, i;
@@ -4114,8 +4127,8 @@ void intel_dp_set_power(struct intel_dp *intel_dp, u8 mode)
 		return;
 	
 	if (mode != DP_SET_POWER_D0) {
-		//if (downstream_hpd_needs_d0(intel_dp))
-			//return;
+		if (downstream_hpd_needs_d0(intel_dp))
+			return;
 
 		Gen11::callback->writeAUX(linkp,DP_SET_POWER,&mode,1);
 
@@ -4252,8 +4265,100 @@ int drm_dp_read_dpcd_caps(struct intel_dp *intel_dp,
 	
 	return ret;
 }
+static u8 drm_dp_downstream_port_count(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	u8 port_count = dpcd[DP_DOWN_STREAM_PORT_COUNT] & DP_PORT_COUNT_MASK;
+
+	if (dpcd[DP_DOWNSTREAMPORT_PRESENT] & DP_DETAILED_CAP_INFO_AVAILABLE && port_count > 4)
+		port_count = 4;
+
+	return port_count;
+}
+
+enum drm_dp_mst_mode drm_dp_read_mst_cap(struct intel_dp *intel_dp,
+					 const u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	u8 mstm_cap;
+
+	if (dpcd[DP_DPCD_REV] < DP_DPCD_REV_12)
+		return DRM_DP_SST;
+
+	if (Gen11::callback->readAUX(linkp, DP_MSTM_CAP, &mstm_cap,1) < 0)
+		return DRM_DP_SST;
+
+	if (mstm_cap & DP_MST_CAP)
+		return DRM_DP_MST;
+
+	if (mstm_cap & DP_SINGLE_STREAM_SIDEBAND_MSG)
+		return DRM_DP_SST_SIDEBAND_MSG;
+
+	return DRM_DP_SST;
+}
+bool intel_dp_mst_source_support(struct intel_dp *intel_dp)
+{
+	return false;//intel_dp->mst.mgr.cbs;
+}
+static enum drm_dp_mst_mode
+intel_dp_mst_mode_choose(struct intel_dp *intel_dp,
+			 enum drm_dp_mst_mode sink_mst_mode)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+
+	//if (!display->params.enable_dp_mst)
+	//	return DRM_DP_SST;
+
+	if (!intel_dp_mst_source_support(intel_dp))
+		return DRM_DP_SST;
+
+	if (sink_mst_mode == DRM_DP_SST_SIDEBAND_MSG &&
+		!(intel_dp->dpcd[DP_MAIN_LINK_CHANNEL_CODING] & DP_CAP_ANSI_128B132B))
+		return DRM_DP_SST;
+
+	return sink_mst_mode;
+}
+
+static enum drm_dp_mst_mode
+intel_dp_mst_detect(struct intel_dp *intel_dp)
+{
+	struct intel_display *display = &NBlue::callback->display_base;
+	enum drm_dp_mst_mode sink_mst_mode;
+	enum drm_dp_mst_mode mst_detect;
+
+	sink_mst_mode = drm_dp_read_mst_cap(intel_dp, intel_dp->dpcd);
+
+	mst_detect = intel_dp_mst_mode_choose(intel_dp, sink_mst_mode);
+
+	return mst_detect;
+}
+int drm_dp_read_downstream_info(struct intel_dp *intel_dp,
+				const u8 dpcd[DP_RECEIVER_CAP_SIZE],
+				u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS])
+{
+	int ret;
+	u8 len;
+
+	memset(downstream_ports, 0, DP_MAX_DOWNSTREAM_PORTS);
+
+	if (!drm_dp_is_branch(dpcd) || dpcd[DP_DPCD_REV] == DP_DPCD_REV_10)
+		return 0;
 
 
+	len = drm_dp_downstream_port_count(dpcd);
+	if (!len)
+		return 0;
+	
+	intel_dp->para0.downspread=1;
+
+	if (dpcd[DP_DOWNSTREAMPORT_PRESENT] & DP_DETAILED_CAP_INFO_AVAILABLE)
+		len *= 4;
+
+	ret = Gen11::callback->readAUX(linkp, DP_DOWNSTREAM_PORT_0, downstream_ports, len);
+	if (ret < 0)
+		return ret;
+
+
+	return 0;
+}
 
 bool intel_dp_start_link_train(struct intel_dp *intel_dp)
 {
@@ -4436,7 +4541,31 @@ drm_dp_enhanced_frame_cap(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
 		(dpcd[9] & DP_ENHANCED_FRAME_CAP);
 }
 
+bool intel_dsc_source_support(const struct intel_crtc_state *crtc_state)
+{
+	struct intel_display *display =&NBlue::callback->display_base;
+	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 
+	if (!HAS_DSC(display))
+		return false;
+
+	if (DISPLAY_VER(display) == 11 && cpu_transcoder == TRANSCODER_A)
+		return false;
+
+	return true;
+}
+static inline int fxp_q4_from_int(int val_int)
+{
+	return val_int << 4;
+}
+int intel_dp_output_format_link_bpp_x16(enum intel_output_format output_format, int pipe_bpp)
+{
+
+	if (output_format == INTEL_OUTPUT_FORMAT_YCBCR420)
+		pipe_bpp /= 2;
+
+	return fxp_q4_from_int(pipe_bpp);
+}
 int
 intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 {
@@ -4444,6 +4573,7 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 	struct intel_dp *intel_dp=&display->intel_dp0;
 	int ret = 0, link_bpp_x16;
 	struct drm_display_mode *adjusted_mode = &pipe_config->hw.adjusted_mode;
+	struct intel_crtc_state *crtc_state=&display->crtc_state0;
 	
 	/*fixed_mode = intel_panel_fixed_mode(connector, adjusted_mode);
 	if (intel_dp_is_edp(intel_dp) && fixed_mode) {
@@ -4476,13 +4606,13 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 	if (ret)
 		return ret;
 	 
-	 if ((intel_dp_is_edp(intel_dp) && fixed_mode) ||
+	 if ((intel_dp_is_edp() && fixed_mode) ||
 		 pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420) {
 		 ret = intel_pfit_compute_config(pipe_config, conn_state);
 		 if (ret)
 			 return ret;
-	 }
-*/
+	 }*/
+
 
 	pipe_config->limited_color_range = false;
 		//intel_dp_limited_color_range(pipe_config, conn_state);
@@ -4492,11 +4622,13 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 			drm_dp_enhanced_frame_cap(intel_dp->dpcd);
 	
 
-	/*if (pipe_config->dsc.compression_enable)
+	pipe_config->dsc.compression_enable=intel_dsc_source_support(crtc_state);
+	
+	if (pipe_config->dsc.compression_enable)
 		link_bpp_x16 = pipe_config->dsc.compressed_bpp_x16;
 	else
 		link_bpp_x16 = intel_dp_output_format_link_bpp_x16(pipe_config->output_format,
-								   pipe_config->pipe_bpp);*/
+								   pipe_config->pipe_bpp);
 
 	/*if (intel_dp->mso_link_count) {
 		int n = intel_dp->mso_link_count;
@@ -4532,6 +4664,8 @@ intel_dp_compute_config(struct intel_crtc_state *pipe_config)
 
 	if (pipe_config->splitter.enable)
 		pipe_config->dp_m_n.data_m *= pipe_config->splitter.link_count;*/
+	
+	crtc_state->vrr.in_range =false;
 
 	//intel_vrr_compute_config(pipe_config, conn_state);
 	//intel_dp_compute_as_sdp(intel_dp, pipe_config);
@@ -5030,6 +5164,17 @@ static inline bool transcoder_is_dsi(enum transcoder transcoder)
 {
 	return transcoder == TRANSCODER_DSI_A || transcoder == TRANSCODER_DSI_C;
 }
+
+static u8 hsw_panel_transcoders(struct intel_display *display)
+{
+	u8 panel_transcoder_mask = BIT(TRANSCODER_EDP);
+
+	if (DISPLAY_VER(display) >= 11)
+		panel_transcoder_mask |= BIT(TRANSCODER_DSI_0) | BIT(TRANSCODER_DSI_1);
+
+	return panel_transcoder_mask;
+}
+
 static void intel_get_transcoder_timings(struct intel_crtc_state *pipe_config)
 {
 	struct intel_display *display = &NBlue::callback->display_base;
@@ -5142,8 +5287,8 @@ uint64_t  Gen11::linkTraining(void *that,void *param_1)
 		intel_dp->para->BitRate = (u8)getMember<u8>(that, kexticl ? 0x24 : 0x128);
 		intel_dp->para->NumberOfLanes = (u8)lane_count;
 		intel_dp->para->EnhancedFraming = (u8)getMember<u8>(that, kexticl ? 0x12 : 0x11a);
-		intel_dp->para->ASR = 0;//(u8)getMember<u8>(that, 0x118);
-		intel_dp->para->Downspread = (u8)getMember<u8>(that, kexticl ? 0x11 : 0x119);
+		intel_dp->para->ASR = 0;//(u8)getMember<u8>(that, 0x118);  //DP_EDP_CONFIGURATION_SET
+		intel_dp->para->Downspread = 0;//(u8)getMember<u8>(that, kexticl ? 0x11 : 0x119);
 		intel_dp->para->BitRate2 = intel_dp->para->BitRate;
 		intel_dp->para->NumberOfLanes2 = (u8)lane_count;
 		intel_dp->para->CR =0;
@@ -5185,12 +5330,14 @@ uint64_t Gen11::getLinkConfig(void *that,IOFBDPLinkConfig *param_1)
 	param_1->  maxDownspread=0;
 	
 	if (intel_dp->para0.t1Time) {
+		param_1->  downspread=intel_dp->para0.downspread;
+		param_1->  maxDownspread=param_1->  downspread;
 		param_1-> version=intel_dp->para0.version;		 // 8 bit high (major); 8 bit low (minor)
 		param_1->  bitRate=intel_dp->para0.bitRate;			 // same encoding as the spec
 		param_1-> t1Time=intel_dp->para0.t1Time;		 // minimum duration of the t1 pattern (microseconds)
 		param_1-> t2Time=intel_dp->para0.t2Time;		 // minimum duration of the t2 pattern
 		param_1-> t3Time=0;	 // minimum duration of the t3 pattern
-		param_1->  idlePatterns=0;   // minimum number of idle patterns
+		param_1->  idlePatterns=5;   // minimum number of idle patterns
 		param_1->  laneCount=intel_dp->para0.laneCount ;		 // number of lanes in the link
 		param_1->  voltage=intel_dp->para0.voltage;
 		param_1->  preEmphasis=intel_dp->para0.preEmphasis;
@@ -5199,6 +5346,8 @@ uint64_t Gen11::getLinkConfig(void *that,IOFBDPLinkConfig *param_1)
 	}
 	return ret;
 }
+
+
 
 void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 {
@@ -5216,6 +5365,13 @@ void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 			drm_dp_read_dpcd_caps(intel_dp,intel_dp->dpcd);
 			
 			Gen11::callback->readAUX(linkp,DP_EDP_DPCD_REV,&intel_dp->edp_dpcd, sizeof(intel_dp->edp_dpcd));
+			
+			drm_dp_read_downstream_info(intel_dp, intel_dp->dpcd,intel_dp->downstream_ports);
+			
+			intel_dp->mst_detect = intel_dp_mst_detect(intel_dp);
+			intel_dp->is_mst = intel_dp->mst_detect != DRM_DP_SST;
+			if (!intel_dp->is_mst) intel_dp->mst_detect = DRM_DP_SST;
+
 			memset(intel_dp->lttpr_common_caps, 0, sizeof(intel_dp->lttpr_common_caps));
 			intel_dp->use_max_params = intel_dp->edp_dpcd[0] < DP_EDP_14;
 			
@@ -5229,25 +5385,29 @@ void Gen11::SetupParams2 (void *param_2, CRTCParams *param_3)
 			intel_dp_set_max_sink_lane_count(intel_dp);
 			intel_dp_detect_dsc_caps(intel_dp, connector);
 			*/
-			
+			//hsw_get_pipe_config
 			//intel_ddi_init
 			intel_get_transcoder_timings(crtc_state);
-			intel_dp_compute_config(crtc_state);
 			icl_ddi_combo_get_config(crtc_state);
-			
+			intel_ddi_mso_get_config(crtc_state);
+			intel_dp_compute_config(crtc_state);
 			intel_ddi_compute_config_late(crtc_state);
+			
+			if (hsw_panel_transcoders(display) & BIT(crtc_state->cpu_transcoder)) {
+				u32 tmp = intel_de_read(display,
+							TRANS_DDI_FUNC_CTL(display, crtc_state->cpu_transcoder));
+
+				if ((tmp & TRANS_DDI_EDP_INPUT_MASK) == TRANS_DDI_EDP_INPUT_A_ONOFF)
+					crtc_state->pch_pfit.force_thru = true;
+			}
+
 			
 		}
 		
-		//param_3->TRANS_CLK_SEL=0x10000000;
 		param_3->TRANS_CLK_SEL=TGL_TRANS_CLK_SEL_PORT(display->port0);
 		param_3->TRANS_MSA_MISC =intel_ddi_set_dp_msa(false);
-		//param_3->TRANS_MSA_MISC = 0x21;
-		//param_3->TRANS_DDI_FUNC_CTL= 0x8a000102;
 		param_3->TRANS_DDI_FUNC_CTL= intel_ddi_transcoder_func_reg_val_get();
-		//param_3->PIPE_MISC= 0x1800010;
 		param_3->PIPE_MISC=bdw_set_pipe_misc();
-		//i9xx_set_pipeconf
 		param_3->TRANSCONF= 0xc0000024;
 		
 		int fScanoutHeight=getMember<int>(param_2, kexticl ? 0x2fc : 0xfc);

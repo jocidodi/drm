@@ -5501,6 +5501,24 @@ struct intel_crtc_state {
 	bool plane_color_changed;
 };
 
+enum drm_dp_mst_mode {
+	/**
+	 * @DRM_DP_SST: The sink does not support MST nor single stream sideband
+	 * messaging.
+	 */
+	DRM_DP_SST,
+	/**
+	 * @DRM_DP_MST: Sink supports MST, more than one stream and single
+	 * stream sideband messaging.
+	 */
+	DRM_DP_MST,
+	/**
+	 * @DRM_DP_SST_SIDEBAND_MSG: Sink supports only one stream and single
+	 * stream sideband messaging.
+	 */
+	DRM_DP_SST_SIDEBAND_MSG,
+};
+
 struct intel_dp {
 	u32 output_reg;
 	u32 DP;
@@ -5531,8 +5549,8 @@ struct intel_dp {
 	u8 edp_dpcd[5];
 	u8 lttpr_common_caps[8];
 	
-	/*u8 downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
-	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
+	u8 downstream_ports[0x10];
+	/*u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
 	u8 lttpr_common_caps[DP_LTTPR_COMMON_CAP_SIZE];
 	u8 lttpr_phy_caps[DP_MAX_LTTPR_COUNT][DP_LTTPR_PHY_CAP_SIZE];
 	u8 pcon_dsc_dpcd[DP_PCON_DSC_ENCODER_CAP_SIZE];
@@ -5586,7 +5604,7 @@ struct intel_dp {
 	struct intel_pps pps;
 
 	bool is_mst;
-	//enum drm_dp_mst_mode mst_detect;
+	enum drm_dp_mst_mode mst_detect;
 
 	/* connector directly attached - won't be use for modeset in mst world */
 	//struct intel_connector *attached_connector;
@@ -6862,6 +6880,8 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 #define   DP_PRE_EMPHASIS_MASK		REG_GENMASK(24, 22)
 #define   DP_PRE_EMPHASIS_0		REG_FIELD_PREP(DP_PRE_EMPHASIS_MASK, 0)
 #define USLEEP_RANGE_UPPER_BOUND	20000
+# define DP_DS_PORT_HPD			    (1 << 3)
+
 #define DP_DPCD_REV                         0x000
 # define DP_DPCD_REV_10                     0x10
 # define DP_DPCD_REV_11                     0x11
@@ -6869,11 +6889,24 @@ static inline constexpr i915_irq_regs make_i915_irq_regs(u32 imr, u32 ier, u32 i
 # define DP_DPCD_REV_13                     0x13
 # define DP_DPCD_REV_14                     0x14
 #define DP_RECEIVER_CAP_SIZE		0xf
+#define DP_DOWN_STREAM_PORT_COUNT	    0x007
+# define DP_PORT_COUNT_MASK		    0x0f
+#define DP_MAX_DOWNSTREAM_PORTS		    0x10
 #define USEC_PER_MSEC	1000L
+#define DP_MSTM_CAP			    0x021   /* 1.2 */
+# define DP_MST_CAP			    (1 << 0)
+#define DP_MAIN_LINK_CHANNEL_CODING         0x006
+# define DP_CAP_ANSI_8B10B		    (1 << 0)
+# define DP_CAP_ANSI_128B132B               (1 << 1)
+# define DP_SINGLE_STREAM_SIDEBAND_MSG      (1 << 1)
 #define DP_TRAINING_PATTERN_SET_PHY_REPEATER1		    0xf0010 /* 1.3 */
 #define DP_TRAINING_PATTERN_SET_PHY_REPEATER(dp_phy) \
 	DP_LTTPR_REG(dp_phy, DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
+#define DP_DOWNSTREAMPORT_PRESENT           0x005
+# define DP_DWN_STRM_PORT_PRESENT           (1 << 0)
 
+# define DP_DETAILED_CAP_INFO_AVAILABLE	    (1 << 4) /* DPI */
+#define DP_DOWNSTREAM_PORT_0		    0x80
 #define DP_TRAINING_LANE0_SET_PHY_REPEATER1		    0xf0011 /* 1.3 */
 #define DP_TRAINING_LANE0_SET_PHY_REPEATER(dp_phy) \
 	DP_LTTPR_REG(dp_phy, DP_TRAINING_LANE0_SET_PHY_REPEATER1)
@@ -6914,6 +6947,9 @@ enum drm_colorspace {
 	DRM_MODE_COLORIMETRY_BT601_YCC		= 15,
 	DRM_MODE_COLORIMETRY_COUNT
 };
+
+#define HAS_DSC(__display)		(DISPLAY_RUNTIME_INFO(__display)->has_dsc)
+
 # define DP_ENHANCED_FRAME_CAP		    (1 << 7)
 #define  SPLITTER_CONFIGURATION_MASK		REG_GENMASK(26, 25)
 #define  SPLITTER_CONFIGURATION_2_SEGMENT	REG_FIELD_PREP(SPLITTER_CONFIGURATION_MASK, 0)
