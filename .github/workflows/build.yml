@@ -1,0 +1,20 @@
+name: Build Kext
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Kext using Xcode
+      run: |
+        xcodebuild -project *.xcodeproj -configuration Release
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Compiled-Kext
+        path: build/Release/*.kext
